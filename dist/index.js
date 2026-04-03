@@ -304,7 +304,7 @@ class MicrosoftRewardsBot {
                 if (this.config.workers.doSpecialPromotions)
                     await this.workers.doSpecialPromotions(data);
                 if (this.config.workers.doMorePromotions)
-                    await this.workers.doMorePromotions(data, this.mainMobilePage);
+                    await this.workers.doMorePromotions(this.mainMobilePage);
                 const searchPoints = await this.browser.func.getSearchPoints();
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true);
                 this.cookies.mobile = await initialContext.cookies();

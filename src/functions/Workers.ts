@@ -51,10 +51,13 @@ export class Workers {
         this.bot.logger.info(this.bot.isMobile, 'DAILY-SET', 'All "Daily Set" items have been completed')
     }
 
-    public async doMorePromotions(data: DashboardData, page: Page) {
-        const rank = this.bot.browser.func.getAccountRank()
-        this.bot.logger.debug(this.bot.isMobile, 'RANK', `Current rank detected: ${rank}`)
+    public async doMorePromotions(page: Page) {
+        this.bot.logger.info(this.bot.isMobile, 'MORE-PROMOTIONS', 'Starting "More Promotions" items')
 
+        // getDashboardData already returns DashboardData object
+        const data = await this.bot.browser.func.getDashboardData()
+        const rank = this.bot.browser.func.getAccountRank()
+        
         const morePromotionsList = [...(data.morePromotions ?? [])]
         
         // If not the base "Member" rank (e.g. is Silver Member, Gold Member), we can do morePromotionsWithoutPromotionalItems
@@ -63,6 +66,7 @@ export class Workers {
             morePromotionsList.push(...(data.morePromotionsWithoutPromotionalItems ?? []))
         }
 
+        // Deduplicate and filter for uncompleted tasks
         const morePromotions: BasePromotion[] = [
             ...new Map(
                 morePromotionsList
@@ -71,8 +75,7 @@ export class Workers {
             ).values()
         ]
 
-        const activitiesUncompleted: BasePromotion[] =
-            morePromotions?.filter(x => this.isActivityUncompleted(x)) ?? []
+        const activitiesUncompleted = morePromotions.filter(x => this.isActivityUncompleted(x))
 
         if (!activitiesUncompleted.length) {
             this.bot.logger.info(
@@ -200,15 +203,12 @@ export class Workers {
 
         for (const activity of activities) {
             try {
-                const type = activity.promotionType?.toLowerCase() ?? ''
-                const name = activity.name?.toLowerCase() ?? ''
                 const offerId = activity.offerId
-                const destinationUrl = activity.destinationUrl?.toLowerCase() ?? ''
 
                 this.bot.logger.info(
                     this.bot.isMobile,
                     'ACTIVITY',
-                    `Processing activity | title="${activity.title}" | offerId=${offerId} | type=${type}`
+                    `Processing activity | title="${activity.title}" | offerId=${offerId} | type=${activity.promotionType}`
                 )
 
                 // Navigation to dashboard/earn page for UI-based solving
@@ -225,39 +225,12 @@ export class Workers {
                 const solvedViaUI = await this.solveActivityViaUI(activity, page)
                 
                 if (solvedViaUI) {
-                    continue // Successfully handled via UI
+                    this.bot.logger.debug(this.bot.isMobile, 'ACTIVITY', `Successfully completed activity via UI click | title="${activity.title}"`)
+                    continue 
                 }
 
-                switch (type) {
-                    // Quiz-like activities
-                    case 'quiz': {
-                        const basePromotion = activity as BasePromotion
-                        if (activity.pointProgressMax === 10 && destinationUrl.includes('pollscenarioid')) {
-                            await this.bot.activities.doUrlReward(basePromotion, page)
-                        } else {
-                            await this.bot.activities.doQuiz(basePromotion, page)
-                        }
-                        break
-                    }
-
-                    // UrlReward
-                    case 'urlreward': {
-                        const basePromotion = activity as BasePromotion
-                        if (name.includes('exploreonbing')) {
-                            await this.bot.activities.doSearchOnBing(basePromotion, page)
-                        } else if (destinationUrl.includes('form=dsetqu') || destinationUrl.includes('form=dwquiz') || destinationUrl.includes('filters=isconversation') || destinationUrl.includes('pollscenarioid')) {
-                            await this.bot.activities.doQuiz(basePromotion, page)
-                        } else {
-                            await this.bot.activities.doUrlReward(basePromotion, page)
-                        }
-                        break
-                    }
-
-                    // Others
-                    case 'findclippy': {
-                        break
-                    }
-                }
+                this.bot.logger.warn(this.bot.isMobile, 'ACTIVITY', `Could not find UI element for "${activity.title}". Skipping to avoid unnatural direct URL navigation.`)
+                continue // Skip if not found in UI to remain human-like
 
                 // Cooldown
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 15000))

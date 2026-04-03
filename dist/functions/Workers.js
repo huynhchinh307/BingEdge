@@ -32,21 +32,24 @@ class Workers {
         await this.solveActivities(activitiesUncompleted, page);
         this.bot.logger.info(this.bot.isMobile, 'DAILY-SET', 'All "Daily Set" items have been completed');
     }
-    async doMorePromotions(data, page) {
+    async doMorePromotions(page) {
+        this.bot.logger.info(this.bot.isMobile, 'MORE-PROMOTIONS', 'Starting "More Promotions" items');
+        // getDashboardData already returns DashboardData object
+        const data = await this.bot.browser.func.getDashboardData();
         const rank = this.bot.browser.func.getAccountRank();
-        this.bot.logger.debug(this.bot.isMobile, 'RANK', `Current rank detected: ${rank}`);
         const morePromotionsList = [...(data.morePromotions ?? [])];
-        // Only include items without promotional labels if the rank is not "Member"
+        // If not the base "Member" rank (e.g. is Silver Member, Gold Member), we can do morePromotionsWithoutPromotionalItems
         if (rank && rank !== 'Member') {
             this.bot.logger.info(this.bot.isMobile, 'MORE-PROMOTIONS', `Rank is ${rank}, adding extra promotions from non-promotional items list`);
             morePromotionsList.push(...(data.morePromotionsWithoutPromotionalItems ?? []));
         }
+        // Deduplicate and filter for uncompleted tasks
         const morePromotions = [
             ...new Map(morePromotionsList
                 .filter(Boolean)
                 .map(p => [p.offerId, p])).values()
         ];
-        const activitiesUncompleted = morePromotions?.filter(x => this.isActivityUncompleted(x)) ?? [];
+        const activitiesUncompleted = morePromotions.filter(x => this.isActivityUncompleted(x));
         if (!activitiesUncompleted.length) {
             this.bot.logger.info(this.bot.isMobile, 'MORE-PROMOTIONS', 'All "More Promotion" items have already been completed');
             return;
@@ -130,11 +133,8 @@ class Workers {
         let onDashboard = false;
         for (const activity of activities) {
             try {
-                const type = activity.promotionType?.toLowerCase() ?? '';
-                const name = activity.name?.toLowerCase() ?? '';
                 const offerId = activity.offerId;
-                const destinationUrl = activity.destinationUrl?.toLowerCase() ?? '';
-                this.bot.logger.info(this.bot.isMobile, 'ACTIVITY', `Processing activity | title="${activity.title}" | offerId=${offerId} | type=${type}`);
+                this.bot.logger.info(this.bot.isMobile, 'ACTIVITY', `Processing activity | title="${activity.title}" | offerId=${offerId} | type=${activity.promotionType}`);
                 // Navigation to dashboard/earn page for UI-based solving
                 if (!onDashboard) {
                     this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD', `Navigating to ${targetUrl} for UI-based solving`);
@@ -146,39 +146,11 @@ class Workers {
                 // UI-based solver as requested: Hover -> Click -> Wait -> Close
                 const solvedViaUI = await this.solveActivityViaUI(activity, page);
                 if (solvedViaUI) {
-                    continue; // Successfully handled via UI
+                    this.bot.logger.debug(this.bot.isMobile, 'ACTIVITY', `Successfully completed activity via UI click | title="${activity.title}"`);
+                    continue;
                 }
-                switch (type) {
-                    // Quiz-like activities
-                    case 'quiz': {
-                        const basePromotion = activity;
-                        if (activity.pointProgressMax === 10 && destinationUrl.includes('pollscenarioid')) {
-                            await this.bot.activities.doUrlReward(basePromotion, page);
-                        }
-                        else {
-                            await this.bot.activities.doQuiz(basePromotion, page);
-                        }
-                        break;
-                    }
-                    // UrlReward
-                    case 'urlreward': {
-                        const basePromotion = activity;
-                        if (name.includes('exploreonbing')) {
-                            await this.bot.activities.doSearchOnBing(basePromotion, page);
-                        }
-                        else if (destinationUrl.includes('form=dsetqu') || destinationUrl.includes('form=dwquiz') || destinationUrl.includes('filters=isconversation') || destinationUrl.includes('pollscenarioid')) {
-                            await this.bot.activities.doQuiz(basePromotion, page);
-                        }
-                        else {
-                            await this.bot.activities.doUrlReward(basePromotion, page);
-                        }
-                        break;
-                    }
-                    // Others
-                    case 'findclippy': {
-                        break;
-                    }
-                }
+                this.bot.logger.warn(this.bot.isMobile, 'ACTIVITY', `Could not find UI element for "${activity.title}". Skipping to avoid unnatural direct URL navigation.`);
+                continue; // Skip if not found in UI to remain human-like
                 // Cooldown
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 15000));
             }

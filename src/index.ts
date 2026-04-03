@@ -461,7 +461,7 @@ export class MicrosoftRewardsBot {
                 // Solve promotions in mobile context
                 if (this.config.workers.doDailySet) await this.workers.doDailySet(data, this.mainMobilePage)
                 if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
-                if (this.config.workers.doMorePromotions) await this.workers.doMorePromotions(data, this.mainMobilePage)
+                if (this.config.workers.doMorePromotions) await this.workers.doMorePromotions(this.mainMobilePage)
 
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)

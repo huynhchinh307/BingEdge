@@ -6,7 +6,7 @@ export declare class Workers {
     bot: MicrosoftRewardsBot;
     constructor(bot: MicrosoftRewardsBot);
     doDailySet(data: DashboardData, page: Page): Promise<void>;
-    doMorePromotions(data: DashboardData, page: Page): Promise<void>;
+    doMorePromotions(page: Page): Promise<void>;
     doAppPromotions(data: AppDashboardData): Promise<void>;
     doSpecialPromotions(data: DashboardData): Promise<void>;
     private solveActivities;
