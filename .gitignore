@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# ========================
+# dist/ — chỉ ignore file nhạy cảm, KHÔNG ignore cả thư mục
+# ========================
+
+# Accounts & stats runtime files
+dist/accounts.json
+dist/account_stats.json
+dist/.accounts.bak.json
+
+# Sessions & fingerprints (dữ liệu đăng nhập thật)
+dist/browser/sessions/
+dist/browser/fingerprints/
+
+# ========================
+# SENSITIVE - DO NOT COMMIT
+# ========================
+
+# Account credentials (root level)
+accounts.json
+accounts.dev.json
+accounts.main.json
+
+# Config files with personal settings (root level)
+config.json
+!src/config.json
+
+# Source-level overrides (keep .example files)
+src/accounts.json
+
+# ========================
+# Development / temporary
+# ========================
+.dev/
+.vscode/
+diagnostics/
+note
+.DS_Store
+.playwright-chromium-installed
+
+# Logs
+*.log

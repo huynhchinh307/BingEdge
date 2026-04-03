@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bing Profile Manager Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f111a;
+            --bg-card: rgba(30, 33, 43, 0.6);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #ec4899;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            overflow-x: hidden;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto 3rem auto;
+            animation: fadeInDown 0.8s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #f472b6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Config form styles */
+        .cfg-section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--primary);
+            font-weight: 700;
+            margin: 1.5rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .cfg-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .cfg-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .cfg-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem 1.5rem;
+        }
+
+        .browser-type-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .browser-type-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .browser-type-btn.active {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.15);
+            color: #a5b4fc;
+            font-weight: 600;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 22px;
+            transition: .3s;
+        }
+
+        .slider::before {
+            content: '';
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: .3s;
+        }
+
+        .toggle input:checked+.slider {
+            background: var(--primary);
+        }
+
+        .toggle input:checked+.slider::before {
+            transform: translateX(18px);
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1600px;
+        }
+
+        .stats-bar {
+            width: 100%;
+            max-width: 1600px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin: 0 auto 1.5rem auto;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .stat-card .stat-sub {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .stat-bar-track {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.3rem;
+        }
+
+        .stat-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease, background 0.6s ease;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        /* Log Drawer */
+        .log-drawer {
+            position: fixed;
+            top: 0;
+            right: -580px;
+            width: 560px;
+            height: 100vh;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-card);
+            border-left: 1px solid var(--border-color);
+            box-shadow: -20px 0 60px rgba(0, 0, 0, 0.6);
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 1.5rem;
+            gap: 0;
+        }
+
+        .log-drawer.open {
+            right: 0;
+        }
+
+        .log-drawer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+        }
+
+        .log-drawer-overlay.open {
+            display: block;
+        }
+
+        /* Floating toggle button */
+        .log-fab {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 998;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.1rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border: none;
+            border-radius: 50px;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+            transition: transform 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.01em;
+        }
+
+        .log-fab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(99, 102, 241, 0.6);
+        }
+
+        .log-fab-badge {
+            background: #10b981;
+            border-radius: 50px;
+            padding: 0.1rem 0.45rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .accounts-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            text-align: left;
+        }
+
+        .accounts-table th,
+        .accounts-table td {
+            padding: 0.85rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .accounts-table th {
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .accounts-table tr {
+            transition: background 0.2s ease;
+        }
+
+        .accounts-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .accounts-table td {
+            vertical-align: middle;
+        }
+
+        /* Checkbox styling */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .custom-checkbox {
+            appearance: none;
+            width: 1.25rem;
+            height: 1.25rem;
+            border: 2px solid var(--text-muted);
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .custom-checkbox:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .custom-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 45%;
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .status-badge.queued {
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+        }
+
+        /* Rank Badge Styles */
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 100px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .rank-badge::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(to bottom right,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0) 40%,
+                    rgba(255, 255, 255, 0.2) 50%,
+                    rgba(255, 255, 255, 0) 60%,
+                    rgba(255, 255, 255, 0) 100%);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% {
+                transform: translateX(-100%) rotate(45deg);
+            }
+
+            100% {
+                transform: translateX(100%) rotate(45deg);
+            }
+        }
+
+        .rank-gold {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            color: #451a03;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .rank-silver {
+            background: linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%);
+            color: #0f172a;
+            box-shadow: 0 0 15px rgba(148, 163, 184, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .rank-member {
+            background: rgba(99, 102, 241, 0.1);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .rank-na {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+
+        .status-badge.active::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-badge.queued::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 2px solid #f59e0b;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.6rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            outline: none;
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn.open-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn.mobile-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn.bot-btn:hover {
+            background: var(--success);
+            border-color: var(--success);
+            color: #fff;
+        }
+
+        .btn.running {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
+            pointer-events: none;
+            position: relative;
+        }
+
+        .btn.running::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            margin-left: 5px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn.stop-btn {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn.stop-btn:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 2rem auto;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: rgba(30, 33, 43, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideInRight 0.3s ease forwards;
+            min-width: 250px;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.hiding {
+            animation: slideOutRight 0.3s ease forwards;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .terminal-panel {
+            margin-top: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .terminal-header {
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .terminal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .terminal-content {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            background: #050510;
+            color: #10b981;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border-radius: 12px;
+            line-height: 1.4;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .system-ansi-color {
+            color: #f472b6;
+        }
+
+        /* Forms and Modals */
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            outline: none;
+            transition: all 0.2s;
+            margin-top: 0.4rem;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeInUp 0.3s ease;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: var(--danger);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Profile Dashboard</h1>
+            <p>A beautiful manager to control all your browser sessions</p>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="openAddAccountModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Account
+            </button>
+            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="openConfigModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+                Settings
+            </button>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="statsBar">
+        <div class="stat-card">
+            <div class="stat-label">CPU Usage</div>
+            <div class="stat-value" id="statCpu">—</div>
+            <div class="stat-sub" id="statCpuSub">—</div>
+            <div class="stat-bar-track">
+                <div class="stat-bar-fill" id="statCpuBar" style="width:0%"></div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">RAM Usage</div>
+            <div class="stat-value" id="statRam">—</div>
+            <div class="stat-sub" id="statRamSub">—</div>
+            <div class="stat-bar-track">
+                <div class="stat-bar-fill" id="statRamBar" style="width:0%"></div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Sessions</div>
+            <div class="stat-value" id="statSessions">—</div>
+            <div class="stat-sub" id="statSessionsSub">Bot processes running</div>
+            <div class="stat-bar-track">
+                <div class="stat-bar-fill" id="statSessionsBar" style="width:0%; background: var(--primary);"></div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">System Uptime</div>
+            <div class="stat-value" id="statUptime">—</div>
+            <div class="stat-sub" id="statUptimeSub">—</div>
+            <div class="stat-bar-track">
+                <div class="stat-bar-fill" id="statUptimeBar" style="width:100%; background: rgba(99,102,241,0.5);">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="main-layout">
+            <div class="glass-panel accounts-section">
+                <div id="loader" style="text-align: center;">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="accountsListContainer" style="display: none;">
+                    <div class="toolbar">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" id="selectAll" class="custom-checkbox"
+                                    onchange="toggleSelectAll()">
+                            </div>
+                            <span style="font-weight: 500; cursor: pointer;"
+                                onclick="document.getElementById('selectAll').click()">Select All</span>
+                            <span id="selectedCount" style="color: var(--text-muted); font-size: 0.9rem;">(0
+                                selected)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <label
+                                style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;">Threads:</label>
+                            <input type="number" id="threadCount" min="1" max="20" value="2"
+                                style="width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.07);border:1px solid var(--border-color);border-radius:8px;color:#fff;font-size:0.9rem;text-align:center;"
+                                title="Number of bots to run in parallel">
+                            <button id="runBotsBtn" class="btn bot-btn" style="padding: 0.75rem 1.25rem;"
+                                onclick="runSelectedBots()">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="18" height="18">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Run Selected Bots
+                            </button>
+                            <button id="stopBotsBtn" class="btn stop-btn"
+                                style="padding: 0.75rem 1.25rem; display:none;" onclick="stopBatchRun()">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="18" height="18">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                </svg>
+                                Stop Queue
+                            </button>
+                        </div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="accounts-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;"></th>
+                                    <th>Account</th>
+                                    <th>Points</th>
+                                    <th>Rank</th>
+                                    <th>Status</th>
+                                    <th style="text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <p>No accounts found in accounts.json</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Log Drawer Overlay -->
+        <div class="log-drawer-overlay" id="logDrawerOverlay" onclick="closeLogDrawer()"></div>
+
+        <!-- Log Drawer -->
+        <div class="log-drawer" id="logDrawer">
+            <div class="terminal-header">
+                <h3 id="terminalTitle" style="font-size:1rem;">Live Logs - No Selection</h3>
+                <button onclick="closeLogDrawer()"
+                    style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"
+                    title="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="terminal-panel" style="padding:0;border:none;box-shadow:none;background:transparent;">
+                <div id="terminal" class="terminal-content">Waiting for a task to start...</div>
+            </div>
+        </div>
+
+        <!-- Floating Log Button -->
+        <button class="log-fab" id="logFab" onclick="toggleLogDrawer()" title="Open Live Logs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14,2 14,8 20,8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10,9 9,9 8,9" />
+            </svg>
+            Live Logs
+            <span class="log-fab-badge" id="logFabBadge">0</span>
+        </button>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <div id="deleteConfirmModal" class="modal-overlay">
+        <div class="modal" style="max-width: 400px; padding: 2rem; text-align: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--danger)"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48"
+                style="margin: 0 auto 1.5rem auto; display: block;">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                </path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Confirm Deletion</h3>
+            <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem;">Are you sure you want to
+                delete <br><strong id="deleteAccountEmail" style="color: #fff;"></strong>?<br>This action cannot be
+                undone.</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="btn" style="padding: 0.75rem 1.5rem; flex: 1;"
+                    onclick="document.getElementById('deleteConfirmModal').style.display='none'">Cancel</button>
+                <button class="btn btn-primary"
+                    style="padding: 0.75rem 1.5rem; flex: 1; background: var(--danger); border-color: var(--danger);"
+                    onclick="executeDelete()">Delete Account</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addAccountModal" class="modal-overlay">
+        <div class="modal" style="max-width: 900px; width: 95%;">
+            <div class="modal-header" style="padding: 1rem 1.5rem;">
+                <h3 style="font-size: 1.1rem;">Add / Edit Account</h3>
+                <button class="close-btn" onclick="document.getElementById('addAccountModal').style.display='none'">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div style="padding: 1rem 1.5rem;">
+                <form id="addAccountForm" onsubmit="event.preventDefault(); submitAddAccount();">
+                    <input type="hidden" id="accFormMode" value="add">
+                    <input type="hidden" id="accFormOriginalEmail" value="">
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Microsoft Email *</label>
+                            <input type="email" id="accEmail" required class="form-input" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Password *</label>
+                            <input type="text" id="accPass" required class="form-input" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Recovery Email</label>
+                            <input type="email" id="accRecovery" class="form-input" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">TOTP Secret</label>
+                            <input type="text" id="accTotp" class="form-input" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Geo Locale</label>
+                            <input type="text" id="accGeoLocale" class="form-input" value="auto" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Language Code</label>
+                            <input type="text" id="accLangCode" class="form-input" value="en" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">Proxy Configuration</h4>
+                        <div class="cfg-field" style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.8rem;">Proxy Quick Paste <span style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
+                            <input type="text" id="accProxyString" class="form-input" placeholder="proxy.example.com:8080:user:pass" oninput="parseProxyString(this.value)" style="padding: 0.4rem 0.6rem;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 100px 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
+                            <div class="cfg-field">
+                                <label style="font-size: 0.8rem;">Proto</label>
+                                <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;" onchange="syncProxyString()">
+                                    <option value="http">HTTP</option>
+                                    <option value="socks5">SOCKS5</option>
+                                </select>
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.8rem;">Host</label>
+                                <input type="text" id="accProxyUrl" class="form-input" placeholder="host" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.8rem;">Port</label>
+                                <input type="number" id="accProxyPort" class="form-input" placeholder="80" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.8rem;">User</label>
+                                <input type="text" id="accProxyUser" class="form-input" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.8rem;">Pass</label>
+                                <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px;">
+                        <div style="display: flex; gap: 1.5rem;">
+                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                                <span>Axios Proxy</span>
+                                <label class="toggle"><input type="checkbox" id="accProxyAxios"><span class="slider"></span></label>
+                             </label>
+                             <div style="height: 20px; width: 1px; background: rgba(255,255,255,0.1);"></div>
+                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                                <span>Save Mobile FP</span>
+                                <label class="toggle"><input type="checkbox" id="accFpMobile" checked><span class="slider"></span></label>
+                             </label>
+                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                                <span>Save Desktop FP</span>
+                                <label class="toggle"><input type="checkbox" id="accFpDesktop" checked><span class="slider"></span></label>
+                             </label>
+                        </div>
+                        
+                        <button type="submit" id="accSubmitBtn" class="btn btn-primary" style="padding: 0.6rem 2rem; font-size: 0.95rem; min-width: 200px;">Save Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="configModal" class="modal-overlay">
+        <div class="modal" style="max-width: 900px; width: 95%;">
+            <div class="modal-header" style="padding: 1rem 1.5rem;">
+                <h3 style="font-size: 1.1rem;">Global Configuration (config.json)</h3>
+                <button class="close-btn" onclick="document.getElementById('configModal').style.display='none'">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div style="padding: 1rem 1.5rem;">
+                <!-- General Section -->
+                <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; align-items: end;">
+                    <div class="cfg-field">
+                        <label style="font-size: 0.8rem;">Base URL</label>
+                        <input id="cfg_baseURL" type="text" class="form-input" value="https://rewards.bing.com" style="padding: 0.4rem 0.6rem;">
+                    </div>
+                    <div class="cfg-field">
+                        <label style="font-size: 0.8rem;">Session Path</label>
+                        <input id="cfg_sessionPath" type="text" class="form-input" value="browser/sessions" style="padding: 0.4rem 0.6rem;">
+                    </div>
+                    <div class="cfg-field">
+                        <label style="font-size: 0.8rem;">Clusters</label>
+                        <input id="cfg_clusters" type="number" class="form-input" min="1" value="1" style="padding: 0.4rem 0.6rem;">
+                    </div>
+                    <div class="cfg-field">
+                        <label style="font-size: 0.8rem;">Global Timeout</label>
+                        <input id="cfg_globalTimeout" type="number" class="form-input" value="120000" style="padding: 0.4rem 0.6rem;">
+                    </div>
+                </div>
+
+                <!-- Browser & Engine Section -->
+                <div style="display: grid; grid-template-columns: 1.5fr 2fr; gap: 1.5rem; margin-bottom: 1.25rem;">
+                    <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.5rem; display: block; font-weight: 600;">Browser Engine</label>
+                        <div style="display:flex; gap:0.5rem;">
+                            <label style="flex:1; cursor:pointer; position: relative;">
+                                <input type="radio" name="cfg_browserType" id="cfg_browserType_chromium" value="chromium" style="display:none;">
+                                <div class="browser-type-btn" id="btn_chromium" onclick="selectBrowserType('chromium')" style="padding: 0.4rem; font-size: 0.85rem;">Chromium</div>
+                            </label>
+                            <label style="flex:1; cursor:pointer; position: relative;">
+                                <input type="radio" name="cfg_browserType" id="cfg_browserType_edge" value="edge" style="display:none;">
+                                <div class="browser-type-btn" id="btn_edge" onclick="selectBrowserType('edge')" style="padding: 0.4rem; font-size: 0.85rem;">Edge</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem 1rem;">
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Headless</span><label class="toggle"><input type="checkbox" id="cfg_headless"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Zero Pts</span><label class="toggle"><input type="checkbox" id="cfg_runOnZeroPoints"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Diagnostic</span><label class="toggle"><input type="checkbox" id="cfg_errorDiagnostics"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Debug</span><label class="toggle"><input type="checkbox" id="cfg_debugLogs"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Bing Local</span><label class="toggle"><input type="checkbox" id="cfg_searchOnBingLocalQueries"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Proxy QE</span><label class="toggle"><input type="checkbox" id="cfg_proxyQueryEngine"><span class="slider"></span></label></label>
+                    </div>
+                </div>
+
+                <!-- Workers & Search Group -->
+                <div style="display: grid; grid-template-columns: 2fr 3fr; gap: 1.5rem; margin-bottom: 1.25rem;">
+                    <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Active Workers</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;">
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Daily Set</span><label class="toggle"><input type="checkbox" id="cfg_doDailySet"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Special Promos</span><label class="toggle"><input type="checkbox" id="cfg_doSpecialPromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>More Promos</span><label class="toggle"><input type="checkbox" id="cfg_doMorePromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Punch Cards</span><label class="toggle"><input type="checkbox" id="cfg_doPunchCards"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>App Promos</span><label class="toggle"><input type="checkbox" id="cfg_doAppPromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Desktop</span><label class="toggle"><input type="checkbox" id="cfg_doDesktopSearch"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Mobile</span><label class="toggle"><input type="checkbox" id="cfg_doMobileSearch"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Check In</span><label class="toggle"><input type="checkbox" id="cfg_doDailyCheckIn"><span class="slider"></span></label></label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Search Settings</label>
+                        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <div class="cfg-field">
+                                <label style="font-size: 0.7rem;">Visit T. (ms)</label>
+                                <input id="cfg_searchResultVisitTime" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.7rem;">S. Delay Min</label>
+                                <input id="cfg_searchDelayMin" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.7rem;">S. Delay Max</label>
+                                <input id="cfg_searchDelayMax" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.7rem;">R. Delay Min</label>
+                                <input id="cfg_readDelayMin" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.7rem;">R. Delay Max</label>
+                                <input id="cfg_readDelayMax" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; margin-bottom: 0.5rem;">
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Scroll Random</span><label class="toggle"><input type="checkbox" id="cfg_scrollRandomResults"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Click Random</span><label class="toggle"><input type="checkbox" id="cfg_clickRandomResults"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Parallel Search</span><label class="toggle"><input type="checkbox" id="cfg_parallelSearching"><span class="slider"></span></label></label>
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.75rem;">Query Engines (comma separated)</label>
+                            <input id="cfg_queryEngines" type="text" class="form-input" placeholder="google, wikipedia..." style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webhook & Save Section -->
+                <div style="display: flex; gap: 1.5rem; align-items: center; background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
+                    <div style="min-width: 155px;">
+                        <label class="toggle-label" style="margin:0; font-size: 0.85rem; font-weight: 600;">
+                            <span>Discord Webhook</span>
+                            <label class="toggle"><input type="checkbox" id="cfg_discordEnabled"><span class="slider"></span></label>
+                        </label>
+                    </div>
+                    <div class="cfg-field" style="flex:1;">
+                        <input id="cfg_discordUrl" type="text" class="form-input" placeholder="https://discord.com/api/webhooks/..." style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    </div>
+                    <button class="btn btn-primary" style="padding: 0.6rem 2.5rem; font-size: 1rem; min-width: 180px;" onclick="saveConfig()">Save All Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let refreshInterval;
+        let logInterval = null;
+        let currentLogKey = null;
+
+        async function fetchAccounts() {
+            try {
+                const res = await fetch(`${API_URL}/api/accounts`);
+                const data = await res.json();
+
+                if (data.success) {
+                    renderAccounts(data.accounts);
+                } else {
+                    showToast(data.error || 'Failed to load accounts', 'error');
+                }
+            } catch (err) {
+                // Silently fail loop if server goes down
+            }
+        }
+
+        const selectedEmails = new Set();
+
+        function toggleSelect(email, checked) {
+            if (checked) selectedEmails.add(email);
+            else selectedEmails.delete(email);
+            updateSelectedCount();
+        }
+
+        function toggleSelectAll() {
+            const isChecked = document.getElementById('selectAll').checked;
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = isChecked;
+                if (isChecked) selectedEmails.add(cb.value);
+                else selectedEmails.delete(cb.value);
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').innerText = `(${selectedEmails.size} selected)`;
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            if (checkboxes.length > 0) {
+                selectAll.checked = selectedEmails.size === checkboxes.length;
+            }
+        }
+
+        let batchRunning = false;
+        let batchCancelled = false;
+        const queuedEmails = new Set(); // track accounts waiting in queue
+
+        function stopBatchRun() {
+            batchCancelled = true;
+            batchRunning = false;
+            document.getElementById('stopBotsBtn').style.display = 'none';
+            document.getElementById('runBotsBtn').disabled = false;
+            showToast('Queue stopped — running bots will finish their current session.', 'error');
+        }
+
+        async function waitForBotFinish(email) {
+            // Phase 1: Wait for bot to START (isActiveBot = true), max 15s
+            await new Promise(resolve => {
+                let attempts = 0;
+                const check = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const res = await fetch(`${API_URL}/api/accounts`);
+                        const data = await res.json();
+                        const acc = data.accounts?.find(a => a.email === email);
+                        if (acc?.isActiveBot || attempts >= 8) { // max ~15s
+                            clearInterval(check);
+                            resolve();
+                        }
+                    } catch { clearInterval(check); resolve(); }
+                }, 2000);
+            });
+
+            // Phase 2: Wait for bot to FINISH (isActiveBot = false)
+            return new Promise(resolve => {
+                const check = setInterval(async () => {
+                    try {
+                        const res = await fetch(`${API_URL}/api/accounts`);
+                        const data = await res.json();
+                        const acc = data.accounts?.find(a => a.email === email);
+                        if (!acc?.isActiveBot) {
+                            clearInterval(check);
+                            resolve();
+                        }
+                    } catch { clearInterval(check); resolve(); }
+                }, 3000);
+            });
+        }
+
+        async function runSelectedBots() {
+            if (selectedEmails.size === 0) {
+                showToast('Please select at least one account', 'error');
+                return;
+            }
+            if (batchRunning) {
+                showToast('Batch already running!', 'error');
+                return;
+            }
+
+            const threads = Math.max(1, Math.min(20, parseInt(document.getElementById('threadCount').value) || 2));
+            const queue = [...selectedEmails];
+            const total = queue.length;
+            let activeCount = 0; // số thread ĐANG chạy
+            let finished = 0;
+
+            // Mark ALL selected as queued upfront
+            queue.forEach(e => queuedEmails.add(e));
+            renderAccounts(lastAccounts);
+
+            batchRunning = true;
+            batchCancelled = false;
+            document.getElementById('stopBotsBtn').style.display = '';
+            document.getElementById('runBotsBtn').disabled = true;
+            showToast(`🚀 Queue: ${total} bots, ${threads} thread(s) running`, 'success');
+
+            function checkAllDone() {
+                if (activeCount === 0 && queue.length === 0) {
+                    batchRunning = false;
+                    batchCancelled = false;
+                    queuedEmails.clear();
+                    document.getElementById('stopBotsBtn').style.display = 'none';
+                    document.getElementById('runBotsBtn').disabled = false;
+                    showToast(`✅ All done! ${finished}/${total} bots completed.`, 'success');
+                    renderAccounts(lastAccounts);
+                }
+            }
+
+            async function runOne(email) {
+                if (batchCancelled) {
+                    queuedEmails.delete(email);
+                    checkAllDone();
+                    return;
+                }
+                activeCount++;
+                queuedEmails.delete(email);
+                await openSession(email, 'bot', true);
+                await new Promise(r => setTimeout(r, 2000));
+                await waitForBotFinish(email);
+                activeCount--;
+                finished++;
+                showToast(`✓ ${email.split('@')[0]} done (${finished}/${total})`, 'success');
+
+                // Lấy acc tiếp theo nếu còn trong queue
+                if (!batchCancelled && queue.length > 0) {
+                    const next = queue.shift();
+                    queuedEmails.delete(next);
+                    runOne(next); // KHÔNG await — slot này tự duy trì
+                }
+
+                // Sau khi gọi runOne tiếp hoặc queue rỗng, check done
+                checkAllDone();
+            }
+
+            // Khởi động pool ban đầu
+            const initialBatch = queue.splice(0, threads);
+            initialBatch.forEach(e => queuedEmails.delete(e));
+            initialBatch.forEach(email => runOne(email)); // KHÔNG await Promise.all
+        }
+
+        let lastAccounts = [];
+
+        function renderAccounts(accounts) {
+            lastAccounts = accounts;
+            document.getElementById('loader').style.display = 'none';
+            const listContainer = document.getElementById('accountsListContainer');
+            const emptyState = document.getElementById('emptyState');
+            const tbody = document.getElementById('accountsTableBody');
+
+            if (accounts.length === 0) {
+                listContainer.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            listContainer.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            const newHTML = accounts.map(acc => {
+                const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile;
+                const isQueued = queuedEmails.has(acc.email);
+                const statusHtml = isRunning
+                    ? `<span class="status-badge active">Running</span>`
+                    : isQueued
+                        ? `<span class="status-badge queued">Queued</span>`
+                        : `<span class="status-badge">Idle</span>`;
+
+                const getBtnState = (type) => {
+                    let isActive = false;
+                    let label = '';
+                    let colorClass = '';
+                    let svg = '';
+
+                    if (type === 'bot') {
+                        isActive = acc.isActiveBot;
+                        label = 'Bot';
+                        colorClass = 'bot-btn';
+                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                    } else if (type === 'mobile') {
+                        isActive = acc.isActiveMobile;
+                        label = 'Mob';
+                        colorClass = 'mobile-btn';
+                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
+                    } else {
+                        isActive = acc.isActiveDesktop;
+                        label = 'PC';
+                        colorClass = 'open-btn';
+                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
+                    }
+
+                    if (isActive) {
+                        return `
+                            <div style="display: flex; overflow: hidden; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05);">
+                                <button class="btn stop-btn" style="border: none; border-radius: 0; padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                </button>
+                                <button class="btn open-btn" style="border: none; border-left: 1px solid var(--border-color); border-radius: 0; padding: 0.3rem 0.45rem;" onclick="viewLogs('${acc.email}', '${type}')" title="View Logs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                </button>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <button class="btn ${colorClass}" style="padding: 0.3rem 0.45rem;" onclick="openSession('${acc.email}', '${type}')" title="Start ${label}">
+                            ${svg}
+                        </button>
+                    `;
+                };
+
+                const isChecked = selectedEmails.has(acc.email) ? 'checked' : '';
+
+                return `
+                    <tr>
+                        <td style="padding-left: 1.5rem;">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" class="custom-checkbox item-checkbox" value="${acc.email}" ${isChecked} onchange="toggleSelect('${acc.email}', this.checked)">
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size: 1rem; font-weight: 500;">${acc.email}</div>
+                            <div style="color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin-top: 0.2rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                ${acc.proxy}
+                            </div>
+                        </td>
+                        <td>
+                            ${(() => {
+                        if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.82rem;color:#f59e0b;">Running...</span></div>`;
+                        if (acc.stats) {
+                            const s = acc.stats;
+                            const earned = s.total >= 0 ? `+${s.total}` : `${s.total}`;
+                            const color = s.total > 0 ? '#10b981' : s.total < 0 ? '#ef4444' : 'var(--text-muted)';
+                            const dur = s.duration ? (s.duration >= 3600 ? `${(s.duration / 3600).toFixed(1)}h` : s.duration >= 60 ? `${Math.floor(s.duration / 60)}m` : `${Math.round(s.duration)}s`) : '';
+                            const when = s.completedAt ? (() => { const diff = Math.floor((Date.now() - new Date(s.completedAt)) / 60000); return diff < 2 ? 'just now' : diff < 60 ? `${diff}m ago` : `${Math.floor(diff / 60)}h ago`; })() : '';
+                            return `<div style="line-height:1.4">
+                                        <div style="font-size:1rem;font-weight:700;color:#fff;">${s.newBalance?.toLocaleString() ?? '—'} <span style="font-size:0.8rem;color:${color};">(${earned})</span></div>
+                                        <div style="font-size:0.75rem;color:var(--text-muted);">${dur ? dur + ' · ' : ''}${when}</div>
+                                    </div>`;
+                        } else if (acc.points) {
+                            const when = acc.lastUpdate !== 'Never' ? (() => {
+                                const diff = Math.floor((Date.now() - new Date(acc.lastUpdate)) / 60000);
+                                if (diff < 2) return 'just now';
+                                if (diff < 60) return `${diff}m ago`;
+                                if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+                                return new Date(acc.lastUpdate).toLocaleDateString();
+                            })() : 'Never';
+                            return `<div style="line-height:1.4">
+                                        <div style="font-size:1rem;font-weight:700;color:#fff;">${acc.points.toLocaleString()} <span style="font-size:0.8rem;color:var(--text-muted);">(saved)</span></div>
+                                        <div style="font-size:0.75rem;color:var(--text-muted);">Updated: ${when}</div>
+                                    </div>`;
+                        }
+                        return '<span style="color:var(--text-muted);font-size:0.82rem;">—</span>';
+                    })()}
+                        </td>
+                        <td>
+                            ${(() => {
+                        const r = acc.rank || '';
+                        let cls = 'rank-na';
+                        if (r.includes('Gold')) cls = 'rank-gold';
+                        else if (r.includes('Silver')) cls = 'rank-silver';
+                        else if (r.includes('Member')) cls = 'rank-member';
+
+                        return `<span class="rank-badge ${cls}">${r || 'N/A'}</span>`;
+                    })()}
+                        </td>
+                        <td>
+                            ${statusHtml}
+                        </td>
+                        <td style="padding-right: 1.5rem;">
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                                ${getBtnState('desktop')}
+                                ${getBtnState('mobile')}
+                                ${getBtnState('bot')}
+                                <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--primary); border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);" onclick="openEditModal('${acc.email}')" title="Edit Account">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" onclick="confirmDelete('${acc.email}')" title="Delete Account">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (tbody.innerHTML !== newHTML) {
+                tbody.innerHTML = newHTML;
+                updateSelectedCount(); // reset UI checkboxes properly based on set
+            }
+        }
+
+        async function openSession(email, type, silent = false) {
+            try {
+                if (!silent) {
+                    let name = type;
+                    if (type === 'mobile') name = 'Mobile profile';
+                    if (type === 'desktop') name = 'Desktop profile';
+                    if (type === 'bot') name = 'Automated Bot tasks';
+                    showToast(`Starting ${name}...`, 'success');
+                }
+                fetchAccounts();
+                const res = await fetch(`${API_URL}/api/open`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, type })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    fetchAccounts();
+                    if (!silent) viewLogs(email, type); // chỉ tự mở log khi user bấm tay
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (err) {
+                showToast('Failed to start session', 'error');
+            }
+        }
+
+        async function stopSession(email, type) {
+            try {
+                showToast(`Stopping...`, 'success');
+                const res = await fetch(`${API_URL}/api/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, type })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Session stopped', 'success');
+                    fetchAccounts();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (err) {
+                showToast('Failed to stop session', 'error');
+            }
+        }
+
+        async function fetchLogs() {
+            if (!currentLogKey) return;
+            try {
+                const [email, type] = currentLogKey.split('-');
+                const res = await fetch(`${API_URL}/api/logs?email=${encodeURIComponent(email)}&type=${type}`);
+                const data = await res.json();
+                if (data.success) {
+                    const terminal = document.getElementById('terminal');
+                    const cleanLogs = data.logs.join('\n').replace(/\[(?:3[0-9]|9[0-9])m/g, '') // remove bash ansi
+                        .replace(/\[[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}[^\]]*\]/g, match => `<span class="system-ansi-color">${match}</span>`);
+
+                    const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 50;
+                    if (data.logs.length === 0) {
+                        terminal.innerHTML = '<i>Waiting for process logs...</i>';
+                    } else {
+                        terminal.innerHTML = cleanLogs;
+                    }
+                    if (isScrolledToBottom) {
+                        terminal.scrollTop = terminal.scrollHeight;
+                    }
+                    // Update badge
+                    const badge = document.getElementById('logFabBadge');
+                    if (data.logs.length > 0) {
+                        badge.textContent = data.logs.length;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            } catch { }
+        }
+
+        function toggleLogDrawer() {
+            const drawer = document.getElementById('logDrawer');
+            if (drawer.classList.contains('open')) closeLogDrawer();
+            else openLogDrawer();
+        }
+
+        function openLogDrawer() {
+            document.getElementById('logDrawer').classList.add('open');
+            document.getElementById('logDrawerOverlay').classList.add('open');
+        }
+
+        function closeLogDrawer() {
+            document.getElementById('logDrawer').classList.remove('open');
+            document.getElementById('logDrawerOverlay').classList.remove('open');
+        }
+
+        function viewLogs(email, type) {
+            currentLogKey = `${email}-${type}`;
+            document.getElementById('terminalTitle').innerText = `Live Logs: ${email} (${type})`;
+            document.getElementById('terminal').innerHTML = 'Connecting...';
+            if (!logInterval) logInterval = setInterval(fetchLogs, 1000);
+            fetchLogs();
+            openLogDrawer();
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                ${type === 'success'
+                    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
+                    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--danger)"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'}
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Account Logic
+        let actToDelete = null;
+
+        function confirmDelete(email) {
+            actToDelete = email;
+            document.getElementById('deleteAccountEmail').innerText = email;
+            document.getElementById('deleteConfirmModal').style.display = 'flex';
+        }
+
+        async function executeDelete() {
+            if (!actToDelete) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/accounts/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: actToDelete })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Xóa tài khoản thành công', 'success');
+                    document.getElementById('deleteConfirmModal').style.display = 'none';
+                    if (selectedEmails.has(actToDelete)) {
+                        selectedEmails.delete(actToDelete);
+                        updateSelectedCount();
+                    }
+                    fetchAccounts();
+                } else throw new Error(data.error);
+            } catch (e) {
+                showToast(e.message || 'Lỗi khi xóa tài khoản', 'error');
+            }
+        }
+
+        function openAddAccountModal() {
+            document.getElementById('addAccountForm').reset();
+            document.getElementById('addAccountModal').querySelector('h3').innerText = 'Add New Account';
+            document.getElementById('accFormMode').value = 'add';
+            document.getElementById('accFormOriginalEmail').value = '';
+            document.getElementById('accSubmitBtn').innerText = 'Add to accounts.json';
+            // Restore defaults after reset
+            document.getElementById('accGeoLocale').value = 'auto';
+            document.getElementById('accLangCode').value = 'en';
+            document.getElementById('accFpMobile').checked = true;
+            document.getElementById('accFpDesktop').checked = true;
+            document.getElementById('addAccountModal').style.display = 'flex';
+        }
+
+        async function openEditModal(email) {
+            try {
+                const res = await fetch(`${API_URL}/api/accounts/get?email=${encodeURIComponent(email)}`);
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+                const acc = data.account;
+
+                document.getElementById('addAccountForm').reset();
+                document.getElementById('addAccountModal').querySelector('h3').innerText = 'Edit Account';
+                document.getElementById('accFormMode').value = 'edit';
+                document.getElementById('accFormOriginalEmail').value = email;
+                document.getElementById('accSubmitBtn').innerText = 'Save Changes';
+
+                document.getElementById('accEmail').value = acc.email || '';
+                document.getElementById('accPass').value = acc.password || '';
+                document.getElementById('accTotp').value = acc.totpSecret || '';
+                document.getElementById('accRecovery').value = acc.recoveryEmail || '';
+                document.getElementById('accGeoLocale').value = acc.geoLocale || 'auto';
+                document.getElementById('accLangCode').value = acc.langCode || 'en';
+
+                const proxy = acc.proxy || {};
+                let rawUrl = proxy.url || '';
+                let proto = 'http';
+                if (rawUrl.includes('://')) {
+                    const parts = rawUrl.split('://');
+                    proto = parts[0];
+                    rawUrl = parts[1];
+                }
+
+                document.getElementById('accProxyProtoSelect').value = proto;
+
+                document.getElementById('accProxyUrl').value = rawUrl;
+                document.getElementById('accProxyPort').value = proxy.port || '';
+                document.getElementById('accProxyUser').value = proxy.username || '';
+                document.getElementById('accProxyPass').value = proxy.password || '';
+                document.getElementById('accProxyAxios').checked = !!proxy.proxyAxios;
+                syncProxyString();
+
+                const fp = acc.saveFingerprint || {};
+                document.getElementById('accFpMobile').checked = fp.mobile !== false;
+                document.getElementById('accFpDesktop').checked = fp.desktop !== false;
+
+                document.getElementById('addAccountModal').style.display = 'flex';
+            } catch (e) {
+                showToast('Failed to load account: ' + e.message, 'error');
+            }
+        }
+
+        function parseProxyString(str) {
+            let proto = 'http';
+            let workingStr = str;
+
+            if (str.includes('://')) {
+                const parts = str.split('://');
+                proto = parts[0].toLowerCase();
+                workingStr = parts[1];
+            } else if (str.toLowerCase().startsWith('socks5:')) {
+                proto = 'socks5';
+                workingStr = str.substring(7);
+            } else if (str.toLowerCase().startsWith('http:')) {
+                proto = 'http';
+                workingStr = str.substring(5);
+            }
+
+            document.getElementById('accProxyProtoSelect').value = proto;
+
+            const parts = workingStr.split(':');
+            if (parts.length >= 2) {
+                document.getElementById('accProxyUrl').value = parts[0] || '';
+                document.getElementById('accProxyPort').value = parts[1] || '';
+                document.getElementById('accProxyUser').value = parts[2] || '';
+                document.getElementById('accProxyPass').value = parts[3] || '';
+            }
+        }
+
+        function syncProxyString() {
+            const proto = document.getElementById('accProxyProtoSelect').value || 'http';
+            const host = document.getElementById('accProxyUrl').value;
+            const port = document.getElementById('accProxyPort').value;
+            const user = document.getElementById('accProxyUser').value;
+            const pass = document.getElementById('accProxyPass').value;
+
+            let str = `${proto}://${host}:${port}`;
+            if (user && pass) str += `:${user}:${pass}`;
+            document.getElementById('accProxyString').value = str;
+        }
+
+        async function submitAddAccount() {
+            const mode = document.getElementById('accFormMode').value;
+            const originalEmail = document.getElementById('accFormOriginalEmail').value;
+
+            const acc = {
+                email: document.getElementById('accEmail').value,
+                password: document.getElementById('accPass').value,
+                totpSecret: document.getElementById('accTotp').value || "",
+                recoveryEmail: document.getElementById('accRecovery').value || "",
+                geoLocale: document.getElementById('accGeoLocale').value || "auto",
+                langCode: document.getElementById('accLangCode').value || "en",
+                proxy: {
+                    proxyAxios: document.getElementById('accProxyAxios').checked,
+                    url: (document.getElementById('accProxyProtoSelect').value || 'http') + "://" + (document.getElementById('accProxyUrl').value || ""),
+                    port: parseInt(document.getElementById('accProxyPort').value) || 0,
+                    username: document.getElementById('accProxyUser').value || "",
+                    password: document.getElementById('accProxyPass').value || ""
+                },
+                saveFingerprint: {
+                    mobile: document.getElementById('accFpMobile').checked,
+                    desktop: document.getElementById('accFpDesktop').checked
+                }
+            };
+
+            const btn = document.getElementById('accSubmitBtn');
+            const cachedText = btn.innerText;
+            btn.innerText = 'Saving...';
+            btn.disabled = true;
+
+            try {
+                let url, body;
+                if (mode === 'edit') {
+                    url = `${API_URL}/api/accounts/update`;
+                    body = JSON.stringify({ originalEmail, account: acc });
+                } else {
+                    url = `${API_URL}/api/accounts/add`;
+                    body = JSON.stringify(acc);
+                }
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(mode === 'edit' ? 'Account updated!' : 'Account added!', 'success');
+                    document.getElementById('addAccountModal').style.display = 'none';
+                    fetchAccounts();
+                } else throw new Error(data.error);
+            } catch (e) {
+                showToast(e.message || 'Failed to save account', 'error');
+            } finally {
+                btn.innerText = cachedText;
+                btn.disabled = false;
+            }
+        }
+
+        // Config Logic
+        async function openConfigModal() {
+            document.getElementById('configModal').style.display = 'flex';
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+                const cfg = JSON.parse(data.config);
+
+                // General
+                setVal('cfg_baseURL', cfg.baseURL);
+                setVal('cfg_sessionPath', cfg.sessionPath);
+                setVal('cfg_clusters', cfg.clusters);
+                setVal('cfg_globalTimeout', cfg.globalTimeout);
+                setCheck('cfg_headless', cfg.headless);
+                setCheck('cfg_runOnZeroPoints', cfg.runOnZeroPoints);
+                setCheck('cfg_errorDiagnostics', cfg.errorDiagnostics);
+                setCheck('cfg_debugLogs', cfg.debugLogs);
+                setCheck('cfg_searchOnBingLocalQueries', cfg.searchOnBingLocalQueries);
+                setCheck('cfg_proxyQueryEngine', cfg.proxy?.queryEngine);
+                selectBrowserType(cfg.browserType || 'chromium');
+
+                // Workers
+                const w = cfg.workers || {};
+                setCheck('cfg_doDailySet', w.doDailySet);
+                setCheck('cfg_doSpecialPromotions', w.doSpecialPromotions);
+                setCheck('cfg_doMorePromotions', w.doMorePromotions);
+                setCheck('cfg_doPunchCards', w.doPunchCards);
+                setCheck('cfg_doAppPromotions', w.doAppPromotions);
+                setCheck('cfg_doDesktopSearch', w.doDesktopSearch);
+                setCheck('cfg_doMobileSearch', w.doMobileSearch);
+                setCheck('cfg_doDailyCheckIn', w.doDailyCheckIn);
+                setCheck('cfg_doReadToEarn', w.doReadToEarn);
+
+                // Search
+                const ss = cfg.searchSettings || {};
+                setVal('cfg_searchResultVisitTime', ss.searchResultVisitTime);
+                setVal('cfg_searchDelayMin', ss.searchDelay?.min);
+                setVal('cfg_searchDelayMax', ss.searchDelay?.max);
+                setVal('cfg_readDelayMin', ss.readDelay?.min);
+                setVal('cfg_readDelayMax', ss.readDelay?.max);
+                setCheck('cfg_scrollRandomResults', ss.scrollRandomResults);
+                setCheck('cfg_clickRandomResults', ss.clickRandomResults);
+                setCheck('cfg_parallelSearching', ss.parallelSearching);
+                setVal('cfg_queryEngines', (ss.queryEngines || []).join(', '));
+
+                // Webhook Discord
+                setCheck('cfg_discordEnabled', cfg.webhook?.discord?.enabled);
+                setVal('cfg_discordUrl', cfg.webhook?.discord?.url);
+
+            } catch (e) {
+                showToast('Error loading config: ' + e.message, 'error');
+                document.getElementById('configModal').style.display = 'none';
+            }
+        }
+
+        function setVal(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.value = val !== undefined && val !== null ? val : '';
+        }
+        function setCheck(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!val;
+        }
+        function getVal(id) { return document.getElementById(id)?.value || ''; }
+        function getNum(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+        function getCheck(id) { return document.getElementById(id)?.checked || false; }
+
+        function selectBrowserType(type) {
+            ['chromium', 'edge'].forEach(t => {
+                const radio = document.getElementById(`cfg_browserType_${t}`);
+                const btn = document.getElementById(`btn_${t}`);
+                if (!radio || !btn) return;
+                const isSelected = t === type;
+                radio.checked = isSelected;
+                btn.classList.toggle('active', isSelected);
+            });
+        }
+
+        async function saveConfig() {
+            try {
+                // Reconstruct full config object from form
+                const existing_res = await fetch(`${API_URL}/api/config`);
+                const existing_data = await existing_res.json();
+                let cfg = {};
+                if (existing_data.success) cfg = JSON.parse(existing_data.config);
+
+                cfg.baseURL = getVal('cfg_baseURL');
+                cfg.sessionPath = getVal('cfg_sessionPath');
+                cfg.clusters = getNum('cfg_clusters');
+                cfg.globalTimeout = getNum('cfg_globalTimeout');
+                cfg.headless = getCheck('cfg_headless');
+                cfg.runOnZeroPoints = getCheck('cfg_runOnZeroPoints');
+                cfg.errorDiagnostics = getCheck('cfg_errorDiagnostics');
+                cfg.debugLogs = getCheck('cfg_debugLogs');
+                cfg.searchOnBingLocalQueries = getCheck('cfg_searchOnBingLocalQueries');
+                cfg.proxy = { ...(cfg.proxy || {}), queryEngine: getCheck('cfg_proxyQueryEngine') };
+                cfg.browserType = document.querySelector('input[name="cfg_browserType"]:checked')?.value || 'chromium';
+
+                cfg.workers = {
+                    doDailySet: getCheck('cfg_doDailySet'),
+                    doSpecialPromotions: getCheck('cfg_doSpecialPromotions'),
+                    doMorePromotions: getCheck('cfg_doMorePromotions'),
+                    doPunchCards: getCheck('cfg_doPunchCards'),
+                    doAppPromotions: getCheck('cfg_doAppPromotions'),
+                    doDesktopSearch: getCheck('cfg_doDesktopSearch'),
+                    doMobileSearch: getCheck('cfg_doMobileSearch'),
+                    doDailyCheckIn: getCheck('cfg_doDailyCheckIn'),
+                    doReadToEarn: getCheck('cfg_doReadToEarn')
+                };
+
+                const engines = getVal('cfg_queryEngines')
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+
+                cfg.searchSettings = {
+                    ...(cfg.searchSettings || {}),
+                    scrollRandomResults: getCheck('cfg_scrollRandomResults'),
+                    clickRandomResults: getCheck('cfg_clickRandomResults'),
+                    parallelSearching: getCheck('cfg_parallelSearching'),
+                    queryEngines: engines,
+                    searchResultVisitTime: getNum('cfg_searchResultVisitTime'),
+                    searchDelay: { min: getNum('cfg_searchDelayMin'), max: getNum('cfg_searchDelayMax') },
+                    readDelay: { min: getNum('cfg_readDelayMin'), max: getNum('cfg_readDelayMax') }
+                };
+
+                cfg.webhook = {
+                    ...(cfg.webhook || {}),
+                    discord: {
+                        enabled: getCheck('cfg_discordEnabled'),
+                        url: getVal('cfg_discordUrl')
+                    }
+                };
+
+                const res = await fetch(`${API_URL}/api/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: JSON.stringify(cfg, null, 4) })
+                });
+                const resData = await res.json();
+                if (resData.success) {
+                    showToast('Configuration saved!', 'success');
+                    document.getElementById('configModal').style.display = 'none';
+                } else throw new Error(resData.error);
+            } catch (e) {
+                showToast(e.message || 'Error saving config', 'error');
+            }
+        }
+
+        function usageColor(pct) {
+            if (pct < 60) return '#10b981'; // green
+            if (pct < 85) return '#f59e0b'; // yellow
+            return '#ef4444';               // red
+        }
+
+        function formatUptime(secs) {
+            const d = Math.floor(secs / 86400);
+            const h = Math.floor((secs % 86400) / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            if (d > 0) return `${d}d ${h}h ${m}m`;
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch(`${API_URL}/api/stats`);
+                const d = await res.json();
+                if (!d.success) return;
+
+                document.getElementById('statCpu').innerText = `${d.cpu}%`;
+                document.getElementById('statCpuSub').innerText = `${d.cpuModel} · ${d.cpuCores} cores`;
+                const cpuBar = document.getElementById('statCpuBar');
+                cpuBar.style.width = `${d.cpu}%`;
+                cpuBar.style.background = usageColor(d.cpu);
+
+                document.getElementById('statRam').innerText = `${d.ramUsed} GB`;
+                document.getElementById('statRamSub').innerText = `of ${d.ramTotal} GB total · ${d.ramPercent}%`;
+                const ramBar = document.getElementById('statRamBar');
+                ramBar.style.width = `${d.ramPercent}%`;
+                ramBar.style.background = usageColor(d.ramPercent);
+
+                document.getElementById('statSessions').innerText = d.activeSessions;
+                const maxSessions = 10;
+                document.getElementById('statSessionsBar').style.width = `${Math.min(d.activeSessions / maxSessions * 100, 100)}%`;
+
+                document.getElementById('statUptime').innerText = formatUptime(d.uptime);
+                document.getElementById('statUptimeSub').innerText = `${d.platform} · online`;
+            } catch (e) { /* silent */ }
+        }
+
+        fetchAccounts();
+        fetchStats();
+        refreshInterval = setInterval(fetchAccounts, 2000);
+        setInterval(fetchStats, 2000);
+    </script>
+</body>
+
+</html>
