@@ -1,56 +1,113 @@
-# 🌟 Microsoft Rewards Script (Patchright Edition)
+# 🌟 Microsoft Rewards Bot (Patchright Edition)
 
-An advanced, high-performance automation tool for Microsoft Rewards, redesigned with a premium SaaS-like interface and human-like interaction algorithms.
+<div align="center">
 
-![Dashboard Preview](https://via.placeholder.com/1200x600/1e1e2e/ffffff?text=Premium+Rewards+Dashboard+Interface)
+![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)
+![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-green?style=for-the-badge)
+![Database](https://img.shields.io/badge/database-SQLite-orange?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-red?style=for-the-badge)
 
-## ✨ Key Features
+**An advanced, high-performance automation ecosystem for Microsoft Rewards, redesigned with a premium Glassmorphism dashboard and 100% database-driven architecture.**
 
-### 🚀 Premium Dashboard UI
-- **Real-time Analytics**: Monitor all your accounts from a single, beautiful dashboard.
-- **Rank Visualization**: Custom badges for **Gold Member**, **Silver Member**, and **Member** with luxury shine and glow effects.
-- **Compact Modals**: Redesigned **Add Account** and **Global Configuration** windows with a 3-column grid layout — NO scrolling required.
+[Explore Features](#-key-features) • [Installation](#-getting-started) • [Architecture](#-system-architecture) • [Disclaimer](#-disclaimer)
 
-### 🛡️ Human-Like Behavior (Stealth Mode)
-- **Strict UI Interaction**: For "More Promotions" and "Daily Set", the bot strictly follows a **Find -> Hover -> Click** pattern on the dashboard and `/earn` page.
-- **No Direct Navigation**: Eliminated `page.goto(url)` fallbacks that lead to detection. If the button isn't there, we don't click it.
-- **Randomized Delays**: Professional-grade delay algorithms between every action to mimic human study and reading patterns.
+</div>
 
-### 📊 Advanced Automation
-- **Account Rank Aware**: Automatically adjusts task load based on your rank. Silver/Gold accounts perform extra promotional tasks for maximum points.
-- **Multi-Worker Support**: Parallel search, daily sets, special promos, punch cards, and more.
-- **Proxy Protocol Support**: Full support for HTTP, HTTPS, SOCKS4, and SOCKS5 proxies per account.
+---
 
-## 🛠️ Requirements
-- **Node.js**: >= 22.0.0
-- **Git**: For source control and updates.
+## ✨ Why Choose This Bot?
+
+Unlike legacy scripts that rely on messy JSON files and basic automation, the **Patchright Edition** is built for professionals who demand stability, speed, and stealth.
+
+### 🚀 Premium Dashboard UI (Glassmorphism)
+- **Real-time Analytics**: Monitor all your accounts from a single, stunning dashboard.
+- **Glassmorphism Design**: A sleek, modern interface with transparency and blur effects.
+- **Dynamic Thread Control**: Adjust execution clusters and active workers on the fly.
+- **Rank Visualization**: Custom luxury badges for **Gold**, **Silver**, and **Standard** members.
+
+### 🛡️ 100% SQLite Persistence
+- **Thread-Safe Storage**: No more file locking issues or corrupted JSON files.
+- **Automatic Migration**: Old `accounts.json` and `config.json` are automatically imported into SQLite.
+- **Concurrent Access**: Dashboard and bot processes read/write simultaneously using WAL mode.
+
+### 🧠 AI-Powered Stealth Searching
+- **Natural Interaction**: Uses **Gemini AI** (or OpenAI-compatible endpoints) to generate human-like search queries.
+- **Human Behavior**: Strictly follows a **Find -> Hover -> Click** pattern — NO direct URL navigation that leads to detection.
+- **Multi-Engine Support**: Search across Google, Wikipedia, Reddit, and Local Bings.
+
+---
+
+## 🛠️ System Architecture
+
+```mermaid
+graph TD
+    UI[Dashboard UI - Glassmorphism] -->|API /api/config| DB[(SQLite Database)]
+    UI -->|API /api/accounts| DB
+    DB -->|Load Config/Accounts| Bot[Bot Engine - Patchright]
+    Bot -->|Update Status/Points| DB
+    Bot -->|AI Query| AI[Gemini / AI Endpoint]
+    Bot -->|Execution| Browsers[Edge / Chromium Instances]
+    Bot -.->|Global Proxy Locking| Locks[.locks Directory]
+```
+
+---
 
 ## 🚀 Getting Started
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/huynhchinh307/BingEdge.git
-   ```
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Run the Dashboard**:
-   ```bash
-   npm run dashboard
-   ```
+### 1. Requirements
+- **Node.js**: `v22.0.0` or higher
+- **Git**: For updates and source control.
 
-## ⚙️ Configuration
-Access the **Global Configuration** modal directly from the dashboard to tweak:
-- **Search Settings**: Visit time, delay min/max, read delay.
-- **Workers**: Toggle specific tasks (Daily Set, Mobile Search, Desktop Search, etc.).
-- **Discord Webhook**: Get real-time notifications about your account status.
+### 2. Quick Install
+```bash
+# Clone the repository
+git clone https://github.com/huynhchinh307/BingEdge.git
+cd BingEdge
 
-## ⚠️ Disclaimer
-This project is for educational purposes only. Use it at your own risk. Automated interaction with Microsoft Rewards may violate their Terms of Service.
+# Install dependencies
+npm install
 
-## 🤝 Contribution
-Found a bug? Have a feature request? Feel free to open an issue or submit a pull request!
+# Build the project
+npm run build
+```
+
+### 3. Launching
+```bash
+# Start the Dashboard
+npm run dashboard
+```
+*Access the interface at `http://localhost:3000`*
 
 ---
-*Maintained by [huynhchinh307](https://github.com/huynhchinh307)*
+
+## ⚙️ Advanced Features
+
+| Feature | Description | Status |
+| :--- | :--- | :---: |
+| **Global Proxy Lock** | Prevents multiple accounts from using the same proxy simultaneously to avoid bans. | ✅ |
+| **Multi-Threading** | Run up to 20 parallel browser instances with shared resource management. | ✅ |
+| **Discord Hook** | Real-time notifications for status updates, errors, and daily points total. | ✅ |
+| **Auto-Diagnosis** | Automated error detection and recovery logic for stalled browser sessions. | ✅ |
+| **Fingerprint Spoofing** | Each account generates a unique browser fingerprint (UA, WebGL, etc.). | ✅ |
+
+---
+
+## 🏗️ Project Structure
+
+- `src/index.ts`: The main entry point for account orchestration.
+- `src/util/Database.ts`: Core SQLite engine and data migration logic.
+- `scripts/main/dashboard.js`: High-performance API server for the dashboard.
+- `scripts/main/dashboard.html`: The frontend UI (Vanila CSS + JS).
+- `browser/`: Directory for persistent browser session storage.
+
+---
+
+## ⚠️ Disclaimer
+
+This project is for **educational purposes only**. Use it at your own risk. Automated interaction with Microsoft Rewards may violate their Terms of Service. The maintainers are not responsible for any account bans or losses.
+
+---
+
+<div align="center">
+    Maintained with ❤️ by <a href="https://github.com/huynhchinh307">huynhchinh307</a>
+</div>
