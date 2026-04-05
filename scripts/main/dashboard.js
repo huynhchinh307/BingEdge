@@ -62,6 +62,77 @@ function getDb() {
                 updated_at       INTEGER NOT NULL DEFAULT 0
             );
         `);
+
+        // Khởi tạo config mặc định nếu chưa có
+        const cfgCount = (_db.prepare('SELECT COUNT(*) as c FROM app_config').get()).c;
+        if (cfgCount === 0) {
+            const defaultConfig = {
+                baseURL: 'https://rewards.bing.com',
+                sessionPath: 'sessions',
+                headless: false,
+                browserType: 'edge',
+                runOnZeroPoints: false,
+                clusters: 1,
+                errorDiagnostics: true,
+                debugLogs: false,
+                workers: {
+                    doDailySet: true,
+                    doSpecialPromotions: true,
+                    doMorePromotions: true,
+                    doPunchCards: true,
+                    doAppPromotions: true,
+                    doDesktopSearch: true,
+                    doMobileSearch: true,
+                    doDailyCheckIn: true,
+                    doReadToEarn: true
+                },
+                searchOnBingLocalQueries: false,
+                globalTimeout: 120000,
+                searchSettings: {
+                    queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
+                    scrollRandomResults: true,
+                    clickRandomResults: true,
+                    parallelSearching: false,
+                    searchResultVisitTime: '5-10s',
+                    searchDelay: { min: '2s', max: '5s' },
+                    readDelay: { min: '1s', max: '3s' }
+                },
+                proxy: {
+                    enable: false,
+                    url: '',
+                    port: '',
+                    username: '',
+                    password: '',
+                    queryEngine: false
+                },
+                consoleLogFilter: {
+                    enabled: false,
+                    mode: 'blacklist',
+                    levels: ['debug'],
+                    keywords: [],
+                    regexPatterns: []
+                },
+                webhook: {
+                    discord: {
+                        enabled: false,
+                        url: ''
+                    },
+                    webhookLogFilter: {
+                        enabled: false,
+                        mode: 'blacklist',
+                        levels: ['error'],
+                        keywords: [],
+                        regexPatterns: []
+                    }
+                },
+                geminiApiKey: '',
+                geminiModel: 'gemini-1.5-flash',
+                geminiEndpoint: 'https://generativelanguage.googleapis.com'
+            };
+            _db.prepare('INSERT INTO app_config (id, data) VALUES (1, ?)').run(JSON.stringify(defaultConfig, null, 2));
+            log('INFO', '[DB] Initialized app_config with default values.');
+        }
+
         return _db;
     } catch (e) {
         log('ERROR', '[DB] Could not open rewards_data.db:', e.message);

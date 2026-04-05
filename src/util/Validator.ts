@@ -62,24 +62,24 @@ const WebhookSchema = z.object({
 
 // Config
 export const ConfigSchema = z.object({
-    baseURL: z.string(),
-    sessionPath: z.string(),
-    headless: z.boolean(),
+    baseURL: z.string().optional().default('https://rewards.bing.com'),
+    sessionPath: z.string().optional().default('sessions'),
+    headless: z.boolean().optional().default(false),
     browserType: z.enum(['chromium', 'edge']).optional().default('chromium'),
     runOnZeroPoints: z.boolean().optional().default(false),
-    clusters: z.number().int().nonnegative(),
-    errorDiagnostics: z.boolean().default(true),
+    clusters: z.number().int().nonnegative().optional().default(1),
+    errorDiagnostics: z.boolean().optional().default(true),
     workers: z.object({
-        doDailySet: z.boolean().default(true),
-        doSpecialPromotions: z.boolean().default(true),
-        doMorePromotions: z.boolean().default(true),
-        doPunchCards: z.boolean().default(true),
-        doAppPromotions: z.boolean().default(true),
-        doDesktopSearch: z.boolean().default(true),
-        doMobileSearch: z.boolean().default(true),
-        doDailyCheckIn: z.boolean().default(true),
-        doReadToEarn: z.boolean().default(true)
-    }).default({
+        doDailySet: z.boolean().optional().default(true),
+        doSpecialPromotions: z.boolean().optional().default(true),
+        doMorePromotions: z.boolean().optional().default(true),
+        doPunchCards: z.boolean().optional().default(true),
+        doAppPromotions: z.boolean().optional().default(true),
+        doDesktopSearch: z.boolean().optional().default(true),
+        doMobileSearch: z.boolean().optional().default(true),
+        doDailyCheckIn: z.boolean().optional().default(true),
+        doReadToEarn: z.boolean().optional().default(true)
+    }).optional().default({
         doDailySet: true,
         doSpecialPromotions: true,
         doMorePromotions: true,
@@ -90,17 +90,17 @@ export const ConfigSchema = z.object({
         doDailyCheckIn: true,
         doReadToEarn: true
     }),
-    searchOnBingLocalQueries: z.boolean().default(false),
-    globalTimeout: NumberOrString.default(120000),
+    searchOnBingLocalQueries: z.boolean().optional().default(false),
+    globalTimeout: NumberOrString.optional().default(120000),
     searchSettings: z.object({
-        scrollRandomResults: z.boolean().default(true),
-        clickRandomResults: z.boolean().default(true),
-        parallelSearching: z.boolean().default(false),
-        queryEngines: z.array(QueryEngineSchema).default(['google', 'wikipedia', 'reddit', 'local']),
-        searchResultVisitTime: NumberOrString.default('5-10s'),
-        searchDelay: DelaySchema.default({ min: '2s', max: '5s' }),
-        readDelay: DelaySchema.default({ min: '1s', max: '3s' })
-    }).default({
+        scrollRandomResults: z.boolean().optional().default(true),
+        clickRandomResults: z.boolean().optional().default(true),
+        parallelSearching: z.boolean().optional().default(false),
+        queryEngines: z.array(QueryEngineSchema).optional().default(['google', 'wikipedia', 'reddit', 'local']),
+        searchResultVisitTime: NumberOrString.optional().default('5-10s'),
+        searchDelay: DelaySchema.optional().default({ min: '2s', max: '5s' }),
+        readDelay: DelaySchema.optional().default({ min: '1s', max: '3s' })
+    }).optional().default({
         scrollRandomResults: true,
         clickRandomResults: true,
         parallelSearching: false,
@@ -109,48 +109,130 @@ export const ConfigSchema = z.object({
         searchDelay: { min: '2s', max: '5s' },
         readDelay: { min: '1s', max: '3s' }
     }),
-    debugLogs: z.boolean().default(false),
+    debugLogs: z.boolean().optional().default(false),
     proxy: z.object({
-        queryEngine: z.boolean().default(false)
-    }).default({
+        enable: z.boolean().optional().default(false),
+        url: z.string().optional().default(''),
+        port: z.union([z.string(), z.number()]).optional().default(''),
+        username: z.string().optional().default(''),
+        password: z.string().optional().default(''),
+        queryEngine: z.boolean().optional().default(false)
+    }).optional().default({
+        enable: false,
+        url: '',
+        port: '',
+        username: '',
+        password: '',
         queryEngine: false
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
-    geminiApiKey: z.string().optional(),
-    geminiModel: z.string().optional(),
-    geminiEndpoint: z.string().optional()
+    geminiApiKey: z.string().optional().default(''),
+    geminiModel: z.string().optional().default('gemini-1.5-flash'),
+    geminiEndpoint: z.string().optional().default('https://generativelanguage.googleapis.com')
+}).optional().default({
+    baseURL: 'https://rewards.bing.com',
+    sessionPath: 'sessions',
+    headless: false,
+    browserType: 'chromium',
+    runOnZeroPoints: false,
+    clusters: 1,
+    errorDiagnostics: true,
+    workers: {
+        doDailySet: true,
+        doSpecialPromotions: true,
+        doMorePromotions: true,
+        doPunchCards: true,
+        doAppPromotions: true,
+        doDesktopSearch: true,
+        doMobileSearch: true,
+        doDailyCheckIn: true,
+        doReadToEarn: true
+    },
+    searchOnBingLocalQueries: false,
+    globalTimeout: 120000,
+    searchSettings: {
+        scrollRandomResults: true,
+        clickRandomResults: true,
+        parallelSearching: false,
+        queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
+        searchResultVisitTime: '5-10s',
+        searchDelay: { min: '2s', max: '5s' },
+        readDelay: { min: '1s', max: '3s' }
+    },
+    debugLogs: false,
+    proxy: {
+        enable: false,
+        url: '',
+        port: '',
+        username: '',
+        password: '',
+        queryEngine: false
+    },
+    consoleLogFilter: {
+        enabled: false,
+        mode: 'blacklist',
+        levels: ['error'],
+        keywords: [],
+        regexPatterns: []
+    },
+    webhook: {
+        discord: { enabled: false, url: '' },
+        webhookLogFilter: {
+            enabled: false,
+            mode: 'blacklist',
+            levels: ['error'],
+            keywords: [],
+            regexPatterns: []
+        }
+    },
+    geminiApiKey: '',
+    geminiModel: 'gemini-1.5-flash',
+    geminiEndpoint: 'https://generativelanguage.googleapis.com'
 })
 
 // Account
 export const AccountSchema = z.object({
     email: z.string(),
-    password: z.string(),
+    password: z.string().optional().default(''),
     totpSecret: z.string().optional(),
-    recoveryEmail: z.string(),
-    geoLocale: z.string(),
-    langCode: z.string(),
+    recoveryEmail: z.string().optional().default(''),
+    geoLocale: z.string().optional().default('auto'),
+    langCode: z.string().optional().default('en'),
     proxy: z.object({
-        proxyAxios: z.boolean(),
-        url: z.string(),
-        port: z.number(),
-        password: z.string(),
-        username: z.string()
+        proxyAxios: z.boolean().optional().default(false),
+        url: z.string().optional().default(''),
+        port: z.coerce.number().optional().default(0),
+        password: z.string().optional().default(''),
+        username: z.string().optional().default('')
+    }).optional().default({
+        proxyAxios: false,
+        url: '',
+        port: 0,
+        password: '',
+        username: ''
     }),
     saveFingerprint: z.object({
-        mobile: z.boolean(),
-        desktop: z.boolean()
+        mobile: z.boolean().optional().default(true),
+        desktop: z.boolean().optional().default(true)
+    }).optional().default({
+        mobile: true,
+        desktop: true
     }),
-    points: z.number().optional(),
-    lastUpdate: z.string().optional()
+    points: z.number().optional().default(0),
+    initialPoints: z.number().optional().default(0),
+    collectedPoints: z.number().optional().default(0),
+    duration: z.number().optional().default(0),
+    rank: z.string().optional().default(''),
+    lastUpdate: z.string().optional().default('Never')
 })
 
 export function validateConfig(data: unknown): Config {
-    return ConfigSchema.parse(data) as Config
+    return ConfigSchema.parse(data) as any
 }
 
 export function validateAccounts(data: unknown): Account[] {
-    return z.array(AccountSchema).parse(data)
+    return z.array(AccountSchema).parse(data) as any
 }
 
 export function checkNodeVersion(): void {
