@@ -14,9 +14,12 @@ export interface Config {
     proxy: ConfigProxy
     consoleLogFilter: LogFilter
     webhook: ConfigWebhook
+    geminiApiKey?: string
+    geminiModel?: string
+    geminiEndpoint?: string
 }
 
-export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local'
+export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local' | 'gemini'
 
 export interface ConfigSearchSettings {
     scrollRandomResults: boolean

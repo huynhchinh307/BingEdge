@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import Database from 'better-sqlite3'
 
 export function getDirname(importMetaUrl) {
     const __filename = fileURLToPath(importMetaUrl)
@@ -91,42 +92,99 @@ export function loadJsonFile(possiblePaths, required = true) {
     return null
 }
 
+function _safeParse(json, fallback) {
+    try { return JSON.parse(json); } catch { return fallback; }
+}
+
 export function loadConfig(projectRoot, isDev = false) {
+    // Ưu tiên đọc từ SQLite
+    try {
+        const dbPath = path.join(projectRoot, 'rewards_data.db');
+        if (fs.existsSync(dbPath)) {
+            const db = new Database(dbPath, { readonly: true });
+            const row = db.prepare('SELECT data FROM app_config WHERE id = 1').get();
+            db.close();
+            if (row) {
+                const config = JSON.parse(row.data);
+                const missingFields = [];
+                if (!config.baseURL)              missingFields.push('baseURL');
+                if (!config.sessionPath)          missingFields.push('sessionPath');
+                if (config.headless === undefined) missingFields.push('headless');
+                if (!config.workers)              missingFields.push('workers');
+                if (missingFields.length > 0) {
+                    log('ERROR', 'Invalid config in DB — missing required fields:');
+                    missingFields.forEach(f => log('ERROR', `  - ${f}`));
+                    process.exit(1);
+                }
+                return { data: config, path: dbPath };
+            }
+        }
+    } catch (e) {
+        log('WARN', `[DB] Could not read config: ${e.message} — falling back to JSON`);
+    }
+
+    // Fallback: JSON (fresh install, DB chưa khởi tạo)
     const possiblePaths = isDev
         ? [path.join(projectRoot, 'src', 'config.json')]
         : [
             path.join(projectRoot, 'dist', 'config.json'),
             path.join(projectRoot, 'config.json')
-        ]
+        ];
 
-    const result = loadJsonFile(possiblePaths, true)
+    const result = loadJsonFile(possiblePaths, true);
 
-    const missingFields = []
-    if (!result.data.baseURL) missingFields.push('baseURL')
-    if (!result.data.sessionPath) missingFields.push('sessionPath')
-    if (result.data.headless === undefined) missingFields.push('headless')
-    if (!result.data.workers) missingFields.push('workers')
+    const missingFields = [];
+    if (!result.data.baseURL)              missingFields.push('baseURL');
+    if (!result.data.sessionPath)          missingFields.push('sessionPath');
+    if (result.data.headless === undefined) missingFields.push('headless');
+    if (!result.data.workers)             missingFields.push('workers');
 
     if (missingFields.length > 0) {
-        log('ERROR', 'Invalid config.json - missing required fields:')
-        missingFields.forEach(field => log('ERROR', `  - ${field}`))
-        log('ERROR', `Config file: ${result.path}`)
-        process.exit(1)
+        log('ERROR', 'Invalid config.json — missing required fields:');
+        missingFields.forEach(field => log('ERROR', `  - ${field}`));
+        log('ERROR', `Config file: ${result.path}`);
+        process.exit(1);
     }
 
-    return result
+    return result;
 }
 
 export function loadAccounts(projectRoot, isDev = false) {
+    // Ưu tiên đọc từ SQLite
+    try {
+        const dbPath = path.join(projectRoot, 'rewards_data.db');
+        if (fs.existsSync(dbPath)) {
+            const db = new Database(dbPath, { readonly: true });
+            const rows = db.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all();
+            db.close();
+            if (rows.length > 0) {
+                const accounts = rows.map(row => ({
+                    email:           row.email,
+                    password:        row.password,
+                    totpSecret:      row.totp_secret  || undefined,
+                    recoveryEmail:   row.recovery_email,
+                    geoLocale:       row.geo_locale,
+                    langCode:        row.lang_code,
+                    proxy:           _safeParse(row.proxy,            {}),
+                    saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+                }));
+                return { data: accounts, path: dbPath };
+            }
+        }
+    } catch (e) {
+        log('WARN', `[DB] Could not read accounts: ${e.message} — falling back to JSON`);
+    }
+
+    // Fallback: JSON (fresh install, DB chưa khởi tạo)
     const possiblePaths = isDev
         ? [path.join(projectRoot, 'src', 'accounts.dev.json')]
         : [
             path.join(projectRoot, 'dist', 'accounts.json'),
             path.join(projectRoot, 'accounts.json'),
             path.join(projectRoot, 'accounts.example.json')
-        ]
+        ];
 
-    return loadJsonFile(possiblePaths, true)
+    return loadJsonFile(possiblePaths, true);
 }
 
 export function findAccountByEmail(accounts, email) {

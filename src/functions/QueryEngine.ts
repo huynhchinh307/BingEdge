@@ -35,7 +35,7 @@ export class QueryCore {
             const topicLists: string[][] = []
 
             const sourceHandlers: Record<
-                'google' | 'wikipedia' | 'reddit' | 'local',
+                'google' | 'wikipedia' | 'reddit' | 'local' | 'gemini',
                 (() => Promise<string[]>) | (() => string[])
             > = {
                 google: async () => {
@@ -56,6 +56,11 @@ export class QueryCore {
                 local: () => {
                     const topics = this.getLocalQueryList()
                     this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `local: ${topics.length}`)
+                    return topics
+                },
+                gemini: async () => {
+                    const topics = await this.getGeminiQueries(langCode, geoLocale).catch(() => [])
+                    this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `gemini: ${topics.length}`)
                     return topics
                 }
             }
@@ -216,7 +221,7 @@ export class QueryCore {
             const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine)
             const trendsData = this.extractJsonFromResponse(response.data)
             if (!trendsData) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries')
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No trendsData parsed from response')
                 return []
             }
@@ -234,7 +239,7 @@ export class QueryCore {
                 })
             }
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-GOOGLE-TRENDS',
@@ -277,7 +282,7 @@ export class QueryCore {
                 response.data.suggestionGroups?.[0]?.searchSuggestions?.map((x: { query: any }) => x.query) ?? []
 
             if (!suggestions.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-BING-SUGGESTIONS',
@@ -287,7 +292,7 @@ export class QueryCore {
 
             return suggestions
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-BING-SUGGESTIONS',
@@ -314,7 +319,7 @@ export class QueryCore {
             const out = Array.isArray(related) ? related : []
 
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-BING-RELATED',
@@ -324,7 +329,7 @@ export class QueryCore {
 
             return out
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-BING-RELATED',
@@ -359,7 +364,7 @@ export class QueryCore {
                 ) ?? []
 
             if (!topics.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-BING-TRENDING',
@@ -369,7 +374,7 @@ export class QueryCore {
 
             return topics
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-BING-TRENDING',
@@ -402,7 +407,7 @@ export class QueryCore {
             const out = articles.slice(0, 50).map(a => a.article.replace(/_/g, ' '))
 
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-WIKIPEDIA-TRENDING',
@@ -412,7 +417,7 @@ export class QueryCore {
 
             return out
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-WIKIPEDIA-TRENDING',
@@ -441,7 +446,7 @@ export class QueryCore {
             const out = posts.filter(p => !p.data.over_18).map(p => p.data.title)
 
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-REDDIT-TRENDING', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT-TRENDING', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-REDDIT-TRENDING',
@@ -451,13 +456,106 @@ export class QueryCore {
 
             return out
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-REDDIT', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-REDDIT',
                 `request failed | subreddit=${subreddit} | error=${
                     error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)
                 }`
+            )
+            return []
+        }
+    }
+
+    async getGeminiQueries(langCode = 'en', geoLocale = 'US'): Promise<string[]> {
+        const apiKey = this.bot.config.geminiApiKey
+        if (!apiKey || apiKey === '') {
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GEMINI', 'Skip: No Gemini API Key in config')
+            return []
+        }
+
+        try {
+            this.bot.logger.info(this.bot.isMobile, 'SEARCH-GEMINI', `Generating 50 queries in [${langCode}] for [${geoLocale}] via Gemini AI...`)
+
+            const prompt = `Act as a regular curious human living in ${geoLocale} who speaks ${langCode} fluently. 
+            YOU MUST GENERATE ALL SEARCH QUERIES IN THE LANGUAGE: ${langCode}.
+            If the language code is 'vi', you MUST write in Vietnamese.
+            Generate a list of 50 unique, natural search queries that a real person in ${geoLocale} would type into a search engine today.
+            The queries should be a mix of:
+            - Informational (how to..., what is..., why...) in ${langCode}
+            - Navigational (popular websites in ${geoLocale})
+            - Transactional (prices in ${geoLocale}, shopping)
+            - Local interests, news, and food in ${geoLocale}
+            - Trending topics in science, tech, and entertainment.
+            
+            Return ONLY a raw JSON array of strings, no other text or formatting. 
+            Example output format: ["query 1", "query 2"]`
+
+            const model = this.bot.config.geminiModel || 'gemini-1.5-flash'
+            const endpoint = (this.bot.config.geminiEndpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
+            
+            const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com')
+            
+            let url: string
+            let data: any
+            let headers: any = { 'Content-Type': 'application/json' }
+
+            if (isOpenAI) {
+                url = `${endpoint}/chat/completions`
+                headers['Authorization'] = `Bearer ${apiKey}`
+                data = {
+                    model: model,
+                    messages: [{ role: 'user', content: prompt }],
+                    response_format: { type: 'json_object' }
+                }
+            } else {
+                const cleanModel = model.replace(/^models\//, '')
+                if (endpoint.includes('/v1') || endpoint.includes('/v1beta')) {
+                    url = `${endpoint}/models/${cleanModel}:generateContent?key=${apiKey}`
+                } else {
+                    url = `${endpoint}/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`
+                }
+                data = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { response_mime_type: 'application/json' }
+                }
+            }
+
+            const request: AxiosRequestConfig = {
+                url: url,
+                method: 'POST',
+                headers: headers,
+                data: data
+            }
+
+            const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine)
+            let content: string | undefined
+            
+            if (isOpenAI) {
+                content = response.data?.choices?.[0]?.message?.content
+            } else {
+                content = response.data?.candidates?.[0]?.content?.parts?.[0]?.text
+            }
+            
+            if (!content) {
+                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GEMINI', 'No response content from Gemini')
+                return []
+            }
+
+            const queries = JSON.parse(content)
+            if (Array.isArray(queries)) {
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GEMINI', `Generated ${queries.length} queries`)
+                return queries
+            }
+
+            return []
+        } catch (error) {
+            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GEMINI', 'Failed to generate queries')
+            this.bot.logger.debug(
+                this.bot.isMobile,
+                'SEARCH-GEMINI',
+                `Error: ${error instanceof Error ? error.message : String(error)}`
             )
             return []
         }
@@ -476,7 +574,7 @@ export class QueryCore {
             )
 
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries')
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries')
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'SEARCH-LOCAL-QUERY-LIST',
@@ -486,7 +584,7 @@ export class QueryCore {
 
             return out
         } catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries')
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries')
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'SEARCH-LOCAL-QUERY-LIST',

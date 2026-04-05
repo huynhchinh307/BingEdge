@@ -621,7 +621,7 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            z-index: 1000;
+            z-index: 3000;
         }
 
         .toast {
@@ -969,12 +969,16 @@
                         <table class="accounts-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;"></th>
+                                    <th style="padding-left: 1.5rem; width: 40px;">
+                                        <input type="checkbox" class="custom-checkbox" id="selectAll"
+                                            onchange="toggleSelectAll(this.checked)">
+                                    </th>
                                     <th>Account</th>
                                     <th>Points</th>
+                                    <th>Daily Status</th>
                                     <th>Rank</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Actions</th>
+                                    <th>Worker</th>
+                                    <th style="padding-right: 1.5rem; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="accountsTableBody"></tbody>
@@ -1069,7 +1073,8 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
                         <div class="cfg-field">
                             <label style="font-size: 0.8rem;">Microsoft Email *</label>
-                            <input type="email" id="accEmail" required class="form-input" style="padding: 0.4rem 0.6rem;">
+                            <input type="email" id="accEmail" required class="form-input"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.8rem;">Password *</label>
@@ -1085,65 +1090,84 @@
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.8rem;">Geo Locale</label>
-                            <input type="text" id="accGeoLocale" class="form-input" value="auto" style="padding: 0.4rem 0.6rem;">
+                            <input type="text" id="accGeoLocale" class="form-input" value="auto"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.8rem;">Language Code</label>
-                            <input type="text" id="accLangCode" class="form-input" value="en" style="padding: 0.4rem 0.6rem;">
+                            <input type="text" id="accLangCode" class="form-input" value="en"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                     </div>
 
-                    <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
-                        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">Proxy Configuration</h4>
+                    <div
+                        style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
+                        <h4
+                            style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                            Proxy Configuration</h4>
                         <div class="cfg-field" style="margin-bottom: 0.75rem;">
-                            <label style="font-size: 0.8rem;">Proxy Quick Paste <span style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
-                            <input type="text" id="accProxyString" class="form-input" placeholder="proxy.example.com:8080:user:pass" oninput="parseProxyString(this.value)" style="padding: 0.4rem 0.6rem;">
+                            <label style="font-size: 0.8rem;">Proxy Quick Paste <span
+                                    style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
+                            <input type="text" id="accProxyString" class="form-input"
+                                placeholder="proxy.example.com:8080:user:pass" oninput="parseProxyString(this.value)"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
-                        <div style="display: grid; grid-template-columns: 100px 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
+                        <div
+                            style="display: grid; grid-template-columns: 100px 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
                             <div class="cfg-field">
                                 <label style="font-size: 0.8rem;">Proto</label>
-                                <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;" onchange="syncProxyString()">
+                                <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;"
+                                    onchange="syncProxyString()">
                                     <option value="http">HTTP</option>
                                     <option value="socks5">SOCKS5</option>
                                 </select>
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.8rem;">Host</label>
-                                <input type="text" id="accProxyUrl" class="form-input" placeholder="host" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                <input type="text" id="accProxyUrl" class="form-input" placeholder="host"
+                                    oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.8rem;">Port</label>
-                                <input type="number" id="accProxyPort" class="form-input" placeholder="80" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                <input type="number" id="accProxyPort" class="form-input" placeholder="80"
+                                    oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.8rem;">User</label>
-                                <input type="text" id="accProxyUser" class="form-input" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                <input type="text" id="accProxyUser" class="form-input" oninput="syncProxyString()"
+                                    style="padding: 0.4rem 0.6rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.8rem;">Pass</label>
-                                <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()"
+                                    style="padding: 0.4rem 0.6rem;">
                             </div>
                         </div>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px;">
                         <div style="display: flex; gap: 1.5rem;">
-                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                            <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
                                 <span>Axios Proxy</span>
-                                <label class="toggle"><input type="checkbox" id="accProxyAxios"><span class="slider"></span></label>
-                             </label>
-                             <div style="height: 20px; width: 1px; background: rgba(255,255,255,0.1);"></div>
-                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                                <label class="toggle"><input type="checkbox" id="accProxyAxios"><span
+                                        class="slider"></span></label>
+                            </label>
+                            <div style="height: 20px; width: 1px; background: rgba(255,255,255,0.1);"></div>
+                            <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
                                 <span>Save Mobile FP</span>
-                                <label class="toggle"><input type="checkbox" id="accFpMobile" checked><span class="slider"></span></label>
-                             </label>
-                             <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
+                                <label class="toggle"><input type="checkbox" id="accFpMobile" checked><span
+                                        class="slider"></span></label>
+                            </label>
+                            <label class="toggle-label" style="margin:0; font-size: 0.85rem;">
                                 <span>Save Desktop FP</span>
-                                <label class="toggle"><input type="checkbox" id="accFpDesktop" checked><span class="slider"></span></label>
-                             </label>
+                                <label class="toggle"><input type="checkbox" id="accFpDesktop" checked><span
+                                        class="slider"></span></label>
+                            </label>
                         </div>
-                        
-                        <button type="submit" id="accSubmitBtn" class="btn btn-primary" style="padding: 0.6rem 2rem; font-size: 0.95rem; min-width: 200px;">Save Account</button>
+
+                        <button type="submit" id="accSubmitBtn" class="btn btn-primary"
+                            style="padding: 0.6rem 2rem; font-size: 0.95rem; min-width: 200px;">Save Account</button>
                     </div>
                 </form>
             </div>
@@ -1153,7 +1177,7 @@
     <div id="configModal" class="modal-overlay">
         <div class="modal" style="max-width: 900px; width: 95%;">
             <div class="modal-header" style="padding: 1rem 1.5rem;">
-                <h3 style="font-size: 1.1rem;">Global Configuration (config.json)</h3>
+                <h3 style="font-size: 1.1rem;">Global Configuration</h3>
                 <button class="close-btn" onclick="document.getElementById('configModal').style.display='none'">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1161,119 +1185,225 @@
                     </svg>
                 </button>
             </div>
-            <div style="padding: 1rem 1.5rem;">
+            <div style="padding: 1rem 1.5rem; overflow-y: auto; max-height: 75vh;">
                 <!-- General Section -->
-                <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; align-items: end;">
+                <div
+                    style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; align-items: end;">
                     <div class="cfg-field">
                         <label style="font-size: 0.8rem;">Base URL</label>
-                        <input id="cfg_baseURL" type="text" class="form-input" value="https://rewards.bing.com" style="padding: 0.4rem 0.6rem;">
+                        <input id="cfg_baseURL" type="text" class="form-input" value="https://rewards.bing.com"
+                            style="padding: 0.4rem 0.6rem;">
                     </div>
                     <div class="cfg-field">
                         <label style="font-size: 0.8rem;">Session Path</label>
-                        <input id="cfg_sessionPath" type="text" class="form-input" value="browser/sessions" style="padding: 0.4rem 0.6rem;">
+                        <input id="cfg_sessionPath" type="text" class="form-input" value="browser/sessions"
+                            style="padding: 0.4rem 0.6rem;">
                     </div>
                     <div class="cfg-field">
                         <label style="font-size: 0.8rem;">Clusters</label>
-                        <input id="cfg_clusters" type="number" class="form-input" min="1" value="1" style="padding: 0.4rem 0.6rem;">
+                        <input id="cfg_clusters" type="number" class="form-input" min="1" value="1"
+                            style="padding: 0.4rem 0.6rem;">
                     </div>
                     <div class="cfg-field">
                         <label style="font-size: 0.8rem;">Global Timeout</label>
-                        <input id="cfg_globalTimeout" type="number" class="form-input" value="120000" style="padding: 0.4rem 0.6rem;">
+                        <input id="cfg_globalTimeout" type="number" class="form-input" value="120000"
+                            style="padding: 0.4rem 0.6rem;">
                     </div>
                 </div>
 
                 <!-- Browser & Engine Section -->
                 <div style="display: grid; grid-template-columns: 1.5fr 2fr; gap: 1.5rem; margin-bottom: 1.25rem;">
-                    <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.5rem; display: block; font-weight: 600;">Browser Engine</label>
+                    <div
+                        style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <label
+                            style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.5rem; display: block; font-weight: 600;">Browser
+                            Engine</label>
                         <div style="display:flex; gap:0.5rem;">
                             <label style="flex:1; cursor:pointer; position: relative;">
-                                <input type="radio" name="cfg_browserType" id="cfg_browserType_chromium" value="chromium" style="display:none;">
-                                <div class="browser-type-btn" id="btn_chromium" onclick="selectBrowserType('chromium')" style="padding: 0.4rem; font-size: 0.85rem;">Chromium</div>
+                                <input type="radio" name="cfg_browserType" id="cfg_browserType_chromium"
+                                    value="chromium" style="display:none;">
+                                <div class="browser-type-btn" id="btn_chromium" onclick="selectBrowserType('chromium')"
+                                    style="padding: 0.4rem; font-size: 0.85rem;">Chromium</div>
                             </label>
                             <label style="flex:1; cursor:pointer; position: relative;">
-                                <input type="radio" name="cfg_browserType" id="cfg_browserType_edge" value="edge" style="display:none;">
-                                <div class="browser-type-btn" id="btn_edge" onclick="selectBrowserType('edge')" style="padding: 0.4rem; font-size: 0.85rem;">Edge</div>
+                                <input type="radio" name="cfg_browserType" id="cfg_browserType_edge" value="edge"
+                                    style="display:none;">
+                                <div class="browser-type-btn" id="btn_edge" onclick="selectBrowserType('edge')"
+                                    style="padding: 0.4rem; font-size: 0.85rem;">Edge</div>
                             </label>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem 1rem;">
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Headless</span><label class="toggle"><input type="checkbox" id="cfg_headless"><span class="slider"></span></label></label>
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Zero Pts</span><label class="toggle"><input type="checkbox" id="cfg_runOnZeroPoints"><span class="slider"></span></label></label>
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Diagnostic</span><label class="toggle"><input type="checkbox" id="cfg_errorDiagnostics"><span class="slider"></span></label></label>
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Debug</span><label class="toggle"><input type="checkbox" id="cfg_debugLogs"><span class="slider"></span></label></label>
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Bing Local</span><label class="toggle"><input type="checkbox" id="cfg_searchOnBingLocalQueries"><span class="slider"></span></label></label>
-                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Proxy QE</span><label class="toggle"><input type="checkbox" id="cfg_proxyQueryEngine"><span class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Headless</span><label
+                                class="toggle"><input type="checkbox" id="cfg_headless"><span
+                                    class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Zero Pts</span><label
+                                class="toggle"><input type="checkbox" id="cfg_runOnZeroPoints"><span
+                                    class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Diagnostic</span><label
+                                class="toggle"><input type="checkbox" id="cfg_errorDiagnostics"><span
+                                    class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Debug</span><label
+                                class="toggle"><input type="checkbox" id="cfg_debugLogs"><span
+                                    class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Bing Local</span><label
+                                class="toggle"><input type="checkbox" id="cfg_searchOnBingLocalQueries"><span
+                                    class="slider"></span></label></label>
+                        <label class="toggle-label" style="font-size: 0.8rem; margin:0;"><span>Proxy QE</span><label
+                                class="toggle"><input type="checkbox" id="cfg_proxyQueryEngine"><span
+                                    class="slider"></span></label></label>
                     </div>
                 </div>
 
                 <!-- Workers & Search Group -->
                 <div style="display: grid; grid-template-columns: 2fr 3fr; gap: 1.5rem; margin-bottom: 1.25rem;">
-                    <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Active Workers</label>
+                    <div
+                        style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <label
+                            style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Active
+                            Workers</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;">
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Daily Set</span><label class="toggle"><input type="checkbox" id="cfg_doDailySet"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Special Promos</span><label class="toggle"><input type="checkbox" id="cfg_doSpecialPromotions"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>More Promos</span><label class="toggle"><input type="checkbox" id="cfg_doMorePromotions"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Punch Cards</span><label class="toggle"><input type="checkbox" id="cfg_doPunchCards"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>App Promos</span><label class="toggle"><input type="checkbox" id="cfg_doAppPromotions"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Desktop</span><label class="toggle"><input type="checkbox" id="cfg_doDesktopSearch"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Mobile</span><label class="toggle"><input type="checkbox" id="cfg_doMobileSearch"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Check In</span><label class="toggle"><input type="checkbox" id="cfg_doDailyCheckIn"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Daily
+                                    Set</span><label class="toggle"><input type="checkbox" id="cfg_doDailySet"><span
+                                        class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Special
+                                    Promos</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_doSpecialPromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>More
+                                    Promos</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_doMorePromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Punch
+                                    Cards</span><label class="toggle"><input type="checkbox" id="cfg_doPunchCards"><span
+                                        class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>App
+                                    Promos</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_doAppPromotions"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Desktop</span><label
+                                    class="toggle"><input type="checkbox" id="cfg_doDesktopSearch"><span
+                                        class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Mobile</span><label
+                                    class="toggle"><input type="checkbox" id="cfg_doMobileSearch"><span
+                                        class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Check
+                                    In</span><label class="toggle"><input type="checkbox" id="cfg_doDailyCheckIn"><span
+                                        class="slider"></span></label></label>
                         </div>
                     </div>
-                    
+
                     <div>
-                        <label style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Search Settings</label>
-                        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <label
+                            style="font-size: 0.75rem; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; display: block; font-weight: 600;">Search
+                            Settings</label>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
                             <div class="cfg-field">
                                 <label style="font-size: 0.7rem;">Visit T. (ms)</label>
-                                <input id="cfg_searchResultVisitTime" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                                <input id="cfg_searchResultVisitTime" type="number" class="form-input"
+                                    style="padding: 0.35rem; font-size: 0.8rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.7rem;">S. Delay Min</label>
-                                <input id="cfg_searchDelayMin" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                                <input id="cfg_searchDelayMin" type="number" class="form-input"
+                                    style="padding: 0.35rem; font-size: 0.8rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.7rem;">S. Delay Max</label>
-                                <input id="cfg_searchDelayMax" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                                <input id="cfg_searchDelayMax" type="number" class="form-input"
+                                    style="padding: 0.35rem; font-size: 0.8rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.7rem;">R. Delay Min</label>
-                                <input id="cfg_readDelayMin" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                                <input id="cfg_readDelayMin" type="number" class="form-input"
+                                    style="padding: 0.35rem; font-size: 0.8rem;">
                             </div>
                             <div class="cfg-field">
                                 <label style="font-size: 0.7rem;">R. Delay Max</label>
-                                <input id="cfg_readDelayMax" type="number" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;">
+                                <input id="cfg_readDelayMax" type="number" class="form-input"
+                                    style="padding: 0.35rem; font-size: 0.8rem;">
                             </div>
                         </div>
-                        <div style="display: flex; gap: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; margin-bottom: 0.5rem;">
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Scroll Random</span><label class="toggle"><input type="checkbox" id="cfg_scrollRandomResults"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Click Random</span><label class="toggle"><input type="checkbox" id="cfg_clickRandomResults"><span class="slider"></span></label></label>
-                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Parallel Search</span><label class="toggle"><input type="checkbox" id="cfg_parallelSearching"><span class="slider"></span></label></label>
+                        <div
+                            style="display: flex; gap: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; margin-bottom: 0.5rem;">
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Scroll
+                                    Random</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_scrollRandomResults"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Click
+                                    Random</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_clickRandomResults"><span class="slider"></span></label></label>
+                            <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Parallel
+                                    Search</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_parallelSearching"><span class="slider"></span></label></label>
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Query Engines (comma separated)</label>
-                            <input id="cfg_queryEngines" type="text" class="form-input" placeholder="google, wikipedia..." style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                            <input id="cfg_queryEngines" type="text" class="form-input"
+                                placeholder="google, wikipedia, reddit, local, gemini"
+                                style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
                         </div>
                     </div>
                 </div>
 
-                <!-- Webhook & Save Section -->
-                <div style="display: flex; gap: 1.5rem; align-items: center; background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
-                    <div style="min-width: 155px;">
-                        <label class="toggle-label" style="margin:0; font-size: 0.85rem; font-weight: 600;">
-                            <span>Discord Webhook</span>
-                            <label class="toggle"><input type="checkbox" id="cfg_discordEnabled"><span class="slider"></span></label>
-                        </label>
+                <!-- Webhook & AI Section -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                    <div
+                        style="display: flex; gap: 1rem; align-items: center; background: rgba(99, 102, 241, 0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
+                        <div style="min-width: 140px;">
+                            <label class="toggle-label" style="margin:0; font-size: 0.8rem; font-weight: 600;">
+                                <span>Discord Webhook</span>
+                                <label class="toggle"><input type="checkbox" id="cfg_discordEnabled"><span
+                                        class="slider"></span></label>
+                            </label>
+                        </div>
+                        <div class="cfg-field" style="flex:1;">
+                            <input id="cfg_discordUrl" type="text" class="form-input"
+                                placeholder="https://discord.com/api/webhooks/..."
+                                style="padding: 0.35rem 0.6rem; font-size: 0.8rem;">
+                        </div>
                     </div>
-                    <div class="cfg-field" style="flex:1;">
-                        <input id="cfg_discordUrl" type="text" class="form-input" placeholder="https://discord.com/api/webhooks/..." style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <div
+                        style="display: flex; flex-direction: column; gap: 0.75rem; background: rgba(236, 72, 153, 0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(236, 72, 153, 0.15);">
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div style="min-width: 100px;">
+                                <label style="margin:0; font-size: 0.8rem; font-weight: 600; color: #f472b6;">API
+                                    Key</label>
+                            </div>
+                            <div class="cfg-field" style="flex:1;">
+                                <input id="cfg_geminiApiKey" type="text" class="form-input" placeholder="AIzaSy..."
+                                    style="padding: 0.35rem 0.6rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1rem;">
+                            <div class="cfg-field">
+                                <label style="font-size: 0.75rem; color: #f472b6;">Model</label>
+                                <input id="cfg_geminiModel" type="text" class="form-input"
+                                    placeholder="gemini-1.5-flash" style="padding: 0.35rem 0.6rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="cfg-field">
+                                <label style="font-size: 0.75rem; color: #f472b6;">Endpoint</label>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <input id="cfg_geminiEndpoint" type="text" class="form-input"
+                                        placeholder="https://generativelanguage.googleapis.com"
+                                        style="padding: 0.35rem 0.6rem; font-size: 0.8rem; flex: 1;">
+                                    <button class="btn"
+                                        style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: #ec4899; border: none; color: white;"
+                                        onclick="testGemini(this)">Test</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="geminiTestResult"
+                            style="display: none; font-size: 0.75rem; padding: 0.5rem; border-radius: 4px; margin-top: -0.25rem;">
+                        </div>
                     </div>
-                    <button class="btn btn-primary" style="padding: 0.6rem 2.5rem; font-size: 1rem; min-width: 180px;" onclick="saveConfig()">Save All Changes</button>
                 </div>
             </div>
+
+            <div style="text-align: right;">
+                <button class="btn btn-primary"
+                    style="padding: 0.75rem 3rem; font-size: 1rem; min-width: 250px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);"
+                    onclick="saveConfig()">Save All Configuration</button>
+            </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -1281,6 +1411,9 @@
         let refreshInterval;
         let logInterval = null;
         let currentLogKey = null;
+
+        const selectedEmails = new Set();
+        let globalConfig = null;
 
         async function fetchAccounts() {
             try {
@@ -1292,12 +1425,22 @@
                 } else {
                     showToast(data.error || 'Failed to load accounts', 'error');
                 }
+
+                // Tiện thể fetch luôn config để đồng bộ số Threads nếu chưa có
+                if (!globalConfig) {
+                    const cRes = await fetch(`${API_URL}/api/config`);
+                    const cData = await cRes.json();
+                    if (cData.success) {
+                        globalConfig = JSON.parse(cData.config);
+                        if (globalConfig.clusters) {
+                            document.getElementById('threadCount').value = globalConfig.clusters;
+                        }
+                    }
+                }
             } catch (err) {
                 // Silently fail loop if server goes down
             }
         }
-
-        const selectedEmails = new Set();
 
         function toggleSelect(email, checked) {
             if (checked) selectedEmails.add(email);
@@ -1384,8 +1527,9 @@
             const threads = Math.max(1, Math.min(20, parseInt(document.getElementById('threadCount').value) || 2));
             const queue = [...selectedEmails];
             const total = queue.length;
-            let activeCount = 0; // số thread ĐANG chạy
+            let activeCount = 0; // Number of active worker slots
             let finished = 0;
+            const operatingProxies = new Set(); // Tracks proxies currently being used by THIS batch run
 
             // Mark ALL selected as queued upfront
             queue.forEach(e => queuedEmails.add(e));
@@ -1395,10 +1539,10 @@
             batchCancelled = false;
             document.getElementById('stopBotsBtn').style.display = '';
             document.getElementById('runBotsBtn').disabled = true;
-            showToast(`🚀 Queue: ${total} bots, ${threads} thread(s) running`, 'success');
+            showToast(`🚀 Queue: ${total} bots, starting ${threads} worker(s)`, 'success');
 
             function checkAllDone() {
-                if (activeCount === 0 && queue.length === 0) {
+                if (activeCount === 0 && queue.length === 0 && batchRunning) {
                     batchRunning = false;
                     batchCancelled = false;
                     queuedEmails.clear();
@@ -1409,39 +1553,122 @@
                 }
             }
 
-            async function runOne(email) {
+            async function runWorker() {
                 if (batchCancelled) {
-                    queuedEmails.delete(email);
                     checkAllDone();
                     return;
                 }
-                activeCount++;
-                queuedEmails.delete(email);
-                await openSession(email, 'bot', true);
-                await new Promise(r => setTimeout(r, 2000));
-                await waitForBotFinish(email);
-                activeCount--;
-                finished++;
-                showToast(`✓ ${email.split('@')[0]} done (${finished}/${total})`, 'success');
 
-                // Lấy acc tiếp theo nếu còn trong queue
-                if (!batchCancelled && queue.length > 0) {
-                    const next = queue.shift();
-                    queuedEmails.delete(next);
-                    runOne(next); // KHÔNG await — slot này tự duy trì
+                // Pick the next compatible account from queue
+                let email = null;
+                let proxyId = null;
+
+                // We loop until we find an account whose proxyGroup is not busy
+                while (!batchCancelled && queue.length > 0) {
+                    // Use proxyGroup for conflict detection:
+                    // - Accounts with no proxy all share 'NO_PROXY' group → sequential
+                    // - Accounts with a real proxy use the full proxy identity
+                    const backendBusyGroups = new Set(
+                        lastAccounts.filter(a => a.isActiveBot).map(a => a.proxyGroup || a.proxy || 'NO_PROXY')
+                    );
+
+                    let foundIdx = -1;
+                    for (let i = 0; i < queue.length; i++) {
+                        const targetEmail = queue[i];
+                        const accInfo = lastAccounts.find(a => a.email === targetEmail);
+                        const p = accInfo ? (accInfo.proxyGroup || accInfo.proxy || 'NO_PROXY') : 'NO_PROXY';
+
+                        if (!backendBusyGroups.has(p) && !operatingProxies.has(p)) {
+                            foundIdx = i;
+                            proxyId = p;
+                            break;
+                        }
+                    }
+
+                    if (foundIdx !== -1) {
+                        email = queue.splice(foundIdx, 1)[0];
+                        queuedEmails.delete(email);
+                        break;
+                    }
+
+                    // If no compatible account found, wait a bit and retry
+                    await new Promise(r => setTimeout(r, 4000));
+                    if (queue.length === 0) break;
                 }
 
-                // Sau khi gọi runOne tiếp hoặc queue rỗng, check done
-                checkAllDone();
+                if (!email) {
+                    checkAllDone();
+                    return;
+                }
+
+                activeCount++;
+                operatingProxies.add(proxyId);
+                renderAccounts(lastAccounts);
+
+                try {
+                    await openSession(email, 'bot', true);
+                    await new Promise(r => setTimeout(r, 2000));
+                    await waitForBotFinish(email);
+
+                    // Check if process reported proxy busy
+                    let isBusy = false;
+                    try {
+                        const res = await fetch(`${API_URL}/api/accounts`);
+                        const data = await res.json();
+                        const acc = data.accounts?.find(a => a.email === email);
+                        isBusy = acc?.stats?.isProxyBusy;
+                    } catch { }
+
+                    if (isBusy) {
+                        queue.push(email);
+                        queuedEmails.add(email);
+                        showToast(`⚠ Proxy busy: ${email.split('@')[0]} [Re-queued]`, 'error');
+                    } else {
+                        finished++;
+                        showToast(`✓ ${email.split('@')[0]} completed (${finished}/${total})`, 'success');
+                    }
+                } catch (e) {
+                    console.error('Worker error:', e);
+                } finally {
+                    activeCount--;
+                    operatingProxies.delete(proxyId);
+                    // Start next task on this worker slot
+                    runWorker();
+                }
             }
 
-            // Khởi động pool ban đầu
-            const initialBatch = queue.splice(0, threads);
-            initialBatch.forEach(e => queuedEmails.delete(e));
-            initialBatch.forEach(email => runOne(email)); // KHÔNG await Promise.all
+            // Fire up the workers
+            for (let i = 0; i < threads; i++) {
+                runWorker();
+            }
         }
 
         let lastAccounts = [];
+
+        function isCompletedToday(lastUpdateIso) {
+            if (!lastUpdateIso || lastUpdateIso === 'Never') return false;
+
+            const lastUpdate = new Date(lastUpdateIso);
+            const now = new Date();
+
+            // Reset boundary: 07:00 AM UTC+7 = 00:00 UTC every day.
+            // We need to find the most recent 00:00 UTC moment that is <= now.
+            // That is: floor(now) to UTC midnight of the same UTC date.
+            // BUT if now is exactly at midnight, that boundary is "now" itself.
+            //
+            // Build "today midnight UTC" correctly:
+            const todayMidnightUTC = new Date(Date.UTC(
+                now.getUTCFullYear(),
+                now.getUTCMonth(),
+                now.getUTCDate(),
+                0, 0, 0, 0
+            ));
+
+            // todayMidnightUTC is always <= now (same UTC date, hour set to 0).
+            // This is the last reset boundary.
+            // If the account's lastUpdate is after this boundary → completed today.
+            return lastUpdate > todayMidnightUTC;
+        }
 
         function renderAccounts(accounts) {
             lastAccounts = accounts;
@@ -1528,31 +1755,32 @@
                         </td>
                         <td>
                             ${(() => {
-                        if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.82rem;color:#f59e0b;">Running...</span></div>`;
+                        if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.95rem;color:#f59e0b;font-weight:600;">Running...</span></div>`;
                         if (acc.stats) {
                             const s = acc.stats;
-                            const earned = s.total >= 0 ? `+${s.total}` : `${s.total}`;
-                            const color = s.total > 0 ? '#10b981' : s.total < 0 ? '#ef4444' : 'var(--text-muted)';
-                            const dur = s.duration ? (s.duration >= 3600 ? `${(s.duration / 3600).toFixed(1)}h` : s.duration >= 60 ? `${Math.floor(s.duration / 60)}m` : `${Math.round(s.duration)}s`) : '';
-                            const when = s.completedAt ? (() => { const diff = Math.floor((Date.now() - new Date(s.completedAt)) / 60000); return diff < 2 ? 'just now' : diff < 60 ? `${diff}m ago` : `${Math.floor(diff / 60)}h ago`; })() : '';
-                            return `<div style="line-height:1.4">
-                                        <div style="font-size:1rem;font-weight:700;color:#fff;">${s.newBalance?.toLocaleString() ?? '—'} <span style="font-size:0.8rem;color:${color};">(${earned})</span></div>
-                                        <div style="font-size:0.75rem;color:var(--text-muted);">${dur ? dur + ' · ' : ''}${when}</div>
+                            const total = s.total ?? 0;
+                            const newBal = s.newBalance ?? null;
+                            const earned = total >= 0 ? `+${total}` : `${total}`;
+                            const color = total > 0 ? '#10b981' : total < 0 ? '#ef4444' : 'var(--text-muted)';
+                            return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
+                                        ${newBal !== null ? newBal.toLocaleString() : '—'} 
+                                        <span style="font-size:0.85rem;color:${color};font-weight:500;">(${earned})</span>
                                     </div>`;
                         } else if (acc.points) {
-                            const when = acc.lastUpdate !== 'Never' ? (() => {
-                                const diff = Math.floor((Date.now() - new Date(acc.lastUpdate)) / 60000);
-                                if (diff < 2) return 'just now';
-                                if (diff < 60) return `${diff}m ago`;
-                                if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-                                return new Date(acc.lastUpdate).toLocaleDateString();
-                            })() : 'Never';
-                            return `<div style="line-height:1.4">
-                                        <div style="font-size:1rem;font-weight:700;color:#fff;">${acc.points.toLocaleString()} <span style="font-size:0.8rem;color:var(--text-muted);">(saved)</span></div>
-                                        <div style="font-size:0.75rem;color:var(--text-muted);">Updated: ${when}</div>
+                            return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
+                                        ${acc.points.toLocaleString()} 
+                                        <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">(saved)</span>
                                     </div>`;
                         }
-                        return '<span style="color:var(--text-muted);font-size:0.82rem;">—</span>';
+                        return '<span style="color:var(--text-muted);font-size:0.9rem;">—</span>';
+                    })()}
+                        </td>
+                        <td>
+                            ${(() => {
+                        const done = isCompletedToday(acc.lastUpdate);
+                        return done
+                            ? `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`
+                            : `<span class="status-badge" style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">⏳ Pending</span>`;
                     })()}
                         </td>
                         <td>
@@ -1923,6 +2151,9 @@
                 setVal('cfg_sessionPath', cfg.sessionPath);
                 setVal('cfg_clusters', cfg.clusters);
                 setVal('cfg_globalTimeout', cfg.globalTimeout);
+                setVal('cfg_geminiApiKey', cfg.geminiApiKey);
+                setVal('cfg_geminiModel', cfg.geminiModel);
+                setVal('cfg_geminiEndpoint', cfg.geminiEndpoint);
                 setCheck('cfg_headless', cfg.headless);
                 setCheck('cfg_runOnZeroPoints', cfg.runOnZeroPoints);
                 setCheck('cfg_errorDiagnostics', cfg.errorDiagnostics);
@@ -1958,6 +2189,11 @@
                 // Webhook Discord
                 setCheck('cfg_discordEnabled', cfg.webhook?.discord?.enabled);
                 setVal('cfg_discordUrl', cfg.webhook?.discord?.url);
+
+                // Gemini AI
+                setVal('cfg_geminiApiKey', cfg.geminiApiKey);
+                setVal('cfg_geminiModel', cfg.geminiModel);
+                setVal('cfg_geminiEndpoint', cfg.geminiEndpoint);
 
             } catch (e) {
                 showToast('Error loading config: ' + e.message, 'error');
@@ -2000,6 +2236,9 @@
                 cfg.sessionPath = getVal('cfg_sessionPath');
                 cfg.clusters = getNum('cfg_clusters');
                 cfg.globalTimeout = getNum('cfg_globalTimeout');
+                cfg.geminiApiKey = getVal('cfg_geminiApiKey');
+                cfg.geminiModel = getVal('cfg_geminiModel');
+                cfg.geminiEndpoint = getVal('cfg_geminiEndpoint');
                 cfg.headless = getCheck('cfg_headless');
                 cfg.runOnZeroPoints = getCheck('cfg_runOnZeroPoints');
                 cfg.errorDiagnostics = getCheck('cfg_errorDiagnostics');
@@ -2044,6 +2283,10 @@
                     }
                 };
 
+                cfg.geminiApiKey = getVal('cfg_geminiApiKey');
+                cfg.geminiModel = getVal('cfg_geminiModel');
+                cfg.geminiEndpoint = getVal('cfg_geminiEndpoint');
+
                 const res = await fetch(`${API_URL}/api/config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2053,9 +2296,58 @@
                 if (resData.success) {
                     showToast('Configuration saved!', 'success');
                     document.getElementById('configModal').style.display = 'none';
+                    // Update main toolbar thread count and cache
+                    globalConfig = cfg;
+                    if (cfg.clusters) {
+                        document.getElementById('threadCount').value = cfg.clusters;
+                    }
                 } else throw new Error(resData.error);
             } catch (e) {
                 showToast(e.message || 'Error saving config', 'error');
+            }
+        }
+
+        async function testGemini(btn) {
+            const apiKey = getVal('cfg_geminiApiKey');
+            const model = getVal('cfg_geminiModel');
+            const endpoint = getVal('cfg_geminiEndpoint');
+            const resultBox = document.getElementById('geminiTestResult');
+
+            if (!apiKey) {
+                showToast('API Key is required', 'error');
+                return;
+            }
+
+            const oldText = btn.innerText;
+            btn.innerText = 'Testing...';
+            btn.disabled = true;
+            resultBox.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_URL}/api/test-gemini`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiKey, model, endpoint })
+                });
+                const data = await res.json();
+
+                resultBox.style.display = 'block';
+                if (data.success) {
+                    resultBox.style.background = 'rgba(16, 185, 129, 0.15)';
+                    resultBox.style.color = '#10b981';
+                    resultBox.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                    resultBox.innerText = `Success: ${data.message}`;
+                } else {
+                    resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+                    resultBox.style.color = '#ef4444';
+                    resultBox.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    resultBox.innerText = `Error: ${data.error}`;
+                }
+            } catch (e) {
+                showToast('Failed to test model', 'error');
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
             }
         }
 

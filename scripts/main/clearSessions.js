@@ -11,24 +11,13 @@ import {
 const __dirname = getDirname(import.meta.url)
 const projectRoot = getProjectRoot(__dirname)
 
-const possibleConfigPaths = [
-    path.join(projectRoot, 'config.json'),
-    path.join(projectRoot, 'src', 'config.json'),
-    path.join(projectRoot, 'dist', 'config.json')
-]
+const args = parseArgs()
+const { data: config, path: configPath } = loadConfig(projectRoot, args.dev)
 
-log('DEBUG', 'Project root:', projectRoot)
-log('DEBUG', 'Searching for config.json...')
-
-const configResult = loadJsonFile(possibleConfigPaths, true)
-const config = configResult.data
-const configPath = configResult.path
-
-log('INFO', 'Using config:', configPath)
+log('INFO', 'Using config source:', configPath)
 
 if (!config.sessionPath) {
-    log('ERROR', 'Invalid config.json - missing required field: sessionPath')
-    log('ERROR', `Config file: ${configPath}`)
+    log('ERROR', 'Invalid configuration - missing required field: sessionPath')
     process.exit(1)
 }
 

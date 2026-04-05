@@ -4,6 +4,8 @@ import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
 import { getDirname, getProjectRoot, loadAccounts, log } from '../utils.js';
+import axios from 'axios';
+import Database from 'better-sqlite3';
 
 const __dirname = getDirname(import.meta.url);
 const projectRoot = getProjectRoot(__dirname);
@@ -12,12 +14,95 @@ const projectRoot = getProjectRoot(__dirname);
 const activeProcesses = {};
 const processLogs = {}; // key -> string[]
 
-// Persist account stats in memory only
+// Persist account stats in memory only (parsed from live bot logs)
 let accountStats = {}; // email -> { total, oldBalance, newBalance, duration, completedAt }
 
-function saveAccountStats() {
-    // No longer saving to disk as requested, keeping in memory for real-time dashboard updates
+/**
+ * Read-write SQLite connection dùng chung cho accounts, config, account_status.
+ * WAL mode: dashboard ghi accounts/config, bot ghi account_status — không block nhau.
+ */
+let _db = null;
+let _statusCache = null;
+let _statusCacheTime = 0;
+const STATUS_CACHE_MS = 1500;
+
+function getDb() {
+    if (_db) return _db;
+    try {
+        const dbPath = path.join(projectRoot, 'rewards_data.db');
+        _db = new Database(dbPath);
+        _db.pragma('journal_mode = WAL');
+        _db.pragma('synchronous = NORMAL');
+        // Đảm bảo các bảng tồn tại (dashboard có thể khởi động trước bot)
+        _db.exec(`
+            CREATE TABLE IF NOT EXISTS accounts (
+                email            TEXT PRIMARY KEY,
+                password         TEXT NOT NULL DEFAULT '',
+                totp_secret      TEXT NOT NULL DEFAULT '',
+                recovery_email   TEXT NOT NULL DEFAULT '',
+                geo_locale       TEXT NOT NULL DEFAULT 'auto',
+                lang_code        TEXT NOT NULL DEFAULT 'en',
+                proxy            TEXT NOT NULL DEFAULT '{}',
+                save_fingerprint TEXT NOT NULL DEFAULT '{"mobile":true,"desktop":true}',
+                created_at       INTEGER NOT NULL DEFAULT 0,
+                updated_at       INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS app_config (
+                id   INTEGER PRIMARY KEY DEFAULT 1,
+                data TEXT NOT NULL DEFAULT '{}'
+            );
+            CREATE TABLE IF NOT EXISTS account_status (
+                email            TEXT PRIMARY KEY,
+                points           INTEGER NOT NULL DEFAULT 0,
+                initial_points   INTEGER NOT NULL DEFAULT 0,
+                collected_points INTEGER NOT NULL DEFAULT 0,
+                duration         REAL    NOT NULL DEFAULT 0,
+                rank             TEXT    NOT NULL DEFAULT '',
+                last_update      TEXT    NOT NULL DEFAULT 'Never',
+                updated_at       INTEGER NOT NULL DEFAULT 0
+            );
+        `);
+        return _db;
+    } catch (e) {
+        log('ERROR', '[DB] Could not open rewards_data.db:', e.message);
+        return null;
+    }
 }
+
+function loadAccountStatus() {
+    const now = Date.now();
+    if (_statusCache !== null && now - _statusCacheTime < STATUS_CACHE_MS) {
+        return _statusCache;
+    }
+    try {
+        const db = getDb();
+        if (!db) { _statusCache = {}; _statusCacheTime = now; return _statusCache; }
+        const rows = db.prepare('SELECT * FROM account_status').all();
+        const result = {};
+        for (const row of rows) {
+            result[row.email] = {
+                points:          row.points,
+                initialPoints:   row.initial_points,
+                collectedPoints: row.collected_points,
+                duration:        row.duration,
+                rank:            row.rank,
+                lastUpdate:      row.last_update
+            };
+        }
+        _statusCache = result;
+    } catch {
+        _statusCache = {};
+    }
+    _statusCacheTime = now;
+    return _statusCache;
+}
+
+function saveAccountStats() { /* in-memory only */ }
+
+function _safeParse(json, fallback) {
+    try { return JSON.parse(json); } catch { return fallback; }
+}
+
 
 // Parse ACCOUNT-END log line to extract stats
 // Format: ... [ACCOUNT-END] Completed account: email | Total: +N | Old: X → New: Y | Duration: Z.Ws
@@ -111,14 +196,11 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'GET' && req.url === '/api/config') {
         try {
-            const isDev = process.argv.includes('-dev');
-            let configPath = path.join(projectRoot, 'dist', 'config.json');
-            if (isDev) configPath = path.join(projectRoot, 'src', 'config.json');
-            else if (!fs.existsSync(configPath)) configPath = path.join(projectRoot, 'config.json');
-            
-            const data = fs.readFileSync(configPath, 'utf-8');
+            const db = getDb();
+            const row = db?.prepare('SELECT data FROM app_config WHERE id = 1').get();
+            if (!row) throw new Error('Config not found in DB');
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, config: data }));
+            res.end(JSON.stringify({ success: true, config: row.data }));
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: e.message }));
@@ -131,20 +213,86 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk.toString());
         req.on('end', () => {
             try {
-                const data = JSON.parse(body);
-                JSON.parse(data.config); 
-                
-                const isDev = process.argv.includes('-dev');
-                let configPath = path.join(projectRoot, 'dist', 'config.json');
-                if (isDev) configPath = path.join(projectRoot, 'src', 'config.json');
-                else if (!fs.existsSync(configPath)) configPath = path.join(projectRoot, 'config.json');
-
-                fs.writeFileSync(configPath, data.config, 'utf-8');
+                const { config: configStr } = JSON.parse(body);
+                JSON.parse(configStr); // validate JSON
+                const db = getDb();
+                db.prepare(`
+                    INSERT INTO app_config (id, data) VALUES (1, @data)
+                    ON CONFLICT(id) DO UPDATE SET data = @data
+                `).run({ data: configStr });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch(e) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: false, error: 'Invalid JSON format or write error' }));
+                res.end(JSON.stringify({ success: false, error: 'Invalid JSON or DB error: ' + e.message }));
+            }
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/test-gemini') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { apiKey, model, endpoint } = JSON.parse(body);
+                let baseUrl = (endpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
+                let modelName = model || 'gemini-1.5-flash';
+                
+                let response;
+                // Check if it's an OpenAI-compatible endpoint (usually ends with /v1 or contains v1/chat)
+                const isOpenAI = baseUrl.includes('/v1') && !baseUrl.includes('generativelanguage.googleapis.com');
+
+                if (isOpenAI) {
+                    const url = `${baseUrl}/chat/completions`;
+                    console.log(`[AI Test] OpenAI Format - Calling: ${url}`);
+                    response = await axios.post(url, {
+                        model: modelName,
+                        messages: [{ role: "user", content: "Hello, what is 1+1? Response only the number." }]
+                    }, {
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        timeout: 10000
+                    });
+                } else {
+                    // Google Gemini Native Format
+                    let url;
+                    const cleanModel = modelName.replace(/^models\//, '');
+                    if (baseUrl.includes('/v1') || baseUrl.includes('/v1beta')) {
+                        url = `${baseUrl}/models/${cleanModel}:generateContent?key=${apiKey}`;
+                    } else {
+                        url = `${baseUrl}/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`;
+                    }
+                    console.log(`[AI Test] Gemini Format - Calling: ${url.replace(apiKey, 'REDACTED')}`);
+                    response = await axios.post(url, {
+                        contents: [{ parts: [{ text: "Hello, what is 1+1? Response only the number." }] }]
+                    }, {
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                    });
+                }
+
+                let reply = "";
+                if (isOpenAI) {
+                    reply = response.data?.choices?.[0]?.message?.content?.trim();
+                } else {
+                    reply = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                }
+                
+                reply = reply || "Connected successfully, but got empty response.";
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: `Connected! Answer: ${reply}` }));
+            } catch (e) {
+                console.error('[AI Test Error]:', e.response?.data || e.message);
+                let errorMsg = e.message;
+                if (e.response && e.response.data && e.response.data.error) {
+                    const detail = e.response.data.error;
+                    errorMsg = typeof detail === 'object' ? (detail.message || JSON.stringify(detail)) : detail;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: errorMsg }));
             }
         });
         return;
@@ -155,25 +303,12 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk.toString());
         req.on('end', () => {
             try {
-                const reqData = JSON.parse(body);
-                
-                const isDev = process.argv.includes('-dev');
-                let accPath = path.join(projectRoot, 'dist', 'accounts.json');
-                if (isDev) accPath = path.join(projectRoot, 'src', 'accounts.dev.json');
-                else if (!fs.existsSync(accPath)) accPath = path.join(projectRoot, 'accounts.json');
-
-                let accs = [];
-                try {
-                    const existing = fs.readFileSync(accPath, 'utf-8');
-                    accs = JSON.parse(existing);
-                } catch(e) {}
-                
-                const initialLen = accs.length;
-                accs = accs.filter(a => a.email !== reqData.email);
-                
-                if (accs.length === initialLen) throw new Error('Account not found');
-
-                fs.writeFileSync(accPath, JSON.stringify(accs, null, 4), 'utf-8');
+                const { email } = JSON.parse(body);
+                const db = getDb();
+                const result = db.prepare('DELETE FROM accounts WHERE email = ?').run(email);
+                if (result.changes === 0) throw new Error('Account not found');
+                // Xóa cả status
+                db.prepare('DELETE FROM account_status WHERE email = ?').run(email);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch(e) {
@@ -188,14 +323,19 @@ const server = http.createServer((req, res) => {
         try {
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
             const email = urlParams.get('email');
-            const isDev = process.argv.includes('-dev');
-            let accPath = path.join(projectRoot, 'dist', 'accounts.json');
-            if (isDev) accPath = path.join(projectRoot, 'src', 'accounts.dev.json');
-            else if (!fs.existsSync(accPath)) accPath = path.join(projectRoot, 'accounts.json');
-
-            const accs = JSON.parse(fs.readFileSync(accPath, 'utf-8'));
-            const acc = accs.find(a => a.email === email);
-            if (!acc) throw new Error('Account not found');
+            const db = getDb();
+            const row = db?.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
+            if (!row) throw new Error('Account not found');
+            const acc = {
+                email:           row.email,
+                password:        row.password,
+                totpSecret:      row.totp_secret || undefined,
+                recoveryEmail:   row.recovery_email,
+                geoLocale:       row.geo_locale,
+                langCode:        row.lang_code,
+                proxy:           _safeParse(row.proxy, {}),
+                saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+            };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, account: acc }));
         } catch(e) {
@@ -211,16 +351,39 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const { originalEmail, account } = JSON.parse(body);
-                const isDev = process.argv.includes('-dev');
-                let accPath = path.join(projectRoot, 'dist', 'accounts.json');
-                if (isDev) accPath = path.join(projectRoot, 'src', 'accounts.dev.json');
-                else if (!fs.existsSync(accPath)) accPath = path.join(projectRoot, 'accounts.json');
-
-                let accs = JSON.parse(fs.readFileSync(accPath, 'utf-8'));
-                const idx = accs.findIndex(a => a.email === originalEmail);
-                if (idx === -1) throw new Error('Account not found');
-                accs[idx] = { ...accs[idx], ...account };
-                fs.writeFileSync(accPath, JSON.stringify(accs, null, 4), 'utf-8');
+                const db = getDb();
+                const now = Date.now();
+                // Nếu email thay đổi: xóa cũ, thêm mới
+                if (originalEmail !== account.email) {
+                    db.prepare('DELETE FROM accounts WHERE email = ?').run(originalEmail);
+                    // Chuyển status sang email mới
+                    db.prepare('UPDATE account_status SET email = ? WHERE email = ?').run(account.email, originalEmail);
+                }
+                db.prepare(`
+                    INSERT INTO accounts
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, created_at, updated_at)
+                    VALUES
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @now, @now)
+                    ON CONFLICT(email) DO UPDATE SET
+                        password         = @password,
+                        totp_secret      = @totpSecret,
+                        recovery_email   = @recoveryEmail,
+                        geo_locale       = @geoLocale,
+                        lang_code        = @langCode,
+                        proxy            = @proxy,
+                        save_fingerprint = @saveFingerprint,
+                        updated_at       = @now
+                `).run({
+                    email:           account.email,
+                    password:        account.password        || '',
+                    totpSecret:      account.totpSecret      || '',
+                    recoveryEmail:   account.recoveryEmail   || '',
+                    geoLocale:       account.geoLocale       || 'auto',
+                    langCode:        account.langCode        || 'en',
+                    proxy:           JSON.stringify(account.proxy           || {}),
+                    saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
+                    now,
+                });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch(e) {
@@ -237,19 +400,25 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const newAcc = JSON.parse(body);
-                
-                const isDev = process.argv.includes('-dev');
-                let accPath = path.join(projectRoot, 'dist', 'accounts.json');
-                if (isDev) accPath = path.join(projectRoot, 'src', 'accounts.dev.json');
-                else if (!fs.existsSync(accPath)) accPath = path.join(projectRoot, 'accounts.json');
-
-                let accs = [];
-                try {
-                    const existing = fs.readFileSync(accPath, 'utf-8');
-                    accs = JSON.parse(existing);
-                } catch(e) {}
-                accs.push(newAcc);
-                fs.writeFileSync(accPath, JSON.stringify(accs, null, 4), 'utf-8');
+                if (!newAcc.email) throw new Error('Email is required');
+                const db = getDb();
+                const now = Date.now();
+                db.prepare(`
+                    INSERT INTO accounts
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, created_at, updated_at)
+                    VALUES
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @now, @now)
+                `).run({
+                    email:           newAcc.email,
+                    password:        newAcc.password        || '',
+                    totpSecret:      newAcc.totpSecret      || '',
+                    recoveryEmail:   newAcc.recoveryEmail   || '',
+                    geoLocale:       newAcc.geoLocale       || 'auto',
+                    langCode:        newAcc.langCode        || 'en',
+                    proxy:           JSON.stringify(newAcc.proxy           || {}),
+                    saveFingerprint: JSON.stringify(newAcc.saveFingerprint || { mobile: true, desktop: true }),
+                    now,
+                });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch(e) {
@@ -262,31 +431,47 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'GET' && req.url === '/api/accounts') {
         try {
-            const isDev = process.argv.includes('-dev');
-            const { data: accounts } = loadAccounts(projectRoot, isDev);
+            const db = getDb();
+            const accounts = db?.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all() || [];
+            const diskStatus = loadAccountStatus();
             
-            const cleanAccounts = accounts.filter(a => a && a.email).map(a => {
+            const cleanAccounts = accounts.map(a => {
+                const proxy = _safeParse(a.proxy, {});
                 const isActiveDesktop = activeProcesses[`${a.email}-desktop`] !== undefined;
-                const isActiveMobile = activeProcesses[`${a.email}-mobile`] !== undefined;
-                const isActiveBot = activeProcesses[`${a.email}-bot`] !== undefined;
+                const isActiveMobile  = activeProcesses[`${a.email}-mobile`]  !== undefined;
+                const isActiveBot     = activeProcesses[`${a.email}-bot`]     !== undefined;
+
+                const proxyStr = proxy?.url ? `${proxy.url}:${proxy.port}` : 'None';
+                const normalizedProxyUrl = (proxy?.url || '').replace(/^https?:\/\//i, '').toLowerCase().trim();
+                const proxyGroup = normalizedProxyUrl
+                    ? `${proxy?.username || ''}@${normalizedProxyUrl}:${proxy?.port || 0}`
+                    : 'NO_PROXY';
+
+                const ds = diskStatus[a.email] || null;
+                let stats = accountStats[a.email] || null;
+                if (!stats && ds) {
+                    stats = {
+                        total:       ds.collectedPoints ?? 0,
+                        oldBalance:  ds.initialPoints   ?? 0,
+                        newBalance:  ds.points          ?? 0,
+                        duration:    ds.duration        ?? null,
+                        rank:        ds.rank            || null,
+                        completedAt: ds.lastUpdate      || null
+                    };
+                }
+
                 return {
                     email: a.email,
-                    proxy: a.proxy?.url ? `${a.proxy.url}:${a.proxy.port}` : 'None',
+                    proxy: proxyStr,
+                    proxyGroup,
                     isActiveDesktop,
                     isActiveMobile,
                     isActiveBot,
-                    stats: accountStats[a.email] || (a.initialPoints !== undefined ? {
-                        total: a.collectedPoints,
-                        oldBalance: a.initialPoints,
-                        newBalance: a.points,
-                        duration: a.duration,
-                        rank: a.rank,
-                        completedAt: a.lastUpdate
-                    } : null),
-                    points: a.points || 0,
-                    rank: accountStats[a.email]?.rank || a.rank || 'N/A',
-                    lastUpdate: a.lastUpdate || 'Never'
-                }
+                    stats,
+                    points:     ds?.points ?? 0,
+                    rank:       accountStats[a.email]?.rank || ds?.rank || 'N/A',
+                    lastUpdate: ds?.lastUpdate || 'Never'
+                };
             });
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -325,6 +510,7 @@ const server = http.createServer((req, res) => {
                 }
 
                 log('INFO', `Dashboard: Opening ${type} session for ${email}`);
+                if (accountStats[email]) delete accountStats[email].isProxyBusy; 
 
                 let args;
                 if (type === 'bot') {
@@ -348,7 +534,13 @@ const server = http.createServer((req, res) => {
                     const clean = stripAnsi(line).trim();
                     if (!clean) return;
                     processLogs[key].push(clean);
-                    if (type === 'bot') parseAccountEndLog(clean, email);
+                    if (type === 'bot') {
+                        parseAccountEndLog(clean, email);
+                        if (clean.includes('[PROXY-BUSY]')) {
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].isProxyBusy = true;
+                        }
+                    }
                 };
 
                 const addLog = (data) => {

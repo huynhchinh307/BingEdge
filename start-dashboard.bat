@@ -4,9 +4,13 @@ title BingReward Dashboard
 color 0A
 
 echo.
-echo  ╔══════════════════════════════════════╗
-echo  ║        BingReward Dashboard          ║
-echo  ╚══════════════════════════════════════╝
+echo  +------------------------------------------------------+
+echo  ^|              BING REWARDS DASHBOARD                ^|
+echo  +------------------------------------------------------+
+echo  ^|  Version : 1.0.0 (Patchright Edition)               ^|
+echo  ^|  Author  : huynhchinh307                            ^|
+echo  ^|  AI Core : Gemini / OpenAI (Compatible)             ^|
+echo  +------------------------------------------------------+
 echo.
 
 :: Check Node.js

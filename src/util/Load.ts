@@ -6,59 +6,70 @@ import path from 'path'
 import type { Account, ConfigSaveFingerprint } from '../interface/Account'
 import type { Config } from '../interface/Config'
 import { validateAccounts, validateConfig } from './Validator'
+import {
+    dbLoadAccounts,
+    dbSaveAccount,
+    dbLoadConfig,
+    updateAccountStatus,
+    getAccountStatus,
+    getAllAccountStatuses,
+    closeDb,
+} from './Database'
 
 let configCache: Config
 
+/**
+ * Đọc danh sách accounts từ SQLite.
+ * Nếu DB trống: throw lỗi yêu cầu user thêm account qua dashboard.
+ */
 export function loadAccounts(): Account[] {
     try {
-        let file = 'accounts.json'
-
-        if (process.argv.includes('-dev')) {
-            file = 'accounts.dev.json'
+        const accounts = dbLoadAccounts()
+        if (accounts.length === 0) {
+            throw new Error(
+                'No accounts found in database.\n' +
+                'Please add accounts via the dashboard or run migration from accounts.json.'
+            )
         }
-
-        const accountDir = path.join(__dirname, '../', file)
-        const accounts = fs.readFileSync(accountDir, 'utf-8')
-        const accountsData = JSON.parse(accounts)
-
-        validateAccounts(accountsData)
-
-        return accountsData
+        validateAccounts(accounts)
+        return accounts
     } catch (error) {
         throw new Error(error as string)
     }
 }
 
+/**
+ * saveAccounts — upsert từng account vào DB.
+ * Giữ lại signature để không break các nơi đang gọi.
+ */
 export function saveAccounts(accounts: Account[]): void {
     try {
-        let file = 'accounts.json'
-
-        if (process.argv.includes('-dev')) {
-            file = 'accounts.dev.json'
+        for (const acc of accounts) {
+            dbSaveAccount(acc)
         }
-
-        const accountDir = path.join(__dirname, '../', file)
-        fs.writeFileSync(accountDir, JSON.stringify(accounts, null, 4))
     } catch (error) {
-        throw new Error(error as string)
+        console.error('[Load] saveAccounts error:', error)
     }
 }
+
+// Re-export DB helpers
+export { updateAccountStatus, getAccountStatus, getAllAccountStatuses, closeDb, dbSaveAccount, dbLoadAccounts }
+export { dbSaveConfig, dbDeleteAccount } from './Database'
+
 
 export function loadConfig(): Config {
     try {
-        if (configCache) {
-            return configCache
+        if (configCache) return configCache
+        const config = dbLoadConfig()
+        if (!config) {
+            throw new Error(
+                'No config found in database.\n' +
+                'Please configure the bot via the dashboard (Config tab).'
+            )
         }
-
-        const configDir = path.join(__dirname, '../', 'config.json')
-        const config = fs.readFileSync(configDir, 'utf-8')
-
-        const configData = JSON.parse(config)
-        validateConfig(configData)
-
-        configCache = configData
-
-        return configData
+        validateConfig(config)
+        configCache = config
+        return configCache
     } catch (error) {
         throw new Error(error as string)
     }
