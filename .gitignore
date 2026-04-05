@@ -9,6 +9,11 @@ node_modules/
 dist/accounts.json
 dist/account_stats.json
 dist/.accounts.bak.json
+account_status.json
+# SQLite database (runtime data)
+rewards_data.db
+rewards_data.db-wal
+rewards_data.db-shm
 
 # Sessions & fingerprints (dữ liệu đăng nhập thật)
 dist/browser/sessions/
