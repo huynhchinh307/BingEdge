@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.dbDeleteAccount = exports.dbSaveConfig = exports.dbLoadAccounts = exports.dbSaveAccount = exports.closeDb = exports.getAllAccountStatuses = exports.getAccountStatus = exports.updateAccountStatus = void 0;
 exports.loadAccounts = loadAccounts;
 exports.saveAccounts = saveAccounts;
 exports.loadConfig = loadConfig;
@@ -12,47 +13,61 @@ exports.saveFingerprintData = saveFingerprintData;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const Validator_1 = require("./Validator");
+const Database_1 = require("./Database");
+Object.defineProperty(exports, "dbLoadAccounts", { enumerable: true, get: function () { return Database_1.dbLoadAccounts; } });
+Object.defineProperty(exports, "dbSaveAccount", { enumerable: true, get: function () { return Database_1.dbSaveAccount; } });
+Object.defineProperty(exports, "updateAccountStatus", { enumerable: true, get: function () { return Database_1.updateAccountStatus; } });
+Object.defineProperty(exports, "getAccountStatus", { enumerable: true, get: function () { return Database_1.getAccountStatus; } });
+Object.defineProperty(exports, "getAllAccountStatuses", { enumerable: true, get: function () { return Database_1.getAllAccountStatuses; } });
+Object.defineProperty(exports, "closeDb", { enumerable: true, get: function () { return Database_1.closeDb; } });
 let configCache;
+/**
+ * Đọc danh sách accounts từ SQLite.
+ * Nếu DB trống: throw lỗi yêu cầu user thêm account qua dashboard.
+ */
 function loadAccounts() {
     try {
-        let file = 'accounts.json';
-        if (process.argv.includes('-dev')) {
-            file = 'accounts.dev.json';
+        const accounts = (0, Database_1.dbLoadAccounts)();
+        if (accounts.length === 0) {
+            throw new Error('No accounts found in database.\n' +
+                'Please add accounts via the dashboard or run migration from accounts.json.');
         }
-        const accountDir = path_1.default.join(__dirname, '../', file);
-        const accounts = fs_1.default.readFileSync(accountDir, 'utf-8');
-        const accountsData = JSON.parse(accounts);
-        (0, Validator_1.validateAccounts)(accountsData);
-        return accountsData;
+        (0, Validator_1.validateAccounts)(accounts);
+        return accounts;
     }
     catch (error) {
         throw new Error(error);
     }
 }
+/**
+ * saveAccounts — upsert từng account vào DB.
+ * Giữ lại signature để không break các nơi đang gọi.
+ */
 function saveAccounts(accounts) {
     try {
-        let file = 'accounts.json';
-        if (process.argv.includes('-dev')) {
-            file = 'accounts.dev.json';
+        for (const acc of accounts) {
+            (0, Database_1.dbSaveAccount)(acc);
         }
-        const accountDir = path_1.default.join(__dirname, '../', file);
-        fs_1.default.writeFileSync(accountDir, JSON.stringify(accounts, null, 4));
     }
     catch (error) {
-        throw new Error(error);
+        console.error('[Load] saveAccounts error:', error);
     }
 }
+var Database_2 = require("./Database");
+Object.defineProperty(exports, "dbSaveConfig", { enumerable: true, get: function () { return Database_2.dbSaveConfig; } });
+Object.defineProperty(exports, "dbDeleteAccount", { enumerable: true, get: function () { return Database_2.dbDeleteAccount; } });
 function loadConfig() {
     try {
-        if (configCache) {
+        if (configCache)
             return configCache;
+        const config = (0, Database_1.dbLoadConfig)();
+        if (!config) {
+            throw new Error('No config found in database.\n' +
+                'Please configure the bot via the dashboard (Config tab).');
         }
-        const configDir = path_1.default.join(__dirname, '../', 'config.json');
-        const config = fs_1.default.readFileSync(configDir, 'utf-8');
-        const configData = JSON.parse(config);
-        (0, Validator_1.validateConfig)(configData);
-        configCache = configData;
-        return configData;
+        (0, Validator_1.validateConfig)(config);
+        configCache = config;
+        return configCache;
     }
     catch (error) {
         throw new Error(error);

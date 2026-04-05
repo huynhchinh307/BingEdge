@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.executionContext = exports.MicrosoftRewardsBot = void 0;
 exports.getCurrentContext = getCurrentContext;
 const node_async_hooks_1 = require("node:async_hooks");
+const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
 const cluster_1 = __importDefault(require("cluster"));
 const package_json_1 = __importDefault(require("../package.json"));
 const Browser_1 = __importDefault(require("./browser/Browser"));
@@ -83,6 +85,15 @@ class MicrosoftRewardsBot {
         const totalAccounts = accountsToRun.length;
         const runStartTime = Date.now();
         this.logger.info('main', 'RUN-START', `Starting Microsoft Rewards Script | v${package_json_1.default.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`);
+        if (cluster_1.default.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
+            const ok = await this.testGeminiConnection();
+            if (!ok) {
+                this.logger.error('main', 'GEMINI-INIT', 'Gemini AI connection test failed. Bot will not start to prevent invalid searches.');
+                await flushAllWebhooks();
+                process.exit(1);
+            }
+            this.logger.info('main', 'GEMINI-INIT', 'Gemini AI connection verified successfully.');
+        }
         if (this.config.clusters > 1) {
             if (cluster_1.default.isPrimary) {
                 this.runMaster(accountsToRun, runStartTime);
@@ -95,10 +106,76 @@ class MicrosoftRewardsBot {
             await this.runTasks(accountsToRun, runStartTime);
         }
     }
+    async testGeminiConnection() {
+        const apiKey = this.config.geminiApiKey;
+        const model = this.config.geminiModel || 'gemini-1.5-flash';
+        const endpoint = (this.config.geminiEndpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
+        if (!apiKey) {
+            this.logger.error('main', 'GEMINI-CHECK', 'Gemini API Key is missing in config.json!');
+            return false;
+        }
+        this.logger.info('main', 'GEMINI-CHECK', 'Testing Gemini API connectivity...');
+        const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com');
+        const axios = new Axios_1.default({}); // Global test, proxy bypassed if not configured in request
+        try {
+            let url = '';
+            let data = {};
+            let headers = { 'Content-Type': 'application/json' };
+            if (isOpenAI) {
+                url = `${endpoint}/chat/completions`;
+                headers['Authorization'] = `Bearer ${apiKey}`;
+                data = {
+                    model: model,
+                    messages: [{ role: 'user', content: 'Say OK' }],
+                    max_tokens: 5
+                };
+            }
+            else {
+                const cleanModel = model.replace(/^models\//, '');
+                url = `${endpoint}/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`;
+                data = {
+                    contents: [{ parts: [{ text: 'Say OK' }] }],
+                    generationConfig: { maxOutputTokens: 5 }
+                };
+            }
+            await axios.request({
+                url,
+                method: 'POST',
+                headers,
+                data,
+                timeout: 10000
+            }, !this.config.proxy.queryEngine);
+            return true;
+        }
+        catch (e) {
+            const detail = e.response?.data?.error?.message || e.response?.data?.error || e.message;
+            this.logger.error('main', 'GEMINI-CHECK', `API Test Failed | URL: ${endpoint} | Error: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
+            return false;
+        }
+    }
     runMaster(accounts, runStartTime) {
         void this.logger.info('main', 'CLUSTER-PRIMARY', `Primary process started | PID: ${process.pid}`);
-        const rawChunks = this.utils.chunkArray(accounts, this.config.clusters);
-        const accountChunks = rawChunks.filter(c => c && c.length > 0);
+        // Group accounts by proxy to ensure "1 account per proxy" at a time across clusters
+        const proxyGroups = new Map();
+        for (const account of accounts) {
+            const proxyKey = this.getProxyKey(account);
+            if (!proxyGroups.has(proxyKey)) {
+                proxyGroups.set(proxyKey, []);
+            }
+            proxyGroups.get(proxyKey).push(account);
+        }
+        if (proxyGroups.size < accounts.length) {
+            this.logger.info('main', 'CLUSTER-PRIMARY', `Grouped ${accounts.length} accounts into ${proxyGroups.size} proxy groups to prevent simultaneous use of the same IP.`);
+        }
+        // Distribute groups across clusters to balance the workload (account count)
+        const workerChunks = Array.from({ length: this.config.clusters }, () => []);
+        const sortedGroups = [...proxyGroups.values()].sort((a, b) => b.length - a.length);
+        for (const group of sortedGroups) {
+            // Assign each group to the worker that currently has the fewest accounts assigned
+            const targetWorker = workerChunks.reduce((min, cur) => (cur.length < min.length ? cur : min), workerChunks[0]);
+            targetWorker.push(...group);
+        }
+        const accountChunks = workerChunks.filter(c => c && c.length > 0);
         this.activeWorkers = accountChunks.length;
         const allAccountStats = [];
         for (const chunk of accountChunks) {
@@ -184,66 +261,94 @@ class MicrosoftRewardsBot {
     }
     async runTasks(accounts, runStartTime) {
         const accountStats = [];
-        for (const account of accounts) {
-            const accountStartTime = Date.now();
-            const accountEmail = account.email;
-            this.userData.userName = this.utils.getEmailUsername(accountEmail);
-            try {
-                this.logger.info('main', 'ACCOUNT-START', `Starting account: ${accountEmail} | geoLocale: ${account.geoLocale}`);
-                this.axios = new Axios_1.default(account.proxy);
-                const result = await this.Main(account).catch(error => {
-                    void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
-                    return undefined;
-                });
-                const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1);
-                if (result) {
-                    const collectedPoints = result.collectedPoints ?? 0;
-                    const accountInitialPoints = result.initialPoints ?? 0;
-                    const accountFinalPoints = accountInitialPoints + collectedPoints;
-                    account.points = accountFinalPoints;
-                    account.initialPoints = accountInitialPoints;
-                    account.collectedPoints = collectedPoints;
-                    account.duration = parseFloat(durationSeconds);
-                    account.rank = result.rank;
-                    account.lastUpdate = new Date().toISOString();
-                    accountStats.push({
-                        email: accountEmail,
-                        initialPoints: accountInitialPoints,
-                        finalPoints: accountFinalPoints,
-                        collectedPoints: collectedPoints,
-                        duration: parseFloat(durationSeconds),
-                        rank: result.rank,
-                        success: true
+        const queue = [...accounts];
+        while (queue.length > 0) {
+            const account = queue.shift();
+            const proxyKey = this.getProxyKey(account);
+            // Try to acquire global lock for this proxy
+            if (await this.acquireProxyLock(proxyKey)) {
+                try {
+                    const accountStartTime = Date.now();
+                    const accountEmail = account.email;
+                    this.userData.userName = this.utils.getEmailUsername(accountEmail);
+                    this.logger.info('main', 'ACCOUNT-START', `Starting account: ${accountEmail} | geoLocale: ${account.geoLocale}`);
+                    this.axios = new Axios_1.default(account.proxy);
+                    const result = await this.Main(account).catch(error => {
+                        void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
+                        return undefined;
                     });
-                    this.logger.info('main', 'ACCOUNT-END', `Completed account: ${accountEmail} | Total: +${collectedPoints} | Old: ${accountInitialPoints} → New: ${accountFinalPoints} | Rank: ${result.rank || 'N/A'} | Duration: ${durationSeconds}s`, 'green');
-                    if (this.config.clusters <= 1) {
-                        (0, Load_1.saveAccounts)(this.accounts);
+                    const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1);
+                    if (result) {
+                        const collectedPoints = result.collectedPoints ?? 0;
+                        const accountInitialPoints = result.initialPoints ?? 0;
+                        const accountFinalPoints = accountInitialPoints + collectedPoints;
+                        account.points = accountFinalPoints;
+                        account.initialPoints = accountInitialPoints;
+                        account.collectedPoints = collectedPoints;
+                        account.duration = parseFloat(durationSeconds);
+                        account.rank = result.rank;
+                        account.lastUpdate = new Date().toISOString();
+                        // Ghi status riêng theo email — tránh race condition khi nhiều worker cùng ghi accounts.json
+                        (0, Load_1.updateAccountStatus)(accountEmail, {
+                            points: accountFinalPoints,
+                            initialPoints: accountInitialPoints,
+                            collectedPoints: collectedPoints,
+                            duration: parseFloat(durationSeconds),
+                            rank: result.rank,
+                            lastUpdate: account.lastUpdate
+                        });
+                        const stats = {
+                            email: accountEmail,
+                            initialPoints: accountInitialPoints,
+                            finalPoints: accountFinalPoints,
+                            collectedPoints: collectedPoints,
+                            duration: parseFloat(durationSeconds),
+                            rank: result.rank,
+                            success: true
+                        };
+                        accountStats.push(stats);
+                        this.logger.info('main', 'ACCOUNT-END', `Completed account: ${accountEmail} | Total: +${collectedPoints} | Old: ${accountInitialPoints} → New: ${accountFinalPoints} | Rank: ${result.rank || 'N/A'} | Duration: ${durationSeconds}s`, 'green');
+                    }
+                    else {
+                        accountStats.push({
+                            email: accountEmail,
+                            initialPoints: 0,
+                            finalPoints: 0,
+                            collectedPoints: 0,
+                            duration: parseFloat(durationSeconds),
+                            success: false,
+                            error: 'Flow failed'
+                        });
                     }
                 }
-                else {
-                    accountStats.push({
-                        email: accountEmail,
-                        initialPoints: 0,
-                        finalPoints: 0,
-                        collectedPoints: 0,
-                        duration: parseFloat(durationSeconds),
-                        success: false,
-                        error: 'Flow failed'
-                    });
+                finally {
+                    this.releaseProxyLock(proxyKey);
                 }
             }
-            catch (error) {
-                const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1);
-                this.logger.error('main', 'ACCOUNT-ERROR', `${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
-                accountStats.push({
-                    email: accountEmail,
-                    initialPoints: 0,
-                    finalPoints: 0,
-                    collectedPoints: 0,
-                    duration: parseFloat(durationSeconds),
-                    success: false,
-                    error: error instanceof Error ? error.message : String(error)
-                });
+            else {
+                // Proxy is busy (another process is using it)
+                if (queue.length > 0) {
+                    // Put back to try other accounts in this worker's queue first
+                    queue.push(account);
+                    this.logger.info(false, 'MAIN', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Moving to next account in queue...`);
+                    await this.utils.wait(3000);
+                }
+                else {
+                    // One of these might be true:
+                    // 1. This is a single account run from Dashboard (accounts.length === 1)
+                    // 2. This is the last account in a worker's chunk
+                    if (accounts.length === 1) {
+                        this.logger.warn(false, 'MAIN', `[PROXY-BUSY] Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Exiting to allow dashboard to switch accounts...`);
+                        // Exit with 88 to signal Proxy Busy
+                        process.exit(88);
+                    }
+                    else {
+                        // For multi-account clumps, we just wait a bit and retry
+                        this.logger.warn(false, 'MAIN', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Waiting...`);
+                        await this.utils.wait(10000);
+                        queue.unshift(account); // Try again later
+                    }
+                }
             }
         }
         if (this.config.clusters <= 1 && !cluster_1.default.isWorker) {
@@ -253,9 +358,76 @@ class MicrosoftRewardsBot {
             const totalDurationMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1);
             this.logger.info('main', 'RUN-END', `Completed all accounts | Accounts processed: ${accountStats.length} | Total points collected: +${totalCollectedPoints} | Old total: ${totalInitialPoints} → New total: ${totalFinalPoints} | Total runtime: ${totalDurationMinutes}min`, 'green');
             await flushAllWebhooks();
-            process.exit();
         }
         return accountStats;
+    }
+    getProxyKey(account) {
+        if (!account.proxy || !account.proxy.url) {
+            return 'NO_PROXY';
+        }
+        // Normalize URL by stripping scheme prefix (http://, https://)
+        // so that 'proxy.example.com' and 'http://proxy.example.com' are treated as the same proxy
+        const normalizedUrl = account.proxy.url.replace(/^https?:\/\//i, '').toLowerCase().trim();
+        return `${account.proxy.username || ''}@${normalizedUrl}:${account.proxy.port}`;
+    }
+    async acquireProxyLock(proxyKey) {
+        const lockDir = node_path_1.default.join(process.cwd(), '.locks');
+        try {
+            if (!node_fs_1.default.existsSync(lockDir)) {
+                node_fs_1.default.mkdirSync(lockDir, { recursive: true });
+            }
+        }
+        catch (e) { }
+        const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
+        const lockPath = node_path_1.default.join(lockDir, `${safeKey}.lock`);
+        try {
+            // Try to create the lock file atomically
+            node_fs_1.default.writeFileSync(lockPath, process.pid.toString(), { flag: 'wx' });
+            return true;
+        }
+        catch (err) {
+            if (err.code === 'EEXIST') {
+                try {
+                    const content = node_fs_1.default.readFileSync(lockPath, 'utf8').trim();
+                    if (!content) {
+                        node_fs_1.default.unlinkSync(lockPath);
+                        return false;
+                    }
+                    const pid = parseInt(content);
+                    if (isNaN(pid)) {
+                        node_fs_1.default.unlinkSync(lockPath);
+                        return false;
+                    }
+                    // Check if process is alive
+                    try {
+                        process.kill(pid, 0);
+                        return pid === process.pid;
+                    }
+                    catch (e) {
+                        // Dead process
+                        node_fs_1.default.unlinkSync(lockPath);
+                        return false;
+                    }
+                }
+                catch (e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+    }
+    releaseProxyLock(proxyKey) {
+        try {
+            const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
+            const lockPath = node_path_1.default.join(process.cwd(), '.locks', `${safeKey}.lock`);
+            if (node_fs_1.default.existsSync(lockPath)) {
+                const pid = parseInt(node_fs_1.default.readFileSync(lockPath, 'utf8').trim());
+                if (pid === process.pid) {
+                    node_fs_1.default.unlinkSync(lockPath);
+                }
+            }
+        }
+        catch (e) { }
     }
     async Main(account) {
         const accountEmail = account.email;
@@ -282,6 +454,8 @@ class MicrosoftRewardsBot {
                 // Set geo
                 this.userData.geoLocale =
                     account.geoLocale === 'auto' ? data.userProfile.attributes.country : account.geoLocale.toLowerCase();
+                this.userData.langCode =
+                    account.langCode ? account.langCode.toLowerCase() : 'en';
                 if (this.userData.geoLocale.length > 2) {
                     this.logger.warn('main', 'GEO-LOCALE', `The provided geoLocale is longer than 2 (${this.userData.geoLocale} | auto=${account.geoLocale === 'auto'}), this is likely invalid and can cause errors!`);
                 }

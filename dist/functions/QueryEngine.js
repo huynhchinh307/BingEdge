@@ -68,6 +68,11 @@ class QueryCore {
                     const topics = this.getLocalQueryList();
                     this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `local: ${topics.length}`);
                     return topics;
+                },
+                gemini: async () => {
+                    const topics = await this.getGeminiQueries(langCode, geoLocale).catch(() => []);
+                    this.bot.logger.debug(this.bot.isMobile, 'QUERY-MANAGER', `gemini: ${topics.length}`);
+                    return topics;
                 }
             };
             for (const source of sourceOrder) {
@@ -168,7 +173,7 @@ class QueryCore {
             const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine);
             const trendsData = this.extractJsonFromResponse(response.data);
             if (!trendsData) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No trendsData parsed from response');
                 return [];
             }
@@ -184,7 +189,7 @@ class QueryCore {
             }
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GOOGLE-TRENDS', `request failed: ${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }
@@ -215,13 +220,13 @@ class QueryCore {
             const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine);
             const suggestions = response.data.suggestionGroups?.[0]?.searchSuggestions?.map((x) => x.query) ?? [];
             if (!suggestions.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', `empty suggestions | query="${query}" | lang=${langCode}`);
             }
             return suggestions;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-SUGGESTIONS', `request failed | query="${query}" | lang=${langCode} | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }
@@ -239,13 +244,13 @@ class QueryCore {
             const related = response.data?.[1];
             const out = Array.isArray(related) ? related : [];
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', `empty related terms | query="${query}"`);
             }
             return out;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-RELATED', `request failed | query="${query}" | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }
@@ -267,13 +272,13 @@ class QueryCore {
             const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine);
             const topics = response.data.value?.map((x) => x.query?.text?.trim() || x.name.trim()) ?? [];
             if (!topics.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', `empty trending topics | lang=${langCode}`);
             }
             return topics;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-BING-TRENDING', `request failed | lang=${langCode} | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }
@@ -295,13 +300,13 @@ class QueryCore {
             const articles = response.data.items?.[0]?.articles ?? [];
             const out = articles.slice(0, 50).map(a => a.article.replace(/_/g, ' '));
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', `empty wikipedia top | lang=${langCode}`);
             }
             return out;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-WIKIPEDIA-TRENDING', `request failed | lang=${langCode} | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }
@@ -320,14 +325,94 @@ class QueryCore {
             const posts = response.data.data?.children ?? [];
             const out = posts.filter(p => !p.data.over_18).map(p => p.data.title);
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-REDDIT-TRENDING', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT-TRENDING', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT-TRENDING', `empty reddit listing | subreddit=${safe}`);
             }
             return out;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-REDDIT', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-REDDIT', `request failed | subreddit=${subreddit} | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
+            return [];
+        }
+    }
+    async getGeminiQueries(langCode = 'en', geoLocale = 'US') {
+        const apiKey = this.bot.config.geminiApiKey;
+        if (!apiKey || apiKey === '') {
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GEMINI', 'Skip: No Gemini API Key in config');
+            return [];
+        }
+        try {
+            this.bot.logger.info(this.bot.isMobile, 'SEARCH-GEMINI', `Generating 50 queries in [${langCode}] for [${geoLocale}] via Gemini AI...`);
+            const prompt = `Act as a regular curious human living in ${geoLocale} who speaks ${langCode} fluently. 
+            YOU MUST GENERATE ALL SEARCH QUERIES IN THE LANGUAGE: ${langCode}.
+            If the language code is 'vi', you MUST write in Vietnamese.
+            Generate a list of 50 unique, natural search queries that a real person in ${geoLocale} would type into a search engine today.
+            The queries should be a mix of:
+            - Informational (how to..., what is..., why...) in ${langCode}
+            - Navigational (popular websites in ${geoLocale})
+            - Transactional (prices in ${geoLocale}, shopping)
+            - Local interests, news, and food in ${geoLocale}
+            - Trending topics in science, tech, and entertainment.
+            
+            Return ONLY a raw JSON array of strings, no other text or formatting. 
+            Example output format: ["query 1", "query 2"]`;
+            const model = this.bot.config.geminiModel || 'gemini-1.5-flash';
+            const endpoint = (this.bot.config.geminiEndpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
+            const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com');
+            let url;
+            let data;
+            let headers = { 'Content-Type': 'application/json' };
+            if (isOpenAI) {
+                url = `${endpoint}/chat/completions`;
+                headers['Authorization'] = `Bearer ${apiKey}`;
+                data = {
+                    model: model,
+                    messages: [{ role: 'user', content: prompt }],
+                    response_format: { type: 'json_object' }
+                };
+            }
+            else {
+                const cleanModel = model.replace(/^models\//, '');
+                if (endpoint.includes('/v1') || endpoint.includes('/v1beta')) {
+                    url = `${endpoint}/models/${cleanModel}:generateContent?key=${apiKey}`;
+                }
+                else {
+                    url = `${endpoint}/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`;
+                }
+                data = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { response_mime_type: 'application/json' }
+                };
+            }
+            const request = {
+                url: url,
+                method: 'POST',
+                headers: headers,
+                data: data
+            };
+            const response = await this.bot.axios.request(request, this.bot.config.proxy.queryEngine);
+            let content;
+            if (isOpenAI) {
+                content = response.data?.choices?.[0]?.message?.content;
+            }
+            else {
+                content = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            }
+            if (!content) {
+                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GEMINI', 'No response content from Gemini');
+                return [];
+            }
+            const queries = JSON.parse(content);
+            if (Array.isArray(queries)) {
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GEMINI', `Generated ${queries.length} queries`);
+                return queries;
+            }
+            return [];
+        }
+        catch (error) {
+            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-GEMINI', 'Failed to generate queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-GEMINI', `Error: ${error instanceof Error ? error.message : String(error)}`);
             return [];
         }
     }
@@ -338,13 +423,13 @@ class QueryCore {
             const out = Array.isArray(queries) ? queries : [];
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'local queries loaded | file=search-queries.json');
             if (!out.length) {
-                this.bot.logger.warn(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries');
+                this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries');
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'search-queries.json parsed but empty or invalid');
             }
             return out;
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries');
+            this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', 'No queries');
             this.bot.logger.debug(this.bot.isMobile, 'SEARCH-LOCAL-QUERY-LIST', `read/parse failed | error=${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ''}` : String(error)}`);
             return [];
         }

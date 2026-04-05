@@ -12,29 +12,36 @@ const semver_1 = __importDefault(require("semver"));
 const package_json_1 = __importDefault(require("../../package.json"));
 const NumberOrString = zod_1.z.union([zod_1.z.number(), zod_1.z.string()]);
 const LogFilterSchema = zod_1.z.object({
-    enabled: zod_1.z.boolean(),
-    mode: zod_1.z.enum(['whitelist', 'blacklist']),
-    levels: zod_1.z.array(zod_1.z.enum(['debug', 'info', 'warn', 'error'])).optional(),
-    keywords: zod_1.z.array(zod_1.z.string()).optional(),
-    regexPatterns: zod_1.z.array(zod_1.z.string()).optional()
+    enabled: zod_1.z.boolean().default(false),
+    mode: zod_1.z.enum(['whitelist', 'blacklist']).default('blacklist'),
+    levels: zod_1.z.array(zod_1.z.enum(['debug', 'info', 'warn', 'error'])).optional().default(['error']),
+    keywords: zod_1.z.array(zod_1.z.string()).optional().default([]),
+    regexPatterns: zod_1.z.array(zod_1.z.string()).optional().default([])
+}).default({
+    enabled: false,
+    mode: 'blacklist',
+    levels: ['error'],
+    keywords: [],
+    regexPatterns: []
 });
 const DelaySchema = zod_1.z.object({
     min: NumberOrString,
     max: NumberOrString
 });
-const QueryEngineSchema = zod_1.z.enum(['google', 'wikipedia', 'reddit', 'local']);
+const QueryEngineSchema = zod_1.z.enum(['google', 'wikipedia', 'reddit', 'local', 'gemini']);
 // Webhook
 const WebhookSchema = zod_1.z.object({
     discord: zod_1.z
         .object({
-        enabled: zod_1.z.boolean(),
-        url: zod_1.z.string()
+        enabled: zod_1.z.boolean().default(false),
+        url: zod_1.z.string().default('')
     })
-        .optional(),
+        .optional()
+        .default({ enabled: false, url: '' }),
     ntfy: zod_1.z
         .object({
-        enabled: zod_1.z.boolean().optional(),
-        url: zod_1.z.string(),
+        enabled: zod_1.z.boolean().optional().default(false),
+        url: zod_1.z.string().default(''),
         topic: zod_1.z.string().optional(),
         token: zod_1.z.string().optional(),
         title: zod_1.z.string().optional(),
@@ -43,6 +50,15 @@ const WebhookSchema = zod_1.z.object({
     })
         .optional(),
     webhookLogFilter: LogFilterSchema
+}).default({
+    discord: { enabled: false, url: '' },
+    webhookLogFilter: {
+        enabled: false,
+        mode: 'blacklist',
+        levels: ['error'],
+        keywords: [],
+        regexPatterns: []
+    }
 });
 // Config
 exports.ConfigSchema = zod_1.z.object({
@@ -52,35 +68,58 @@ exports.ConfigSchema = zod_1.z.object({
     browserType: zod_1.z.enum(['chromium', 'edge']).optional().default('chromium'),
     runOnZeroPoints: zod_1.z.boolean().optional().default(false),
     clusters: zod_1.z.number().int().nonnegative(),
-    errorDiagnostics: zod_1.z.boolean(),
+    errorDiagnostics: zod_1.z.boolean().default(true),
     workers: zod_1.z.object({
-        doDailySet: zod_1.z.boolean(),
-        doSpecialPromotions: zod_1.z.boolean(),
-        doMorePromotions: zod_1.z.boolean(),
-        doPunchCards: zod_1.z.boolean(),
-        doAppPromotions: zod_1.z.boolean(),
-        doDesktopSearch: zod_1.z.boolean(),
-        doMobileSearch: zod_1.z.boolean(),
-        doDailyCheckIn: zod_1.z.boolean(),
-        doReadToEarn: zod_1.z.boolean()
+        doDailySet: zod_1.z.boolean().default(true),
+        doSpecialPromotions: zod_1.z.boolean().default(true),
+        doMorePromotions: zod_1.z.boolean().default(true),
+        doPunchCards: zod_1.z.boolean().default(true),
+        doAppPromotions: zod_1.z.boolean().default(true),
+        doDesktopSearch: zod_1.z.boolean().default(true),
+        doMobileSearch: zod_1.z.boolean().default(true),
+        doDailyCheckIn: zod_1.z.boolean().default(true),
+        doReadToEarn: zod_1.z.boolean().default(true)
+    }).default({
+        doDailySet: true,
+        doSpecialPromotions: true,
+        doMorePromotions: true,
+        doPunchCards: true,
+        doAppPromotions: true,
+        doDesktopSearch: true,
+        doMobileSearch: true,
+        doDailyCheckIn: true,
+        doReadToEarn: true
     }),
-    searchOnBingLocalQueries: zod_1.z.boolean(),
-    globalTimeout: NumberOrString,
+    searchOnBingLocalQueries: zod_1.z.boolean().default(false),
+    globalTimeout: NumberOrString.default(120000),
     searchSettings: zod_1.z.object({
-        scrollRandomResults: zod_1.z.boolean(),
-        clickRandomResults: zod_1.z.boolean(),
-        parallelSearching: zod_1.z.boolean(),
-        queryEngines: zod_1.z.array(QueryEngineSchema),
-        searchResultVisitTime: NumberOrString,
-        searchDelay: DelaySchema,
-        readDelay: DelaySchema
+        scrollRandomResults: zod_1.z.boolean().default(true),
+        clickRandomResults: zod_1.z.boolean().default(true),
+        parallelSearching: zod_1.z.boolean().default(false),
+        queryEngines: zod_1.z.array(QueryEngineSchema).default(['google', 'wikipedia', 'reddit', 'local']),
+        searchResultVisitTime: NumberOrString.default('5-10s'),
+        searchDelay: DelaySchema.default({ min: '2s', max: '5s' }),
+        readDelay: DelaySchema.default({ min: '1s', max: '3s' })
+    }).default({
+        scrollRandomResults: true,
+        clickRandomResults: true,
+        parallelSearching: false,
+        queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
+        searchResultVisitTime: '5-10s',
+        searchDelay: { min: '2s', max: '5s' },
+        readDelay: { min: '1s', max: '3s' }
     }),
-    debugLogs: zod_1.z.boolean(),
+    debugLogs: zod_1.z.boolean().default(false),
     proxy: zod_1.z.object({
-        queryEngine: zod_1.z.boolean()
+        queryEngine: zod_1.z.boolean().default(false)
+    }).default({
+        queryEngine: false
     }),
     consoleLogFilter: LogFilterSchema,
-    webhook: WebhookSchema
+    webhook: WebhookSchema,
+    geminiApiKey: zod_1.z.string().optional(),
+    geminiModel: zod_1.z.string().optional(),
+    geminiEndpoint: zod_1.z.string().optional()
 });
 // Account
 exports.AccountSchema = zod_1.z.object({

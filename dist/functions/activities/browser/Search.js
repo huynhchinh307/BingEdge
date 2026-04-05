@@ -29,7 +29,7 @@ class Search extends Workers_1.Workers {
                 related: true,
                 langCode,
                 geoLocale: locale,
-                sourceOrder: ['google', 'wikipedia', 'reddit', 'local']
+                sourceOrder: this.bot.config.searchSettings.queryEngines
             });
             queries = [...new Set(queries.map(q => q.trim()).filter(Boolean))];
             this.bot.logger.debug(isMobile, 'SEARCH-BING', `Query pool ready | count=${queries.length}`);

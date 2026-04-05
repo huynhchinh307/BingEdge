@@ -19,6 +19,7 @@ export declare class QueryCore {
     getBingTrendingTopics(langCode?: string): Promise<string[]>;
     getWikipediaTrending(langCode?: string): Promise<string[]>;
     getRedditTopics(subreddit?: string): Promise<string[]>;
+    getGeminiQueries(langCode?: string, geoLocale?: string): Promise<string[]>;
     getLocalQueryList(): string[];
 }
 //# sourceMappingURL=QueryEngine.d.ts.map

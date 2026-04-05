@@ -56,9 +56,13 @@ export declare class MicrosoftRewardsBot {
     get isMobile(): boolean;
     initialize(): Promise<void>;
     run(): Promise<void>;
+    private testGeminiConnection;
     private runMaster;
     private runWorker;
     private runTasks;
+    private getProxyKey;
+    private acquireProxyLock;
+    private releaseProxyLock;
     Main(account: Account): Promise<{
         initialPoints: number;
         collectedPoints: number;

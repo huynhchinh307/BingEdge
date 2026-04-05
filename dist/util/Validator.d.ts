@@ -11,89 +11,93 @@ export declare const ConfigSchema: z.ZodObject<{
     }>>>;
     runOnZeroPoints: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
     clusters: z.ZodNumber;
-    errorDiagnostics: z.ZodBoolean;
-    workers: z.ZodObject<{
-        doDailySet: z.ZodBoolean;
-        doSpecialPromotions: z.ZodBoolean;
-        doMorePromotions: z.ZodBoolean;
-        doPunchCards: z.ZodBoolean;
-        doAppPromotions: z.ZodBoolean;
-        doDesktopSearch: z.ZodBoolean;
-        doMobileSearch: z.ZodBoolean;
-        doDailyCheckIn: z.ZodBoolean;
-        doReadToEarn: z.ZodBoolean;
-    }, z.core.$strip>;
-    searchOnBingLocalQueries: z.ZodBoolean;
-    globalTimeout: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-    searchSettings: z.ZodObject<{
-        scrollRandomResults: z.ZodBoolean;
-        clickRandomResults: z.ZodBoolean;
-        parallelSearching: z.ZodBoolean;
-        queryEngines: z.ZodArray<z.ZodEnum<{
+    errorDiagnostics: z.ZodDefault<z.ZodBoolean>;
+    workers: z.ZodDefault<z.ZodObject<{
+        doDailySet: z.ZodDefault<z.ZodBoolean>;
+        doSpecialPromotions: z.ZodDefault<z.ZodBoolean>;
+        doMorePromotions: z.ZodDefault<z.ZodBoolean>;
+        doPunchCards: z.ZodDefault<z.ZodBoolean>;
+        doAppPromotions: z.ZodDefault<z.ZodBoolean>;
+        doDesktopSearch: z.ZodDefault<z.ZodBoolean>;
+        doMobileSearch: z.ZodDefault<z.ZodBoolean>;
+        doDailyCheckIn: z.ZodDefault<z.ZodBoolean>;
+        doReadToEarn: z.ZodDefault<z.ZodBoolean>;
+    }, z.core.$strip>>;
+    searchOnBingLocalQueries: z.ZodDefault<z.ZodBoolean>;
+    globalTimeout: z.ZodDefault<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>;
+    searchSettings: z.ZodDefault<z.ZodObject<{
+        scrollRandomResults: z.ZodDefault<z.ZodBoolean>;
+        clickRandomResults: z.ZodDefault<z.ZodBoolean>;
+        parallelSearching: z.ZodDefault<z.ZodBoolean>;
+        queryEngines: z.ZodDefault<z.ZodArray<z.ZodEnum<{
             google: "google";
             wikipedia: "wikipedia";
             reddit: "reddit";
             local: "local";
-        }>>;
-        searchResultVisitTime: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-        searchDelay: z.ZodObject<{
+            gemini: "gemini";
+        }>>>;
+        searchResultVisitTime: z.ZodDefault<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>;
+        searchDelay: z.ZodDefault<z.ZodObject<{
             min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-        }, z.core.$strip>;
-        readDelay: z.ZodObject<{
+        }, z.core.$strip>>;
+        readDelay: z.ZodDefault<z.ZodObject<{
             min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-        }, z.core.$strip>;
-    }, z.core.$strip>;
-    debugLogs: z.ZodBoolean;
-    proxy: z.ZodObject<{
-        queryEngine: z.ZodBoolean;
-    }, z.core.$strip>;
-    consoleLogFilter: z.ZodObject<{
-        enabled: z.ZodBoolean;
-        mode: z.ZodEnum<{
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+    debugLogs: z.ZodDefault<z.ZodBoolean>;
+    proxy: z.ZodDefault<z.ZodObject<{
+        queryEngine: z.ZodDefault<z.ZodBoolean>;
+    }, z.core.$strip>>;
+    consoleLogFilter: z.ZodDefault<z.ZodObject<{
+        enabled: z.ZodDefault<z.ZodBoolean>;
+        mode: z.ZodDefault<z.ZodEnum<{
             whitelist: "whitelist";
             blacklist: "blacklist";
-        }>;
-        levels: z.ZodOptional<z.ZodArray<z.ZodEnum<{
+        }>>;
+        levels: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodEnum<{
             debug: "debug";
             info: "info";
             warn: "warn";
             error: "error";
-        }>>>;
-        keywords: z.ZodOptional<z.ZodArray<z.ZodString>>;
-        regexPatterns: z.ZodOptional<z.ZodArray<z.ZodString>>;
-    }, z.core.$strip>;
-    webhook: z.ZodObject<{
-        discord: z.ZodOptional<z.ZodObject<{
-            enabled: z.ZodBoolean;
-            url: z.ZodString;
-        }, z.core.$strip>>;
+        }>>>>;
+        keywords: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
+        regexPatterns: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
+    }, z.core.$strip>>;
+    webhook: z.ZodDefault<z.ZodObject<{
+        discord: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+            enabled: z.ZodDefault<z.ZodBoolean>;
+            url: z.ZodDefault<z.ZodString>;
+        }, z.core.$strip>>>;
         ntfy: z.ZodOptional<z.ZodObject<{
-            enabled: z.ZodOptional<z.ZodBoolean>;
-            url: z.ZodString;
+            enabled: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+            url: z.ZodDefault<z.ZodString>;
             topic: z.ZodOptional<z.ZodString>;
             token: z.ZodOptional<z.ZodString>;
             title: z.ZodOptional<z.ZodString>;
             tags: z.ZodOptional<z.ZodArray<z.ZodString>>;
             priority: z.ZodOptional<z.ZodUnion<readonly [z.ZodLiteral<1>, z.ZodLiteral<2>, z.ZodLiteral<3>, z.ZodLiteral<4>, z.ZodLiteral<5>]>>;
         }, z.core.$strip>>;
-        webhookLogFilter: z.ZodObject<{
-            enabled: z.ZodBoolean;
-            mode: z.ZodEnum<{
+        webhookLogFilter: z.ZodDefault<z.ZodObject<{
+            enabled: z.ZodDefault<z.ZodBoolean>;
+            mode: z.ZodDefault<z.ZodEnum<{
                 whitelist: "whitelist";
                 blacklist: "blacklist";
-            }>;
-            levels: z.ZodOptional<z.ZodArray<z.ZodEnum<{
+            }>>;
+            levels: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodEnum<{
                 debug: "debug";
                 info: "info";
                 warn: "warn";
                 error: "error";
-            }>>>;
-            keywords: z.ZodOptional<z.ZodArray<z.ZodString>>;
-            regexPatterns: z.ZodOptional<z.ZodArray<z.ZodString>>;
-        }, z.core.$strip>;
-    }, z.core.$strip>;
+            }>>>>;
+            keywords: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
+            regexPatterns: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+    geminiApiKey: z.ZodOptional<z.ZodString>;
+    geminiModel: z.ZodOptional<z.ZodString>;
+    geminiEndpoint: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const AccountSchema: z.ZodObject<{
     email: z.ZodString;
