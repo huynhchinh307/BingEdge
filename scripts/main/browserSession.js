@@ -1,6 +1,7 @@
 import fs from 'fs'
-import { chromium } from 'patchright'
+import { chromium } from 'playwright-chromium'
 import { FingerprintGenerator } from 'fingerprint-generator'
+import { newInjectedContext } from 'fingerprint-injector'
 import {
     getDirname,
     getProjectRoot,
@@ -131,39 +132,16 @@ async function main() {
 
     const userAgent = fingerprint?.fingerprint?.navigator?.userAgent || fingerprint?.fingerprint?.userAgent || null
 
-    const browserType = config.browserType ?? 'chromium'
-    const getEdgeExecutable = () => {
-        const edgePaths = {
-            win32: [
-                'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-                'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-                `${process.env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe`
-            ],
-            linux: [
-                '/usr/bin/microsoft-edge',
-                '/usr/bin/microsoft-edge-stable',
-                '/opt/microsoft/msedge/msedge'
-            ],
-            darwin: [
-                '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
-            ]
-        }
-        const paths = edgePaths[process.platform] ?? []
-        return paths.find(p => fs.existsSync(p))
-    }
-
-    const edgePath = browserType === 'edge' ? getEdgeExecutable() : undefined
     log('INFO', `Session: ${args.email} (${sessionType})`)
     log('INFO', `  Cookies: ${cookies.length}`)
     log('INFO', `  Fingerprint: ${fingerprint ? 'Yes' : 'No'}`)
     log('INFO', `  User-Agent: ${userAgent || 'Default'}`)
     log('INFO', `  Proxy: ${proxy ? 'Yes' : 'No'}`)
-    log('INFO', `Launching Patchright Chromium...`)
+    log('INFO', `Launching Chromium (stealth enabled)...`)
 
     const browser = await chromium.launch({
         headless: false,
         ...(proxy ? { proxy } : {}),
-        // Always use Patchright's patched binary for stability
         args: [
             '--no-sandbox',
             '--mute-audio',
@@ -182,16 +160,13 @@ async function main() {
 
     let context
     if (fingerprint) {
-        // Use native Patchright context with fingerprint parameters
-        // Patchright manages stealth at the binary level, no need for fingerprint-injector
-        context = await browser.newContext({
-            userAgent: fingerprint.fingerprint.navigator.userAgent,
-            viewport: {
-                width: fingerprint.fingerprint.screen.width,
-                height: fingerprint.fingerprint.screen.height
-            },
-            locale: account.langCode || 'en-US',
-            timezoneId: fingerprint.fingerprint.navigator.extra?.timezone || 'UTC'
+        // Use newInjectedContext for stealth
+        context = await newInjectedContext(browser, { 
+            fingerprint,
+            newContextOptions: {
+                locale: account.langCode || 'en-US',
+                timezoneId: fingerprint.fingerprint.navigator.extra?.timezone || 'UTC'
+            }
         })
 
         await context.addInitScript(() => {
@@ -202,11 +177,11 @@ async function main() {
                     get: () => Promise.reject(new Error('WebAuthn disabled'))
                 }
             })
-            // Ensure navigator.webdriver is false (though Patchright does this too)
+            // Ensure navigator.webdriver is false
             Object.defineProperty(navigator, 'webdriver', { get: () => false })
         })
 
-        log('SUCCESS', 'Native context created with saved fingerprint')
+        log('SUCCESS', 'Context created with fingerprint-injector')
     } else {
         context = await browser.newContext({
             viewport: isMobile ? { width: 375, height: 667 } : { width: 1366, height: 768 }

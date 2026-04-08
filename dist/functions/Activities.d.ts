@@ -1,5 +1,5 @@
 import type { MicrosoftRewardsBot } from '../index';
-import type { Page } from 'patchright';
+import type { Page } from 'playwright-chromium';
 import type { BasePromotion, DashboardData, FindClippyPromotion, PurplePromotionalItem } from '../interface/DashboardData';
 import type { Promotion } from '../interface/AppDashBoardData';
 export default class Activities {

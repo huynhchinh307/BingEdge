@@ -174,7 +174,6 @@ class BrowserFunc {
      */
     async getAppEarnablePoints() {
         try {
-            const eligibleOffers = ['ENUS_readarticle3_30points', 'Gamification_Sapphire_DailyCheckIn'];
             const request = {
                 url: 'https://prod.rewardsplatform.microsoft.com/dapi/me?channel=SAAndroid&options=613',
                 method: 'GET',
@@ -187,7 +186,7 @@ class BrowserFunc {
             };
             const response = await this.bot.axios.request(request);
             const userData = response.data;
-            const eligibleActivities = userData.response.promotions.filter(x => eligibleOffers.includes(x.attributes.offerid ?? ''));
+            const eligibleActivities = userData.response.promotions.filter(x => x.attributes.type === 'msnreadearn' || x.attributes.type === 'checkin');
             let readToEarn = 0;
             let checkIn = 0;
             for (const item of eligibleActivities) {

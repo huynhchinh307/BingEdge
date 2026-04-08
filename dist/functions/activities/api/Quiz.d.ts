@@ -1,4 +1,4 @@
-import type { Page } from 'patchright';
+import type { Page } from 'playwright-chromium';
 import type { BasePromotion } from '../../../interface/DashboardData';
 import { Workers } from '../../Workers';
 export declare class Quiz extends Workers {

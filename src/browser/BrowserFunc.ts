@@ -1,4 +1,4 @@
-import type { BrowserContext, Cookie } from 'patchright'
+import type { BrowserContext, Cookie } from 'playwright-chromium'
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import fs from 'node:fs'
 
@@ -234,8 +234,6 @@ export default class BrowserFunc {
      */
     async getAppEarnablePoints(): Promise<AppEarnablePoints> {
         try {
-            const eligibleOffers = ['ENUS_readarticle3_30points', 'Gamification_Sapphire_DailyCheckIn']
-
             const request: AxiosRequestConfig = {
                 url: 'https://prod.rewardsplatform.microsoft.com/dapi/me?channel=SAAndroid&options=613',
                 method: 'GET',
@@ -250,7 +248,7 @@ export default class BrowserFunc {
             const response = await this.bot.axios.request(request)
             const userData: AppUserData = response.data
             const eligibleActivities = userData.response.promotions.filter(x =>
-                eligibleOffers.includes(x.attributes.offerid ?? '')
+                x.attributes.type === 'msnreadearn' || x.attributes.type === 'checkin'
             )
 
             let readToEarn = 0

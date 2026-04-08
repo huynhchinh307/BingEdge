@@ -1,4 +1,4 @@
-import type { Page } from 'patchright'
+import type { Page } from 'playwright-chromium'
 import type { MicrosoftRewardsBot } from '../index'
 import type {
     DashboardData,
@@ -217,8 +217,7 @@ export class Workers {
                     await page.goto(targetUrl, { waitUntil: 'networkidle' })
                     onDashboard = true
 
-                    // Reveal hidden elements only once when arriving at the dashboard
-                    await this.revealDailySetElements(page)
+                    // Elements will be revealed on-demand in solveActivityViaUI if the link is not found
                 }
 
                 // UI-based solver as requested: Hover -> Click -> Wait -> Close
@@ -272,26 +271,32 @@ export class Workers {
         this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Attempting UI solve for "${activity.title}" | offerId=${offerId}`)
 
         try {
-            // Try different selector patterns to find the task on the dashboard
-            const selectors = [
-                `#dailyset a[href*="${offerId}"]`,
-                `#dailyset a[href*="${encodeURIComponent(offerId)}"]`,
-                `a[href*="${offerId}"]`,
-                `#dailyset a:has-text("${activity.title}")`,
-                `a:has-text("${activity.title}")`
-            ]
-
-            let element = null
-            for (const selector of selectors) {
-                const loc = page.locator(selector).first()
-                if (await loc.count() > 0) {
-                    element = loc
-                    break
+            const findElement = async () => {
+                const selectors = [
+                    `#dailyset a[href*="${offerId}"]`,
+                    `#dailyset a[href*="${encodeURIComponent(offerId)}"]`,
+                    `a[href*="${offerId}"]`,
+                    `#dailyset a:has-text("${activity.title}")`,
+                    `a:has-text("${activity.title}")`
+                ]
+                
+                for (const selector of selectors) {
+                    const loc = page.locator(selector).first()
+                    if (await loc.isVisible()) return loc
                 }
+                return null
+            }
+
+            let element = await findElement()
+
+            if (!element) {
+                this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Link for "${activity.title}" not found, checking if it is hidden...`)
+                await this.revealDailySetElements(page)
+                element = await findElement()
             }
 
             if (!element) {
-                return false // Could not find element
+                return false // Could not find element even after attempting reveal
             }
 
             // Click UI flow as requested

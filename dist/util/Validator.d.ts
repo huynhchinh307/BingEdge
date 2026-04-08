@@ -1,55 +1,60 @@
 import { z } from 'zod';
 import { Config } from '../interface/Config';
 import { Account } from '../interface/Account';
-export declare const ConfigSchema: z.ZodObject<{
-    baseURL: z.ZodString;
-    sessionPath: z.ZodString;
-    headless: z.ZodBoolean;
+export declare const ConfigSchema: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+    baseURL: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    sessionPath: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    headless: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
     browserType: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
         chromium: "chromium";
         edge: "edge";
     }>>>;
     runOnZeroPoints: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
-    clusters: z.ZodNumber;
-    errorDiagnostics: z.ZodDefault<z.ZodBoolean>;
-    workers: z.ZodDefault<z.ZodObject<{
-        doDailySet: z.ZodDefault<z.ZodBoolean>;
-        doSpecialPromotions: z.ZodDefault<z.ZodBoolean>;
-        doMorePromotions: z.ZodDefault<z.ZodBoolean>;
-        doPunchCards: z.ZodDefault<z.ZodBoolean>;
-        doAppPromotions: z.ZodDefault<z.ZodBoolean>;
-        doDesktopSearch: z.ZodDefault<z.ZodBoolean>;
-        doMobileSearch: z.ZodDefault<z.ZodBoolean>;
-        doDailyCheckIn: z.ZodDefault<z.ZodBoolean>;
-        doReadToEarn: z.ZodDefault<z.ZodBoolean>;
-    }, z.core.$strip>>;
-    searchOnBingLocalQueries: z.ZodDefault<z.ZodBoolean>;
-    globalTimeout: z.ZodDefault<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>;
-    searchSettings: z.ZodDefault<z.ZodObject<{
-        scrollRandomResults: z.ZodDefault<z.ZodBoolean>;
-        clickRandomResults: z.ZodDefault<z.ZodBoolean>;
-        parallelSearching: z.ZodDefault<z.ZodBoolean>;
-        queryEngines: z.ZodDefault<z.ZodArray<z.ZodEnum<{
+    clusters: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    errorDiagnostics: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    workers: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+        doDailySet: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doSpecialPromotions: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doMorePromotions: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doPunchCards: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doAppPromotions: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doDesktopSearch: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doMobileSearch: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doDailyCheckIn: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doReadToEarn: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    }, z.core.$strip>>>;
+    searchOnBingLocalQueries: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    globalTimeout: z.ZodDefault<z.ZodOptional<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>>;
+    searchSettings: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+        scrollRandomResults: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        clickRandomResults: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        parallelSearching: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        queryEngines: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodEnum<{
             google: "google";
             wikipedia: "wikipedia";
             reddit: "reddit";
             local: "local";
             gemini: "gemini";
-        }>>>;
-        searchResultVisitTime: z.ZodDefault<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>;
-        searchDelay: z.ZodDefault<z.ZodObject<{
+        }>>>>;
+        searchResultVisitTime: z.ZodDefault<z.ZodOptional<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>>;
+        searchDelay: z.ZodDefault<z.ZodOptional<z.ZodObject<{
             min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-        }, z.core.$strip>>;
-        readDelay: z.ZodDefault<z.ZodObject<{
+        }, z.core.$strip>>>;
+        readDelay: z.ZodDefault<z.ZodOptional<z.ZodObject<{
             min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
-        }, z.core.$strip>>;
-    }, z.core.$strip>>;
-    debugLogs: z.ZodDefault<z.ZodBoolean>;
-    proxy: z.ZodDefault<z.ZodObject<{
-        queryEngine: z.ZodDefault<z.ZodBoolean>;
-    }, z.core.$strip>>;
+        }, z.core.$strip>>>;
+    }, z.core.$strip>>>;
+    debugLogs: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    proxy: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+        enable: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        url: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+        port: z.ZodDefault<z.ZodOptional<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        username: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+        password: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+        queryEngine: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    }, z.core.$strip>>>;
     consoleLogFilter: z.ZodDefault<z.ZodObject<{
         enabled: z.ZodDefault<z.ZodBoolean>;
         mode: z.ZodDefault<z.ZodEnum<{
@@ -95,30 +100,34 @@ export declare const ConfigSchema: z.ZodObject<{
             regexPatterns: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
         }, z.core.$strip>>;
     }, z.core.$strip>>;
-    geminiApiKey: z.ZodOptional<z.ZodString>;
-    geminiModel: z.ZodOptional<z.ZodString>;
-    geminiEndpoint: z.ZodOptional<z.ZodString>;
-}, z.core.$strip>;
+    geminiApiKey: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    geminiModel: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    geminiEndpoint: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+}, z.core.$strip>>>;
 export declare const AccountSchema: z.ZodObject<{
     email: z.ZodString;
-    password: z.ZodString;
+    password: z.ZodDefault<z.ZodOptional<z.ZodString>>;
     totpSecret: z.ZodOptional<z.ZodString>;
-    recoveryEmail: z.ZodString;
-    geoLocale: z.ZodString;
-    langCode: z.ZodString;
-    proxy: z.ZodObject<{
-        proxyAxios: z.ZodBoolean;
-        url: z.ZodString;
-        port: z.ZodNumber;
-        password: z.ZodString;
-        username: z.ZodString;
-    }, z.core.$strip>;
-    saveFingerprint: z.ZodObject<{
-        mobile: z.ZodBoolean;
-        desktop: z.ZodBoolean;
-    }, z.core.$strip>;
-    points: z.ZodOptional<z.ZodNumber>;
-    lastUpdate: z.ZodOptional<z.ZodString>;
+    recoveryEmail: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    geoLocale: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    langCode: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    proxy: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+        proxyAxios: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        url: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+        port: z.ZodDefault<z.ZodOptional<z.ZodCoercedNumber<unknown>>>;
+        password: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+        username: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    }, z.core.$strip>>>;
+    saveFingerprint: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+        mobile: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        desktop: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    }, z.core.$strip>>>;
+    points: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    initialPoints: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    collectedPoints: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    duration: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    rank: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    lastUpdate: z.ZodDefault<z.ZodOptional<z.ZodString>>;
 }, z.core.$strip>;
 export declare function validateConfig(data: unknown): Config;
 export declare function validateAccounts(data: unknown): Account[];

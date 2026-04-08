@@ -1,4 +1,4 @@
-import type { Page } from 'patchright';
+import type { Page } from 'playwright-chromium';
 export interface PromptOptions {
     question: string;
     timeoutSeconds?: number;

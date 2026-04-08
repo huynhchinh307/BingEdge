@@ -1,5 +1,6 @@
-import { chromium, type Browser as PatchrightBrowser, type BrowserContext } from 'patchright'
+import { chromium, type Browser as PlaywrightBrowser, type BrowserContext } from 'playwright-chromium'
 import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
+import { newInjectedContext } from 'fingerprint-injector'
 
 import type { MicrosoftRewardsBot } from '../index'
 import { loadSessionData, saveFingerprintData } from '../util/Load'
@@ -43,7 +44,8 @@ class Browser {
     }
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
-        let browser: PatchrightBrowser
+        let browser: PlaywrightBrowser
+        const browserType = this.bot.config.browserType ?? 'chromium'
 
         try {
             const proxyConfig = account.proxy.url
@@ -60,11 +62,9 @@ class Browser {
             this.bot.logger.info(
                 this.bot.isMobile, 
                 'BROWSER', 
-                'Launching Patchright Chromium (Edge Spoofing enabled)...'
+                `Launching Chromium (website fingerprint: ${browserType.toUpperCase()})`
             )
 
-            // Always use Patchright's patched binary for stealth
-            // We use 'edge' fingerprint style to get the 20 bonus points even on Chromium engine
             browser = await chromium.launch({
                 headless: this.bot.config.headless,
                 ...(proxyConfig && { proxy: proxyConfig }),
@@ -86,17 +86,8 @@ class Browser {
 
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile))
 
-            // Use native Patchright context with fingerprint parameters
-            // Patchright manages stealth at the binary level, no need for fingerprint-injector
-            const context = await browser.newContext({
-                userAgent: fingerprint.fingerprint.navigator.userAgent,
-                viewport: {
-                    width: fingerprint.fingerprint.screen.width,
-                    height: fingerprint.fingerprint.screen.height
-                },
-                locale: account.langCode || 'en-US',
-                timezoneId: (fingerprint.fingerprint.navigator as any).extra?.timezone || 'UTC'
-            })
+            // Use newInjectedContext for better consistency
+            const context = await newInjectedContext(browser as any, { fingerprint })
 
             await context.addInitScript(() => {
                 // Disable WebAuthn which often triggers dialogs
@@ -106,8 +97,6 @@ class Browser {
                         get: () => Promise.reject(new Error('WebAuthn disabled'))
                     }
                 })
-                // Ensure navigator.webdriver is false (though Patchright does this too)
-                Object.defineProperty(navigator, 'webdriver', { get: () => false })
             })
 
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000))
@@ -146,8 +135,8 @@ class Browser {
     }
 
     async generateFingerprint(isMobile: boolean) {
-        // Force edge fingerprint style to ensure bonus points
-        const fingerprintBrowser = 'edge'
+        const browserType = this.bot.config.browserType ?? 'chromium'
+        const fingerprintBrowser = browserType === 'edge' ? 'edge' : 'chrome'
 
         const fingerPrintData = new FingerprintGenerator().getFingerprint({
             devices: isMobile ? ['mobile'] : ['desktop'],

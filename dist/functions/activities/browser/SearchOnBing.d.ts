@@ -1,4 +1,4 @@
-import type { Page } from 'patchright';
+import type { Page } from 'playwright-chromium';
 import { Workers } from '../../Workers';
 import type { BasePromotion } from '../../../interface/DashboardData';
 export declare class SearchOnBing extends Workers {

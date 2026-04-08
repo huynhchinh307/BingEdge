@@ -1,4 +1,4 @@
-import type { Page } from 'patchright';
+import type { Page } from 'playwright-chromium';
 import type { MicrosoftRewardsBot } from '../../../index';
 export declare class TotpLogin {
     private bot;

@@ -1,5 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
-import type { Page } from 'patchright'
+import type { Page } from 'playwright-chromium'
 import * as fs from 'fs'
 import path from 'path'
 

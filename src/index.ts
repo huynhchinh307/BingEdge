@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'node:fs'
 import path from 'node:path'
 import cluster, { Worker } from 'cluster'
-import type { BrowserContext, Cookie, Page } from 'patchright'
+import type { BrowserContext, Cookie, Page } from 'playwright-chromium'
 import pkg from '../package.json'
 
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator'
@@ -643,9 +643,29 @@ export class MicrosoftRewardsBot {
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
-                if (this.config.workers.doAppPromotions) await this.workers.doAppPromotions(appData)
-                if (this.config.workers.doDailyCheckIn) await this.activities.doDailyCheckIn()
-                if (this.config.workers.doReadToEarn) await this.activities.doReadToEarn()
+                const activeWorkersList = Object.entries(this.config.workers)
+                    .filter(([_, val]) => val === true)
+                    .map(([key]) => key.replace('do', ''))
+                    .join(', ')
+                this.logger.info('main', 'FLOW', `Active workers for this session: [${activeWorkersList}]`)
+
+                try {
+                    if (this.config.workers.doAppPromotions) await this.workers.doAppPromotions(appData)
+                } catch (e) {
+                    this.logger.error('main', 'FLOW', `App Promotions error: ${e instanceof Error ? e.message : String(e)}`)
+                }
+
+                try {
+                    if (this.config.workers.doDailyCheckIn) await this.activities.doDailyCheckIn()
+                } catch (e) {
+                    this.logger.error('main', 'FLOW', `Daily Check-in error: ${e instanceof Error ? e.message : String(e)}`)
+                }
+
+                try {
+                    if (this.config.workers.doReadToEarn) await this.activities.doReadToEarn()
+                } catch (e) {
+                    this.logger.error('main', 'FLOW', `Read to Earn error: ${e instanceof Error ? e.message : String(e)}`)
+                }
 
                 // Solve promotions in mobile context
                 if (this.config.workers.doDailySet) await this.workers.doDailySet(data, this.mainMobilePage)

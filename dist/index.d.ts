@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Cookie, Page } from 'patchright';
+import type { Cookie, Page } from 'playwright-chromium';
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator';
 import BrowserFunc from './browser/BrowserFunc';
 import BrowserUtils from './browser/BrowserUtils';
