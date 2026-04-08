@@ -1102,9 +1102,19 @@
 
                     <div
                         style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
-                        <h4
-                            style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
-                            Proxy Configuration</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <h4 style="margin: 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                                Proxy Configuration
+                            </h4>
+                            <label class="toggle-label" style="margin: 0; font-size: 0.85rem;">
+                                <span>Use Proxy</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="accUseProxy" checked onchange="toggleProxyFields()">
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                        </div>
+                        <div id="proxyFieldsContainer">
                         <div class="cfg-field" style="margin-bottom: 0.75rem;">
                             <label style="font-size: 0.8rem;">Proxy Quick Paste <span
                                     style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
@@ -1142,6 +1152,7 @@
                                 <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()"
                                     style="padding: 0.4rem 0.6rem;">
                             </div>
+                        </div>
                         </div>
                     </div>
 
@@ -1988,11 +1999,20 @@
             document.getElementById('accFormOriginalEmail').value = '';
             document.getElementById('accSubmitBtn').innerText = 'Add to accounts.json';
             // Restore defaults after reset
+            document.getElementById('accGeolocale') ? document.getElementById('accGeolocale').value = 'auto' : null;
             document.getElementById('accGeoLocale').value = 'auto';
             document.getElementById('accLangCode').value = 'en';
             document.getElementById('accFpMobile').checked = true;
             document.getElementById('accFpDesktop').checked = true;
+            document.getElementById('accUseProxy').checked = true;
+            toggleProxyFields();
             document.getElementById('addAccountModal').style.display = 'flex';
+        }
+        
+        function toggleProxyFields() {
+            const useProxy = document.getElementById('accUseProxy').checked;
+            document.getElementById('proxyFieldsContainer').style.display = useProxy ? 'block' : 'none';
+            document.getElementById('accProxyAxios').closest('.toggle-label').style.display = useProxy ? 'flex' : 'none';
         }
 
         async function openEditModal(email) {
@@ -2031,6 +2051,11 @@
                 document.getElementById('accProxyUser').value = proxy.username || '';
                 document.getElementById('accProxyPass').value = proxy.password || '';
                 document.getElementById('accProxyAxios').checked = !!proxy.proxyAxios;
+                
+                const hasProxy = !!(rawUrl || proxy.port || proxy.username);
+                document.getElementById('accUseProxy').checked = hasProxy;
+                toggleProxyFields();
+                
                 syncProxyString();
 
                 const fp = acc.saveFingerprint || {};
@@ -2093,13 +2118,13 @@
                 recoveryEmail: document.getElementById('accRecovery').value || "",
                 geoLocale: document.getElementById('accGeoLocale').value || "auto",
                 langCode: document.getElementById('accLangCode').value || "en",
-                proxy: {
+                proxy: document.getElementById('accUseProxy').checked ? {
                     proxyAxios: document.getElementById('accProxyAxios').checked,
                     url: (document.getElementById('accProxyProtoSelect').value || 'http') + "://" + (document.getElementById('accProxyUrl').value || ""),
                     port: parseInt(document.getElementById('accProxyPort').value) || 0,
                     username: document.getElementById('accProxyUser').value || "",
                     password: document.getElementById('accProxyPass').value || ""
-                },
+                } : {},
                 saveFingerprint: {
                     mobile: document.getElementById('accFpMobile').checked,
                     desktop: document.getElementById('accFpDesktop').checked
