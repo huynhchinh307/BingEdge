@@ -244,8 +244,13 @@ export function buildProxyConfig(account) {
         return null
     }
 
+    let proxyUrl = account.proxy.url
+    if (!proxyUrl.includes('://')) {
+        proxyUrl = 'http://' + proxyUrl
+    }
+
     const proxy = {
-        server: `${account.proxy.url}:${account.proxy.port}`
+        server: `${proxyUrl}:${account.proxy.port}`
     }
 
     if (account.proxy.username && account.proxy.password) {

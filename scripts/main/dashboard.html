@@ -1128,7 +1128,9 @@
                                 <label style="font-size: 0.8rem;">Proto</label>
                                 <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;"
                                     onchange="syncProxyString()">
-                                    <option value="http">HTTP</option>
+                                    <option value="http" selected>HTTP</option>
+                                    <option value="https">HTTPS</option>
+                                    <option value="socks4">SOCKS4</option>
                                     <option value="socks5">SOCKS5</option>
                                 </select>
                             </div>
@@ -2036,15 +2038,9 @@
                 document.getElementById('accLangCode').value = acc.langCode || 'en';
 
                 const proxy = acc.proxy || {};
-                let rawUrl = proxy.url || '';
-                let proto = 'http';
-                if (rawUrl.includes('://')) {
-                    const parts = rawUrl.split('://');
-                    proto = parts[0];
-                    rawUrl = parts[1];
-                }
-
-                document.getElementById('accProxyProtoSelect').value = proto;
+                let rawUrl = (proxy.url || '').replace(/^(https?|socks[45])?:\/\//i, '');
+                let proto = (proxy.url || '').match(/^(https?|socks[45])/i)?.[0] || 'http';
+                document.getElementById('accProxyProtoSelect').value = proto.toLowerCase();
 
                 document.getElementById('accProxyUrl').value = rawUrl;
                 document.getElementById('accProxyPort').value = proxy.port || '';
@@ -2069,38 +2065,41 @@
         }
 
         function parseProxyString(str) {
+            if (!str) return;
+            
+            // Detect protocol
             let proto = 'http';
-            let workingStr = str;
-
-            if (str.includes('://')) {
-                const parts = str.split('://');
-                proto = parts[0].toLowerCase();
-                workingStr = parts[1];
-            } else if (str.toLowerCase().startsWith('socks5:')) {
-                proto = 'socks5';
-                workingStr = str.substring(7);
-            } else if (str.toLowerCase().startsWith('http:')) {
-                proto = 'http';
-                workingStr = str.substring(5);
+            const protoMatch = str.match(/^(https?|socks[45])/i);
+            if (protoMatch) {
+                proto = protoMatch[0].toLowerCase();
             }
 
-            document.getElementById('accProxyProtoSelect').value = proto;
-
+            // Strip any protocol if present for further parsing
+            let workingStr = str.replace(/^(https?|socks[45])?:\/\//i, '');
+            
             const parts = workingStr.split(':');
             if (parts.length >= 2) {
                 document.getElementById('accProxyUrl').value = parts[0] || '';
                 document.getElementById('accProxyPort').value = parts[1] || '';
                 document.getElementById('accProxyUser').value = parts[2] || '';
                 document.getElementById('accProxyPass').value = parts[3] || '';
+                
+                // Set the detected or default proto
+                document.getElementById('accProxyProtoSelect').value = proto;
             }
         }
 
         function syncProxyString() {
-            const proto = document.getElementById('accProxyProtoSelect').value || 'http';
-            const host = document.getElementById('accProxyUrl').value;
-            const port = document.getElementById('accProxyPort').value;
-            const user = document.getElementById('accProxyUser').value;
-            const pass = document.getElementById('accProxyPass').value;
+            const proto = document.getElementById('accProxyProtoSelect').value;
+            const host = (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, '');
+            const port = document.getElementById('accProxyPort').value || "";
+            const user = document.getElementById('accProxyUser').value || "";
+            const pass = document.getElementById('accProxyPass').value || "";
+
+            if (!host) {
+                document.getElementById('accProxyString').value = "";
+                return;
+            }
 
             let str = `${proto}://${host}:${port}`;
             if (user && pass) str += `:${user}:${pass}`;
@@ -2120,7 +2119,7 @@
                 langCode: document.getElementById('accLangCode').value || "en",
                 proxy: document.getElementById('accUseProxy').checked ? {
                     proxyAxios: document.getElementById('accProxyAxios').checked,
-                    url: (document.getElementById('accProxyProtoSelect').value || 'http') + "://" + (document.getElementById('accProxyUrl').value || ""),
+                    url: document.getElementById('accProxyProtoSelect').value + "://" + (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, ''),
                     port: parseInt(document.getElementById('accProxyPort').value) || 0,
                     username: document.getElementById('accProxyUser').value || "",
                     password: document.getElementById('accProxyPass').value || ""

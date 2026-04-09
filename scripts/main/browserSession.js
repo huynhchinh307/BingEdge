@@ -1,7 +1,9 @@
 import fs from 'fs'
-import { chromium } from 'playwright-chromium'
+import { chromium } from 'patchright'
 import { FingerprintGenerator } from 'fingerprint-generator'
 import { newInjectedContext } from 'fingerprint-injector'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
 import {
     getDirname,
     getProjectRoot,
@@ -63,7 +65,7 @@ async function main() {
         const fallbackType = sessionType === 'desktop' ? 'mobile' : 'desktop'
         log('WARN', `No ${sessionType} session cookies found, checking ${fallbackType} session...`)
         const fallbackCookies = await loadCookies(sessionBase, fallbackType)
-        
+
         if (fallbackCookies.length > 0) {
             log('INFO', `Found cookies in ${fallbackType} session, switching...`)
             cookies = fallbackCookies
@@ -99,17 +101,17 @@ async function main() {
             fingerprint = fingerprintGenerator.getFingerprint(bOptions)
 
             try {
-                const { UserAgentManager } = await import('../../dist/browser/UserAgent.js')
+                const { UserAgentManager } = require('../../dist/browser/UserAgent.js')
                 const mockBot = {
                     config,
-                    logger: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} }
+                    logger: { error: () => { }, warn: () => { }, info: () => { }, debug: () => { } }
                 }
                 const um = new UserAgentManager(mockBot)
                 fingerprint = await um.updateFingerprintUserAgent(fingerprint, isMobile)
             } catch (err) {
                 log('WARN', 'Could not apply exact Microsoft Edge UA string matching: ' + err.message)
             }
-                        
+
             fs.writeFileSync(
                 `${sessionBase}/session_fingerprint_${sessionType}.json`,
                 JSON.stringify(fingerprint, null, 2)
@@ -121,6 +123,10 @@ async function main() {
     }
 
     const proxy = buildProxyConfig(account)
+
+    if (proxy) {
+        log('INFO', `  Proxy Config for Playwright: ${JSON.stringify(proxy)}`);
+    }
 
     if (account.proxy && account.proxy.url && (!proxy || !proxy.server)) {
         log('ERROR', 'Proxy is configured in account but proxy data is invalid or incomplete')
@@ -137,7 +143,7 @@ async function main() {
     log('INFO', `  Fingerprint: ${fingerprint ? 'Yes' : 'No'}`)
     log('INFO', `  User-Agent: ${userAgent || 'Default'}`)
     log('INFO', `  Proxy: ${proxy ? 'Yes' : 'No'}`)
-    log('INFO', `Launching Chromium (stealth enabled)...`)
+    log('INFO', 'Launching browser...')
 
     const browser = await chromium.launch({
         headless: false,
@@ -160,28 +166,18 @@ async function main() {
 
     let context
     if (fingerprint) {
-        // Use newInjectedContext for stealth
-        context = await newInjectedContext(browser, { 
-            fingerprint,
-            newContextOptions: {
-                locale: account.langCode || 'en-US',
-                timezoneId: fingerprint.fingerprint.navigator.extra?.timezone || 'UTC'
-            }
-        })
+        context = await newInjectedContext(browser, { fingerprint })
 
         await context.addInitScript(() => {
-            // Disable WebAuthn which often triggers dialogs
             Object.defineProperty(navigator, 'credentials', {
                 value: {
                     create: () => Promise.reject(new Error('WebAuthn disabled')),
                     get: () => Promise.reject(new Error('WebAuthn disabled'))
                 }
             })
-            // Ensure navigator.webdriver is false
-            Object.defineProperty(navigator, 'webdriver', { get: () => false })
         })
 
-        log('SUCCESS', 'Context created with fingerprint-injector')
+        log('SUCCESS', 'Fingerprint injected into browser context')
     } else {
         context = await browser.newContext({
             viewport: isMobile ? { width: 375, height: 667 } : { width: 1366, height: 768 }
