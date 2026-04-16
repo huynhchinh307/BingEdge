@@ -1,4 +1,4 @@
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 import { randomBytes } from 'crypto'
 import { URLSearchParams } from 'url'
 

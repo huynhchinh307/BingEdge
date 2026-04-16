@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import semver from 'semver'
-import pkg from '../../package.json'
+import pkg from '../../package.json' with { type: 'json' }
 
 import { Config } from '../interface/Config'
 import { Account } from '../interface/Account'

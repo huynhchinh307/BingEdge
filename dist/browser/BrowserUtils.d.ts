@@ -1,4 +1,4 @@
-import { type Page } from 'playwright-chromium';
+import { type Page } from 'patchright';
 import { CheerioAPI } from 'cheerio';
 import { ClickOptions } from 'ghost-cursor-playwright-port';
 import type { MicrosoftRewardsBot } from '../index';

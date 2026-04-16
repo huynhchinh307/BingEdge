@@ -31,15 +31,15 @@ export class UserAgentManager {
         const brandVersionMajor = browserType === 'edge' ? app.edge_major_version : app.chrome_major_version
 
         const uaMetadata = {
-            isMobile,
+            mobile: isMobile,
             platform: isMobile ? 'Android' : 'Windows',
             fullVersionList: [
-                { brand: 'Not/A)Brand', version: `${UserAgentManager.NOT_A_BRAND_VERSION}.0.0.0` },
+                { brand: 'Not/A)Brand', version: '99.0.0.0' },
                 { brand: brandName, version: brandVersionFull },
                 { brand: 'Chromium', version: app['chrome_version'] }
             ],
             brands: [
-                { brand: 'Not/A)Brand', version: UserAgentManager.NOT_A_BRAND_VERSION },
+                { brand: 'Not/A)Brand', version: '99' },
                 { brand: brandName, version: brandVersionMajor },
                 { brand: 'Chromium', version: app['chrome_major_version'] }
             ],
@@ -150,16 +150,19 @@ export class UserAgentManager {
 
             fingerprint.headers['user-agent'] = userAgentData.userAgent
             
+            fingerprint.headers['sec-ch-ua-mobile'] = isMobile ? '?1' : '?0'
+            fingerprint.headers['sec-ch-ua-platform'] = isMobile ? '"Android"' : '"Windows"'
+
             if (browserType === 'edge') {
                 fingerprint.headers['sec-ch-ua'] =
-                    `"Microsoft Edge";v="${componentData.edge_major_version}", "Not=A?Brand";v="${componentData.not_a_brand_major_version}", "Chromium";v="${componentData.chrome_major_version}"`
+                    `"Microsoft Edge";v="${componentData.edge_major_version}", "Not/A)Brand";v="99", "Chromium";v="${componentData.chrome_major_version}"`
                 fingerprint.headers['sec-ch-ua-full-version-list'] =
-                    `"Microsoft Edge";v="${componentData.edge_version}", "Not=A?Brand";v="${componentData.not_a_brand_version}", "Chromium";v="${componentData.chrome_version}"`
+                    `"Microsoft Edge";v="${componentData.edge_version}", "Not/A)Brand";v="99.0.0.0", "Chromium";v="${componentData.chrome_version}"`
             } else {
                 fingerprint.headers['sec-ch-ua'] =
-                    `"Google Chrome";v="${componentData.chrome_major_version}", "Not=A?Brand";v="${componentData.not_a_brand_major_version}", "Chromium";v="${componentData.chrome_major_version}"`
+                    `"Google Chrome";v="${componentData.chrome_major_version}", "Not/A)Brand";v="99", "Chromium";v="${componentData.chrome_major_version}"`
                 fingerprint.headers['sec-ch-ua-full-version-list'] =
-                    `"Google Chrome";v="${componentData.chrome_version}", "Not=A?Brand";v="${componentData.not_a_brand_version}", "Chromium";v="${componentData.chrome_version}"`
+                    `"Google Chrome";v="${componentData.chrome_version}", "Not/A)Brand";v="99.0.0.0", "Chromium";v="${componentData.chrome_version}"`
             }
 
             /*

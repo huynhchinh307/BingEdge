@@ -1,9 +1,7 @@
 import fs from 'fs'
 import { chromium } from 'patchright'
-import { FingerprintGenerator } from 'fingerprint-generator'
 import { newInjectedContext } from 'fingerprint-injector'
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
+import { FingerprintGenerator } from 'fingerprint-generator'
 import {
     getDirname,
     getProjectRoot,
@@ -101,7 +99,7 @@ async function main() {
             fingerprint = fingerprintGenerator.getFingerprint(bOptions)
 
             try {
-                const { UserAgentManager } = require('../../dist/browser/UserAgent.js')
+                const { UserAgentManager } = await import('../../dist/browser/UserAgent.js')
                 const mockBot = {
                     config,
                     logger: { error: () => { }, warn: () => { }, info: () => { }, debug: () => { } }
@@ -124,10 +122,6 @@ async function main() {
 
     const proxy = buildProxyConfig(account)
 
-    if (proxy) {
-        log('INFO', `  Proxy Config for Playwright: ${JSON.stringify(proxy)}`);
-    }
-
     if (account.proxy && account.proxy.url && (!proxy || !proxy.server)) {
         log('ERROR', 'Proxy is configured in account but proxy data is invalid or incomplete')
         log('ERROR', 'Account proxy config:', JSON.stringify(account.proxy, null, 2))
@@ -138,16 +132,40 @@ async function main() {
 
     const userAgent = fingerprint?.fingerprint?.navigator?.userAgent || fingerprint?.fingerprint?.userAgent || null
 
+    const browserType = config.browserType ?? 'chromium'
+    const getEdgeExecutable = () => {
+        const edgePaths = {
+            win32: [
+                'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+                `${process.env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe`
+            ],
+            linux: [
+                '/usr/bin/microsoft-edge',
+                '/usr/bin/microsoft-edge-stable',
+                '/opt/microsoft/msedge/msedge'
+            ],
+            darwin: [
+                '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+            ]
+        }
+        const paths = edgePaths[process.platform] ?? []
+        return paths.find(p => fs.existsSync(p))
+    }
+
+    const edgePath = browserType === 'edge' ? getEdgeExecutable() : undefined
+
     log('INFO', `Session: ${args.email} (${sessionType})`)
     log('INFO', `  Cookies: ${cookies.length}`)
     log('INFO', `  Fingerprint: ${fingerprint ? 'Yes' : 'No'}`)
     log('INFO', `  User-Agent: ${userAgent || 'Default'}`)
     log('INFO', `  Proxy: ${proxy ? 'Yes' : 'No'}`)
-    log('INFO', 'Launching browser...')
+    log('INFO', `Launching ${edgePath ? 'Microsoft Edge' : 'browser'}...`)
 
     const browser = await chromium.launch({
         headless: false,
         ...(proxy ? { proxy } : {}),
+        ...(edgePath && { executablePath: edgePath }),
         args: [
             '--no-sandbox',
             '--mute-audio',

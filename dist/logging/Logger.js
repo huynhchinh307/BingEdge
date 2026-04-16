@@ -1,22 +1,16 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Logger = void 0;
-const chalk_1 = __importDefault(require("chalk"));
-const cluster_1 = __importDefault(require("cluster"));
-const Discord_1 = require("./Discord");
-const Ntfy_1 = require("./Ntfy");
-const ErrorDiagnostic_1 = require("../util/ErrorDiagnostic");
+import chalk from 'chalk';
+import cluster from 'cluster';
+import { sendDiscord } from './Discord.js';
+import { sendNtfy } from './Ntfy.js';
+import { errorDiagnostic } from '../util/ErrorDiagnostic.js';
 function platformText(platform) {
     return platform === 'main' ? 'MAIN' : platform ? 'MOBILE' : 'DESKTOP';
 }
 function platformBadge(platform) {
-    return platform === 'main' ? chalk_1.default.bgCyan('MAIN') : platform ? chalk_1.default.bgBlue('MOBILE') : chalk_1.default.bgMagenta('DESKTOP');
+    return platform === 'main' ? chalk.bgCyan('MAIN') : platform ? chalk.bgBlue('MOBILE') : chalk.bgMagenta('DESKTOP');
 }
 function getColorFn(color) {
-    return color && typeof chalk_1.default[color] === 'function' ? chalk_1.default[color] : null;
+    return color && typeof chalk[color] === 'function' ? chalk[color] : null;
 }
 function consoleOut(level, msg, chalkFn) {
     const out = chalkFn ? chalkFn(msg) : msg;
@@ -32,7 +26,8 @@ function consoleOut(level, msg, chalkFn) {
 function formatMessage(message) {
     return message instanceof Error ? `${message.message}\n${message.stack || ''}` : message;
 }
-class Logger {
+export class Logger {
+    bot;
     constructor(bot) {
         this.bot = bot;
     }
@@ -79,7 +74,7 @@ class Logger {
         if (level === 'error' && config.errorDiagnostics) {
             const page = this.bot.isMobile ? this.bot.mainMobilePage : this.bot.mainDesktopPage;
             const error = message instanceof Error ? message : new Error(String(message));
-            (0, ErrorDiagnostic_1.errorDiagnostic)(page, error);
+            errorDiagnostic(page, error);
         }
         const consoleAllowed = this.shouldPassFilter(config.consoleLogFilter, level, cleanMsg);
         const webhookAllowed = this.shouldPassFilter(config.webhook.webhookLogFilter, level, cleanMsg);
@@ -89,16 +84,16 @@ class Logger {
         if (!webhookAllowed) {
             return;
         }
-        if (cluster_1.default.isPrimary) {
+        if (cluster.isPrimary) {
             if (config.webhook.discord?.enabled && config.webhook.discord.url) {
                 if (level === 'debug')
                     return;
-                (0, Discord_1.sendDiscord)(config.webhook.discord.url, cleanMsg, level);
+                sendDiscord(config.webhook.discord.url, cleanMsg, level);
             }
             if (config.webhook.ntfy?.enabled && config.webhook.ntfy.url) {
                 if (level === 'debug')
                     return;
-                (0, Ntfy_1.sendNtfy)(config.webhook.ntfy, cleanMsg, level);
+                sendNtfy(config.webhook.ntfy, cleanMsg, level);
             }
         }
         else {
@@ -147,5 +142,4 @@ class Logger {
         return mode === 'whitelist' ? isMatch : !isMatch;
     }
 }
-exports.Logger = Logger;
 //# sourceMappingURL=Logger.js.map

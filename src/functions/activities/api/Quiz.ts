@@ -1,5 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 import type { BasePromotion } from '../../../interface/DashboardData'
 import { Workers } from '../../Workers'
 

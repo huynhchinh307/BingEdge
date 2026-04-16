@@ -1,8 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const cheerio_1 = require("cheerio");
-const ghost_cursor_playwright_port_1 = require("ghost-cursor-playwright-port");
-class BrowserUtils {
+import { load } from 'cheerio';
+import { createCursor } from 'ghost-cursor-playwright-port';
+export default class BrowserUtils {
+    bot;
     constructor(bot) {
         this.bot = bot;
     }
@@ -83,7 +82,7 @@ class BrowserUtils {
     async reloadBadPage(page) {
         try {
             const html = await page.content().catch(() => '');
-            const $ = (0, cheerio_1.load)(html);
+            const $ = load(html);
             if ($('body.neterror').length) {
                 this.bot.logger.info(this.bot.isMobile, 'RELOAD-BAD-PAGE', 'Bad page detected, reloading!');
                 try {
@@ -147,7 +146,7 @@ class BrowserUtils {
     }
     async loadInCheerio(data) {
         const html = typeof data === 'string' ? data : await data.content();
-        const $ = (0, cheerio_1.load)(html);
+        const $ = load(html);
         return $;
     }
     async ghostClick(page, selector, options) {
@@ -155,7 +154,7 @@ class BrowserUtils {
             this.bot.logger.debug(this.bot.isMobile, 'GHOST-CLICK', `Trying to click selector: ${selector}, options: ${JSON.stringify(options)}`);
             // Wait for selector to exist before clicking
             await page.waitForSelector(selector, { timeout: 10000 });
-            const cursor = (0, ghost_cursor_playwright_port_1.createCursor)(page);
+            const cursor = createCursor(page);
             await cursor.click(selector, options);
             return true;
         }
@@ -188,5 +187,4 @@ class BrowserUtils {
         });
     }
 }
-exports.default = BrowserUtils;
 //# sourceMappingURL=BrowserUtils.js.map

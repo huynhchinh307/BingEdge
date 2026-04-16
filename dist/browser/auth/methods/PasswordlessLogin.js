@@ -1,12 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PasswordlessLogin = void 0;
-class PasswordlessLogin {
+export class PasswordlessLogin {
+    bot;
+    maxAttempts = 60;
+    numberDisplaySelector = 'div[data-testid="displaySign"]';
+    approvalPath = '/ppsecure/post.srf';
     constructor(bot) {
         this.bot = bot;
-        this.maxAttempts = 60;
-        this.numberDisplaySelector = 'div[data-testid="displaySign"]';
-        this.approvalPath = '/ppsecure/post.srf';
     }
     async getDisplayedNumber(page) {
         try {
@@ -74,5 +72,4 @@ class PasswordlessLogin {
         }
     }
 }
-exports.PasswordlessLogin = PasswordlessLogin;
 //# sourceMappingURL=PasswordlessLogin.js.map

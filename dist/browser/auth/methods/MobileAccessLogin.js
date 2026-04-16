@@ -1,18 +1,17 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MobileAccessLogin = void 0;
-const crypto_1 = require("crypto");
-const url_1 = require("url");
-class MobileAccessLogin {
+import { randomBytes } from 'crypto';
+import { URLSearchParams } from 'url';
+export class MobileAccessLogin {
+    bot;
+    page;
+    clientId = '0000000040170455';
+    authUrl = 'https://login.live.com/oauth20_authorize.srf';
+    redirectUrl = 'https://login.live.com/oauth20_desktop.srf';
+    tokenUrl = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
+    scope = 'service::prod.rewardsplatform.microsoft.com::MBI_SSL';
+    maxTimeout = 180_000; // 3min
     constructor(bot, page) {
         this.bot = bot;
         this.page = page;
-        this.clientId = '0000000040170455';
-        this.authUrl = 'https://login.live.com/oauth20_authorize.srf';
-        this.redirectUrl = 'https://login.live.com/oauth20_desktop.srf';
-        this.tokenUrl = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
-        this.scope = 'service::prod.rewardsplatform.microsoft.com::MBI_SSL';
-        this.maxTimeout = 180000; // 3min
     }
     async get(email) {
         try {
@@ -21,7 +20,7 @@ class MobileAccessLogin {
             authorizeUrl.searchParams.append('client_id', this.clientId);
             authorizeUrl.searchParams.append('redirect_uri', this.redirectUrl);
             authorizeUrl.searchParams.append('scope', this.scope);
-            authorizeUrl.searchParams.append('state', (0, crypto_1.randomBytes)(16).toString('hex'));
+            authorizeUrl.searchParams.append('state', randomBytes(16).toString('hex'));
             authorizeUrl.searchParams.append('access_type', 'offline_access');
             authorizeUrl.searchParams.append('login_hint', email);
             this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `Auth URL constructed: ${authorizeUrl.origin}${authorizeUrl.pathname}`);
@@ -61,7 +60,7 @@ class MobileAccessLogin {
                 this.bot.logger.debug(this.bot.isMobile, 'LOGIN-APP', `Final page URL: ${this.page.url()}`);
                 return '';
             }
-            const data = new url_1.URLSearchParams();
+            const data = new URLSearchParams();
             data.append('grant_type', 'authorization_code');
             data.append('client_id', this.clientId);
             data.append('code', code);
@@ -92,5 +91,4 @@ class MobileAccessLogin {
         }
     }
 }
-exports.MobileAccessLogin = MobileAccessLogin;
 //# sourceMappingURL=MobileAccessLogin.js.map

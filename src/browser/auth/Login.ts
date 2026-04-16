@@ -1,4 +1,4 @@
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 import type { MicrosoftRewardsBot } from '../../index'
 import { saveSessionData } from '../../util/Load'
 
@@ -74,10 +74,10 @@ export class Login {
             this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting login process')
 
             await page
-                .goto('https://rewards.bing.com/createuser?idru=%2F&userScenarioId=anonsignin', {
+                .goto('https://rewards.bing.com/', {
                     waitUntil: 'domcontentloaded'
                 })
-                .catch(() => {})
+                .catch(() => { })
             await this.bot.utils.wait(2000)
             await this.bot.browser.utils.reloadBadPage(page)
             await this.bot.browser.utils.disableFido(page)
@@ -153,7 +153,7 @@ export class Login {
     }
 
     private async detectCurrentState(page: Page, account?: Account): Promise<LoginState> {
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { })
 
         const url = new URL(page.url())
         this.bot.logger.debug(this.bot.isMobile, 'DETECT-STATE', `Current URL: ${url.hostname}${url.pathname}`)
@@ -266,7 +266,7 @@ export class Login {
 
     private async checkSelector(page: Page, selector: string): Promise<boolean> {
         return page
-            .waitForSelector(selector, { state: 'visible', timeout: 200 })
+            .waitForSelector(selector, { state: 'visible', timeout: 200 } as any)
             .then(() => true)
             .catch(() => false)
     }
@@ -385,7 +385,7 @@ export class Login {
                             waitUntil: 'domcontentloaded',
                             timeout: 10000
                         })
-                        .catch(() => {})
+                        .catch(() => { })
                     await this.bot.utils.wait(3000)
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Recovery navigation successful')
                     return true
@@ -396,7 +396,7 @@ export class Login {
                             waitUntil: 'domcontentloaded',
                             timeout: 10000
                         })
-                        .catch(() => {})
+                        .catch(() => { })
                     await this.bot.utils.wait(3000)
                     this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Fallback navigation successful')
                     return true
@@ -470,7 +470,7 @@ export class Login {
     private async finalizeLogin(page: Page, email: string) {
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Finalizing login')
 
-        await page.goto(this.bot.config.baseURL, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
+        await page.goto(this.bot.config.baseURL, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => { })
 
         const loginRewardsSuccess = new URL(page.url()).hostname === 'rewards.bing.com'
         if (loginRewardsSuccess) {
@@ -501,7 +501,7 @@ export class Login {
         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Verifying Bing session')
 
         try {
-            await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
+            await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => { })
 
             for (let i = 0; i < loopMax; i++) {
                 if (page.isClosed()) break
@@ -523,7 +523,7 @@ export class Login {
                 )
 
                 if (atBingHome) {
-                    await this.bot.browser.utils.tryDismissAllMessages(page).catch(() => {})
+                    await this.bot.browser.utils.tryDismissAllMessages(page).catch(() => { })
 
                     const signedIn = await page
                         .waitForSelector(this.selectors.bingProfile, { timeout: 3000 })
@@ -559,7 +559,7 @@ export class Login {
         try {
             await page
                 .goto(`${this.bot.config.baseURL}?_=${Date.now()}`, { waitUntil: 'networkidle', timeout: 10000 })
-                .catch(() => {})
+                .catch(() => { })
 
             for (let i = 0; i < loopMax; i++) {
                 if (page.isClosed()) break

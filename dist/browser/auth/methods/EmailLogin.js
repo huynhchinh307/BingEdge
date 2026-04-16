@@ -1,10 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.EmailLogin = void 0;
-class EmailLogin {
+export class EmailLogin {
+    bot;
+    submitButton = 'button[type="submit"]';
     constructor(bot) {
         this.bot = bot;
-        this.submitButton = 'button[type="submit"]';
     }
     async enterEmail(page, email) {
         try {
@@ -69,5 +67,4 @@ class EmailLogin {
         }
     }
 }
-exports.EmailLogin = EmailLogin;
 //# sourceMappingURL=EmailLogin.js.map

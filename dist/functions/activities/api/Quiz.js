@@ -1,14 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Quiz = void 0;
-const Workers_1 = require("../../Workers");
-class Quiz extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.cookieHeader = '';
-        this.fingerprintHeader = {};
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import { Workers } from '../../Workers.js';
+export class Quiz extends Workers {
+    cookieHeader = '';
+    fingerprintHeader = {};
+    oldBalance = this.bot.userData.currentPoints;
     async doQuiz(promotion, page) {
         const offerId = promotion.offerId;
         const url = promotion.destinationUrl;
@@ -108,5 +102,4 @@ class Quiz extends Workers_1.Workers {
         }
     }
 }
-exports.Quiz = Quiz;
 //# sourceMappingURL=Quiz.js.map

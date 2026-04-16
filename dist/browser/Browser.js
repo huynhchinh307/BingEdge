@@ -1,21 +1,50 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const playwright_chromium_1 = require("playwright-chromium");
-const fingerprint_generator_1 = require("fingerprint-generator");
-const fingerprint_injector_1 = require("fingerprint-injector");
-const Load_1 = require("../util/Load");
-const UserAgent_1 = require("./UserAgent");
+import patchright from 'patchright';
+import { newInjectedContext } from 'fingerprint-injector';
+import { FingerprintGenerator } from 'fingerprint-generator';
+import fs from 'fs';
+import path from 'path';
+import { loadSessionData, saveFingerprintData } from '../util/Load.js';
+import { UserAgentManager } from './UserAgent.js';
 class Browser {
+    bot;
+    static BROWSER_ARGS = [
+        '--no-sandbox',
+        '--mute-audio',
+        '--disable-setuid-sandbox',
+        '--ignore-certificate-errors',
+        '--ignore-certificate-errors-spki-list',
+        '--ignore-ssl-errors',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-web-authentication-ui',
+        '--disable-external-intent-requests',
+        '--disable-blink-features=Attestation',
+        '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys,WebAuthenticationProxy,U2F',
+        '--disable-save-password-bubble'
+    ];
     constructor(bot) {
         this.bot = bot;
     }
     async createBrowser(account) {
         let browser;
-        const browserType = this.bot.config.browserType ?? 'chromium';
         try {
+            let bypassString = undefined;
+            const bypassFilePath = path.join(process.cwd(), 'bypass.txt');
+            if (fs.existsSync(bypassFilePath)) {
+                try {
+                    const bypassContent = fs.readFileSync(bypassFilePath, 'utf8').trim();
+                    if (bypassContent) {
+                        bypassString = bypassContent;
+                    }
+                }
+                catch (e) {
+                    this.bot.logger.warn(this.bot.isMobile, 'BROWSER', `Failed to read bypass.txt: ${e.message}`);
+                }
+            }
             const proxyConfig = account.proxy.url
                 ? {
                     server: this.formatProxyServer(account.proxy),
+                    bypass: bypassString,
                     ...(account.proxy.username &&
                         account.proxy.password && {
                         username: account.proxy.username,
@@ -23,8 +52,8 @@ class Browser {
                     })
                 }
                 : undefined;
-            this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Launching Chromium (website fingerprint: ${browserType.toUpperCase()})`);
-            browser = await playwright_chromium_1.chromium.launch({
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Launching stealth browser (Patchright)`);
+            browser = await patchright.chromium.launch({
                 headless: this.bot.config.headless,
                 ...(proxyConfig && { proxy: proxyConfig }),
                 args: [...Browser.BROWSER_ARGS]
@@ -36,12 +65,19 @@ class Browser {
             throw error;
         }
         try {
-            const sessionData = await (0, Load_1.loadSessionData)(this.bot.config.sessionPath, account.email, account.saveFingerprint, this.bot.isMobile);
+            const sessionData = await loadSessionData(this.bot.config.sessionPath, account.email, account.saveFingerprint, this.bot.isMobile);
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile));
-            // Use newInjectedContext for better consistency
-            const context = await (0, fingerprint_injector_1.newInjectedContext)(browser, { fingerprint });
+            const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`;
+            const context = await newInjectedContext(browser, {
+                fingerprint,
+                newContextOptions: {
+                    locale,
+                    bypassCSP: true,
+                    ignoreHTTPSErrors: true,
+                    permissions: []
+                }
+            });
             await context.addInitScript(() => {
-                // Disable WebAuthn which often triggers dialogs
                 Object.defineProperty(navigator, 'credentials', {
                     value: {
                         create: () => Promise.reject(new Error('WebAuthn disabled')),
@@ -53,7 +89,7 @@ class Browser {
             await context.addCookies(sessionData.cookies);
             if ((account.saveFingerprint.mobile && this.bot.isMobile) ||
                 (account.saveFingerprint.desktop && !this.bot.isMobile)) {
-                await (0, Load_1.saveFingerprintData)(this.bot.config.sessionPath, account.email, this.bot.isMobile, fingerprint);
+                await saveFingerprintData(this.bot.config.sessionPath, account.email, this.bot.isMobile, fingerprint);
             }
             this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Created browser with User-Agent: "${fingerprint.fingerprint.navigator.userAgent}"`);
             this.bot.logger.debug(this.bot.isMobile, 'BROWSER-FINGERPRINT', JSON.stringify(fingerprint));
@@ -77,30 +113,15 @@ class Browser {
     async generateFingerprint(isMobile) {
         const browserType = this.bot.config.browserType ?? 'chromium';
         const fingerprintBrowser = browserType === 'edge' ? 'edge' : 'chrome';
-        const fingerPrintData = new fingerprint_generator_1.FingerprintGenerator().getFingerprint({
+        const fingerPrintData = new FingerprintGenerator().getFingerprint({
             devices: isMobile ? ['mobile'] : ['desktop'],
-            operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'linux'],
-            browsers: [{ name: fingerprintBrowser }]
+            operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'macos', 'linux'],
+            browsers: [fingerprintBrowser]
         });
-        const userAgentManager = new UserAgent_1.UserAgentManager(this.bot);
+        const userAgentManager = new UserAgentManager(this.bot);
         const updatedFingerPrintData = await userAgentManager.updateFingerprintUserAgent(fingerPrintData, isMobile);
         return updatedFingerPrintData;
     }
 }
-Browser.BROWSER_ARGS = [
-    '--no-sandbox',
-    '--mute-audio',
-    '--disable-setuid-sandbox',
-    '--ignore-certificate-errors',
-    '--ignore-certificate-errors-spki-list',
-    '--ignore-ssl-errors',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-user-media-security=true',
-    '--disable-blink-features=Attestation',
-    '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys',
-    '--disable-save-password-bubble',
-    '--disable-infobars'
-];
-exports.default = Browser;
+export default Browser;
 //# sourceMappingURL=Browser.js.map

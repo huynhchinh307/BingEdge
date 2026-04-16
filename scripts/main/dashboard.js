@@ -45,7 +45,8 @@ function getDb() {
                 proxy            TEXT NOT NULL DEFAULT '{}',
                 save_fingerprint TEXT NOT NULL DEFAULT '{"mobile":true,"desktop":true}',
                 created_at       INTEGER NOT NULL DEFAULT 0,
-                updated_at       INTEGER NOT NULL DEFAULT 0
+                updated_at       INTEGER NOT NULL DEFAULT 0,
+                account_group    TEXT NOT NULL DEFAULT 'Ungrouped'
             );
             CREATE TABLE IF NOT EXISTS app_config (
                 id   INTEGER PRIMARY KEY DEFAULT 1,
@@ -62,6 +63,12 @@ function getDb() {
                 updated_at       INTEGER NOT NULL DEFAULT 0
             );
         `);
+
+        // Đảm bảo cột account_group tồn tại nếu đã có DB cũ
+        try {
+            _db.prepare("ALTER TABLE accounts ADD COLUMN account_group TEXT NOT NULL DEFAULT 'Ungrouped'").run();
+            log('INFO', '[DB] Added account_group column to accounts table.');
+        } catch(e) { /* Cột đã tồn tại */ }
 
         // Khởi tạo config mặc định nếu chưa có
         const cfgCount = (_db.prepare('SELECT COUNT(*) as c FROM app_config').get()).c;
@@ -369,6 +376,65 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/test-proxy') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const proxyInfo = JSON.parse(body);
+                const rawUrl = proxyInfo.url || '';
+                if (!rawUrl || !proxyInfo.port) {
+                    throw new Error('Missing Proxy Host or Port');
+                }
+                const protoMatch = rawUrl.match(/^(https?|socks[45])/i);
+                let proto = protoMatch ? protoMatch[1].toLowerCase() : 'http';
+                const host = rawUrl.replace(/^(https?|socks[45])?:\/\//i, '');
+                
+                let proxyUrlStr = `${proto}://`;
+                if (proxyInfo.username && proxyInfo.password) {
+                    proxyUrlStr += `${encodeURIComponent(proxyInfo.username)}:${encodeURIComponent(proxyInfo.password)}@`;
+                }
+                proxyUrlStr += `${host}:${proxyInfo.port}`;
+
+                let agent;
+                if (proto.startsWith('socks')) {
+                    const { SocksProxyAgent } = await import('socks-proxy-agent');
+                    agent = new SocksProxyAgent(proxyUrlStr);
+                } else {
+                    const { HttpsProxyAgent } = await import('https-proxy-agent');
+                    agent = new HttpsProxyAgent(proxyUrlStr);
+                }
+
+                const response = await axios.get('http://ip-api.com/json/', {
+                    httpsAgent: agent,
+                    httpAgent: agent,
+                    timeout: 10000 
+                });
+
+                if (response.data && response.data.status === 'success') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ 
+                        success: true, 
+                        ip: response.data.query,
+                        country: response.data.country,
+                        city: response.data.city,
+                        isp: response.data.isp
+                    }));
+                } else if (response.data && response.data.query) {
+                    // Fallback if status is not success but query is there
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, ip: response.data.query }));
+                } else {
+                    throw new Error('Invalid response from IP service: ' + (response.data?.message || 'Unknown error'));
+                }
+            } catch (e) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/accounts/delete') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
@@ -406,6 +472,7 @@ const server = http.createServer((req, res) => {
                 langCode:        row.lang_code,
                 proxy:           _safeParse(row.proxy, {}),
                 saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+                group:           row.account_group || 'Ungrouped',
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, account: acc }));
@@ -432,9 +499,9 @@ const server = http.createServer((req, res) => {
                 }
                 db.prepare(`
                     INSERT INTO accounts
-                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, created_at, updated_at)
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
                     VALUES
-                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @now, @now)
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
                     ON CONFLICT(email) DO UPDATE SET
                         password         = @password,
                         totp_secret      = @totpSecret,
@@ -443,6 +510,7 @@ const server = http.createServer((req, res) => {
                         lang_code        = @langCode,
                         proxy            = @proxy,
                         save_fingerprint = @saveFingerprint,
+                        account_group    = @group,
                         updated_at       = @now
                 `).run({
                     email:           account.email,
@@ -453,6 +521,7 @@ const server = http.createServer((req, res) => {
                     langCode:        account.langCode        || 'en',
                     proxy:           JSON.stringify(account.proxy           || {}),
                     saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
+                    group:           account.group           || 'Ungrouped',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -476,9 +545,9 @@ const server = http.createServer((req, res) => {
                 const now = Date.now();
                 db.prepare(`
                     INSERT INTO accounts
-                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, created_at, updated_at)
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
                     VALUES
-                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @now, @now)
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
                 `).run({
                     email:           newAcc.email,
                     password:        newAcc.password        || '',
@@ -488,10 +557,119 @@ const server = http.createServer((req, res) => {
                     langCode:        newAcc.langCode        || 'en',
                     proxy:           JSON.stringify(newAcc.proxy           || {}),
                     saveFingerprint: JSON.stringify(newAcc.saveFingerprint || { mobile: true, desktop: true }),
+                    group:           newAcc.group           || 'Ungrouped',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
+            } catch(e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/accounts/bulk-update-group') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { emails, group } = JSON.parse(body);
+                if (!Array.isArray(emails) || emails.length === 0) throw new Error('No emails provided');
+                
+                const db = getDb();
+                const now = Date.now();
+                const stmt = db.prepare('UPDATE accounts SET account_group = ?, updated_at = ? WHERE email = ?');
+                
+                db.transaction(() => {
+                    for (const email of emails) {
+                        stmt.run(group || 'Ungrouped', now, email);
+                    }
+                })();
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, count: emails.length }));
+            } catch(e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/accounts/export') {
+        try {
+            const db = getDb();
+            const accounts = db?.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all() || [];
+            
+            const exportAccounts = accounts.map(row => ({
+                email:           row.email,
+                password:        row.password,
+                totpSecret:      row.totp_secret || undefined,
+                recoveryEmail:   row.recovery_email,
+                geoLocale:       row.geo_locale,
+                langCode:        row.lang_code,
+                proxy:           _safeParse(row.proxy, {}),
+                saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+                group:           row.account_group || 'Ungrouped',
+            }));
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, accounts: exportAccounts }));
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/accounts/import') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { accounts } = JSON.parse(body);
+                if (!Array.isArray(accounts)) throw new Error('Accounts must be an array');
+                const db = getDb();
+                const now = Date.now();
+                const insertStmt = db.prepare(`
+                    INSERT INTO accounts
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
+                    VALUES
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
+                    ON CONFLICT(email) DO UPDATE SET
+                        password         = @password,
+                        totp_secret      = @totpSecret,
+                        recovery_email   = @recoveryEmail,
+                        geo_locale       = @geoLocale,
+                        lang_code        = @langCode,
+                        proxy            = @proxy,
+                        save_fingerprint = @saveFingerprint,
+                        account_group    = @group,
+                        updated_at       = @now
+                `);
+                
+                db.transaction(() => {
+                    for (const account of accounts) {
+                        if (!account.email) continue;
+                        insertStmt.run({
+                            email:           account.email,
+                            password:        account.password        || '',
+                            totpSecret:      account.totpSecret      || '',
+                            recoveryEmail:   account.recoveryEmail   || '',
+                            geoLocale:       account.geoLocale       || 'auto',
+                            langCode:        account.langCode        || 'en',
+                            proxy:           JSON.stringify(account.proxy           || {}),
+                            saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
+                            group:           account.group           || 'Ungrouped',
+                            now,
+                        });
+                    }
+                })();
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, count: accounts.length }));
             } catch(e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
@@ -512,10 +690,16 @@ const server = http.createServer((req, res) => {
                 const isActiveMobile  = activeProcesses[`${a.email}-mobile`]  !== undefined;
                 const isActiveBot     = activeProcesses[`${a.email}-bot`]     !== undefined;
 
-                const proxyStr = proxy?.url ? `${proxy.url}:${proxy.port}` : 'None';
-                const normalizedProxyUrl = (proxy?.url || '').replace(/^https?:\/\//i, '').toLowerCase().trim();
-                const proxyGroup = normalizedProxyUrl
-                    ? `${proxy?.username || ''}@${normalizedProxyUrl}:${proxy?.port || 0}`
+                let host = (proxy?.url || '').replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
+                let port = proxy?.port;
+                if (host.includes(':')) {
+                    const parts = host.split(':');
+                    host = parts[0];
+                    if (!port) port = parseInt(parts[1]);
+                }
+                const proxyStr = host ? `${host}:${port || 0}` : 'None';
+                const proxyGroup = host
+                    ? `${proxy?.username || ''}@${host}:${port || 0}`
                     : 'NO_PROXY';
 
                 const ds = diskStatus[a.email] || null;
@@ -534,6 +718,8 @@ const server = http.createServer((req, res) => {
                 return {
                     email: a.email,
                     proxy: proxyStr,
+                    isProxyV6: !!proxy.isProxyV6,
+                    group: a.account_group || 'Ungrouped',
                     proxyGroup,
                     isActiveDesktop,
                     isActiveMobile,

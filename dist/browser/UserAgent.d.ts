@@ -7,7 +7,7 @@ export declare class UserAgentManager {
     getUserAgent(isMobile: boolean, browserType: 'chromium' | 'edge'): Promise<{
         userAgent: string;
         userAgentMetadata: {
-            isMobile: boolean;
+            mobile: boolean;
             platform: string;
             fullVersionList: {
                 brand: string;

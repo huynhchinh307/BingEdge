@@ -1,7 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Workers = void 0;
-class Workers {
+export class Workers {
+    bot;
     constructor(bot) {
         this.bot = bot;
     }
@@ -274,5 +272,4 @@ class Workers {
         return false;
     }
 }
-exports.Workers = Workers;
 //# sourceMappingURL=Workers.js.map

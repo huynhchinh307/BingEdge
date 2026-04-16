@@ -1,4 +1,4 @@
-import type { Cookie } from 'playwright-chromium';
+import type { Cookie } from 'patchright';
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator';
 import type { Account, ConfigSaveFingerprint } from '../interface/Account';
 import type { Config } from '../interface/Config';

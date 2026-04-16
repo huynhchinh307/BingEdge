@@ -1,4 +1,4 @@
-import type { BrowserContext } from 'playwright-chromium';
+import type { BrowserContext } from 'patchright';
 import type { AxiosResponse } from 'axios';
 import type { MicrosoftRewardsBot } from '../index';
 import type { Counters, DashboardData } from './../interface/DashboardData';

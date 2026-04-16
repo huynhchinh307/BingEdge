@@ -1,18 +1,11 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendNtfy = sendNtfy;
-exports.flushNtfyQueue = flushNtfyQueue;
-const axios_1 = __importDefault(require("axios"));
-const p_queue_1 = __importDefault(require("p-queue"));
-const ntfyQueue = new p_queue_1.default({
+import axios from 'axios';
+import PQueue from 'p-queue';
+const ntfyQueue = new PQueue({
     interval: 1000,
     intervalCap: 2,
     carryoverConcurrencyCount: true
 });
-async function sendNtfy(config, content, level) {
+export async function sendNtfy(config, content, level) {
     if (!config?.url)
         return;
     switch (level) {
@@ -44,7 +37,7 @@ async function sendNtfy(config, content, level) {
     };
     await ntfyQueue.add(async () => {
         try {
-            await (0, axios_1.default)(request);
+            await axios(request);
         }
         catch (err) {
             const status = err?.response?.status;
@@ -53,7 +46,7 @@ async function sendNtfy(config, content, level) {
         }
     });
 }
-async function flushNtfyQueue(timeoutMs = 5000) {
+export async function flushNtfyQueue(timeoutMs = 5000) {
     await Promise.race([
         (async () => {
             await ntfyQueue.onIdle();

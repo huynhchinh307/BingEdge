@@ -1,4 +1,4 @@
-import type { Page } from 'playwright-chromium';
+import type { Page } from 'patchright';
 import type { MicrosoftRewardsBot } from '../../index';
 import { EmailLogin } from './methods/EmailLogin';
 import { PasswordlessLogin } from './methods/PasswordlessLogin';

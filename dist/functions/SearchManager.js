@@ -1,8 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SearchManager = void 0;
-const index_1 = require("../index");
-class SearchManager {
+import { executionContext } from '../index.js';
+export class SearchManager {
+    bot;
     constructor(bot) {
         this.bot = bot;
     }
@@ -34,7 +32,7 @@ class SearchManager {
             }
             this.bot.logger.info('main', 'SEARCH-MANAGER', 'Closing mobile session');
             try {
-                await index_1.executionContext.run({ isMobile: true, account }, async () => {
+                await executionContext.run({ isMobile: true, account }, async () => {
                     await this.bot.browser.func.closeBrowser(mobileSession.context, accountEmail);
                 });
                 this.bot.logger.info('main', 'SEARCH-MANAGER', 'Mobile session closed');
@@ -51,10 +49,10 @@ class SearchManager {
         this.bot.logger.info('main', 'SEARCH-MANAGER', `Mode: ${useParallel ? 'parallel' : 'sequential'}`);
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `parallelSearching=${useParallel} | account=${accountEmail}`);
         if (useParallel) {
-            return await this.doParallelSearches(data, missingSearchPoints, mobileSession, account, accountEmail, index_1.executionContext);
+            return await this.doParallelSearches(data, missingSearchPoints, mobileSession, account, accountEmail, executionContext);
         }
         else {
-            return await this.doSequentialSearches(data, missingSearchPoints, mobileSession, account, accountEmail, index_1.executionContext);
+            return await this.doSequentialSearches(data, missingSearchPoints, mobileSession, account, accountEmail, executionContext);
         }
     }
     async doParallelSearches(data, missingSearchPoints, mobileSession, account, accountEmail, executionContext) {
@@ -335,5 +333,4 @@ class SearchManager {
         await this.doDesktopWorkers(data);
     }
 }
-exports.SearchManager = SearchManager;
 //# sourceMappingURL=SearchManager.js.map

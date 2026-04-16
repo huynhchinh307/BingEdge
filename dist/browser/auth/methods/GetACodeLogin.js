@@ -1,14 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CodeLogin = void 0;
-const LoginUtils_1 = require("./LoginUtils");
-class CodeLogin {
+import { getErrorMessage, getSubtitleMessage, promptInput } from './LoginUtils.js';
+export class CodeLogin {
+    bot;
+    textInputSelector = '[data-testid="codeInputWrapper"]';
+    secondairyInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]';
+    maxManualSeconds = 60;
+    maxManualAttempts = 5;
     constructor(bot) {
         this.bot = bot;
-        this.textInputSelector = '[data-testid="codeInputWrapper"]';
-        this.secondairyInputSelector = 'input[id="otc-confirmation-input"], input[name="otc"]';
-        this.maxManualSeconds = 60;
-        this.maxManualAttempts = 5;
     }
     async fillCode(page, code) {
         try {
@@ -37,7 +35,7 @@ class CodeLogin {
     async handle(page) {
         try {
             this.bot.logger.info(this.bot.isMobile, 'LOGIN-CODE', 'Code login authentication requested');
-            const emailMessage = await (0, LoginUtils_1.getSubtitleMessage)(page);
+            const emailMessage = await getSubtitleMessage(page);
             if (emailMessage) {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN-CODE', `Page message: "${emailMessage}"`);
             }
@@ -45,7 +43,7 @@ class CodeLogin {
                 this.bot.logger.warn(this.bot.isMobile, 'LOGIN-CODE', 'Unable to retrieve email code destination');
             }
             for (let attempt = 1; attempt <= this.maxManualAttempts; attempt++) {
-                const code = await (0, LoginUtils_1.promptInput)({
+                const code = await promptInput({
                     question: `Enter the 6-digit code (waiting ${this.maxManualSeconds}s): `,
                     timeoutSeconds: this.maxManualSeconds,
                     validate: code => /^\d{6}$/.test(code)
@@ -68,7 +66,7 @@ class CodeLogin {
                 await this.bot.utils.wait(500);
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
                 // Check if wrong code was entered
-                const errorMessage = await (0, LoginUtils_1.getErrorMessage)(page);
+                const errorMessage = await getErrorMessage(page);
                 if (errorMessage) {
                     this.bot.logger.warn(this.bot.isMobile, 'LOGIN-CODE', `Incorrect code: ${errorMessage} (attempt ${attempt}/${this.maxManualAttempts})`);
                     if (attempt === this.maxManualAttempts) {
@@ -94,5 +92,4 @@ class CodeLogin {
         }
     }
 }
-exports.CodeLogin = CodeLogin;
 //# sourceMappingURL=GetACodeLogin.js.map

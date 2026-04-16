@@ -1,22 +1,13 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AccountSchema = exports.ConfigSchema = void 0;
-exports.validateConfig = validateConfig;
-exports.validateAccounts = validateAccounts;
-exports.checkNodeVersion = checkNodeVersion;
-const zod_1 = require("zod");
-const semver_1 = __importDefault(require("semver"));
-const package_json_1 = __importDefault(require("../../package.json"));
-const NumberOrString = zod_1.z.union([zod_1.z.number(), zod_1.z.string()]);
-const LogFilterSchema = zod_1.z.object({
-    enabled: zod_1.z.boolean().default(false),
-    mode: zod_1.z.enum(['whitelist', 'blacklist']).default('blacklist'),
-    levels: zod_1.z.array(zod_1.z.enum(['debug', 'info', 'warn', 'error'])).optional().default(['error']),
-    keywords: zod_1.z.array(zod_1.z.string()).optional().default([]),
-    regexPatterns: zod_1.z.array(zod_1.z.string()).optional().default([])
+import { z } from 'zod';
+import semver from 'semver';
+import pkg from '../../package.json' with { type: 'json' };
+const NumberOrString = z.union([z.number(), z.string()]);
+const LogFilterSchema = z.object({
+    enabled: z.boolean().default(false),
+    mode: z.enum(['whitelist', 'blacklist']).default('blacklist'),
+    levels: z.array(z.enum(['debug', 'info', 'warn', 'error'])).optional().default(['error']),
+    keywords: z.array(z.string()).optional().default([]),
+    regexPatterns: z.array(z.string()).optional().default([])
 }).default({
     enabled: false,
     mode: 'blacklist',
@@ -24,29 +15,29 @@ const LogFilterSchema = zod_1.z.object({
     keywords: [],
     regexPatterns: []
 });
-const DelaySchema = zod_1.z.object({
+const DelaySchema = z.object({
     min: NumberOrString,
     max: NumberOrString
 });
-const QueryEngineSchema = zod_1.z.enum(['google', 'wikipedia', 'reddit', 'local', 'gemini']);
+const QueryEngineSchema = z.enum(['google', 'wikipedia', 'reddit', 'local', 'gemini']);
 // Webhook
-const WebhookSchema = zod_1.z.object({
-    discord: zod_1.z
+const WebhookSchema = z.object({
+    discord: z
         .object({
-        enabled: zod_1.z.boolean().default(false),
-        url: zod_1.z.string().default('')
+        enabled: z.boolean().default(false),
+        url: z.string().default('')
     })
         .optional()
         .default({ enabled: false, url: '' }),
-    ntfy: zod_1.z
+    ntfy: z
         .object({
-        enabled: zod_1.z.boolean().optional().default(false),
-        url: zod_1.z.string().default(''),
-        topic: zod_1.z.string().optional(),
-        token: zod_1.z.string().optional(),
-        title: zod_1.z.string().optional(),
-        tags: zod_1.z.array(zod_1.z.string()).optional(),
-        priority: zod_1.z.union([zod_1.z.literal(1), zod_1.z.literal(2), zod_1.z.literal(3), zod_1.z.literal(4), zod_1.z.literal(5)]).optional()
+        enabled: z.boolean().optional().default(false),
+        url: z.string().default(''),
+        topic: z.string().optional(),
+        token: z.string().optional(),
+        title: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional()
     })
         .optional(),
     webhookLogFilter: LogFilterSchema
@@ -61,24 +52,24 @@ const WebhookSchema = zod_1.z.object({
     }
 });
 // Config
-exports.ConfigSchema = zod_1.z.object({
-    baseURL: zod_1.z.string().optional().default('https://rewards.bing.com'),
-    sessionPath: zod_1.z.string().optional().default('sessions'),
-    headless: zod_1.z.boolean().optional().default(false),
-    browserType: zod_1.z.enum(['chromium', 'edge']).optional().default('chromium'),
-    runOnZeroPoints: zod_1.z.boolean().optional().default(false),
-    clusters: zod_1.z.number().int().nonnegative().optional().default(1),
-    errorDiagnostics: zod_1.z.boolean().optional().default(true),
-    workers: zod_1.z.object({
-        doDailySet: zod_1.z.boolean().optional().default(true),
-        doSpecialPromotions: zod_1.z.boolean().optional().default(true),
-        doMorePromotions: zod_1.z.boolean().optional().default(true),
-        doPunchCards: zod_1.z.boolean().optional().default(true),
-        doAppPromotions: zod_1.z.boolean().optional().default(true),
-        doDesktopSearch: zod_1.z.boolean().optional().default(true),
-        doMobileSearch: zod_1.z.boolean().optional().default(true),
-        doDailyCheckIn: zod_1.z.boolean().optional().default(true),
-        doReadToEarn: zod_1.z.boolean().optional().default(true)
+export const ConfigSchema = z.object({
+    baseURL: z.string().optional().default('https://rewards.bing.com'),
+    sessionPath: z.string().optional().default('sessions'),
+    headless: z.boolean().optional().default(false),
+    browserType: z.enum(['chromium', 'edge']).optional().default('chromium'),
+    runOnZeroPoints: z.boolean().optional().default(false),
+    clusters: z.number().int().nonnegative().optional().default(1),
+    errorDiagnostics: z.boolean().optional().default(true),
+    workers: z.object({
+        doDailySet: z.boolean().optional().default(true),
+        doSpecialPromotions: z.boolean().optional().default(true),
+        doMorePromotions: z.boolean().optional().default(true),
+        doPunchCards: z.boolean().optional().default(true),
+        doAppPromotions: z.boolean().optional().default(true),
+        doDesktopSearch: z.boolean().optional().default(true),
+        doMobileSearch: z.boolean().optional().default(true),
+        doDailyCheckIn: z.boolean().optional().default(true),
+        doReadToEarn: z.boolean().optional().default(true)
     }).optional().default({
         doDailySet: true,
         doSpecialPromotions: true,
@@ -90,13 +81,13 @@ exports.ConfigSchema = zod_1.z.object({
         doDailyCheckIn: true,
         doReadToEarn: true
     }),
-    searchOnBingLocalQueries: zod_1.z.boolean().optional().default(false),
+    searchOnBingLocalQueries: z.boolean().optional().default(false),
     globalTimeout: NumberOrString.optional().default(120000),
-    searchSettings: zod_1.z.object({
-        scrollRandomResults: zod_1.z.boolean().optional().default(true),
-        clickRandomResults: zod_1.z.boolean().optional().default(true),
-        parallelSearching: zod_1.z.boolean().optional().default(false),
-        queryEngines: zod_1.z.array(QueryEngineSchema).optional().default(['google', 'wikipedia', 'reddit', 'local']),
+    searchSettings: z.object({
+        scrollRandomResults: z.boolean().optional().default(true),
+        clickRandomResults: z.boolean().optional().default(true),
+        parallelSearching: z.boolean().optional().default(false),
+        queryEngines: z.array(QueryEngineSchema).optional().default(['google', 'wikipedia', 'reddit', 'local']),
         searchResultVisitTime: NumberOrString.optional().default('5-10s'),
         searchDelay: DelaySchema.optional().default({ min: '2s', max: '5s' }),
         readDelay: DelaySchema.optional().default({ min: '1s', max: '3s' })
@@ -109,14 +100,14 @@ exports.ConfigSchema = zod_1.z.object({
         searchDelay: { min: '2s', max: '5s' },
         readDelay: { min: '1s', max: '3s' }
     }),
-    debugLogs: zod_1.z.boolean().optional().default(false),
-    proxy: zod_1.z.object({
-        enable: zod_1.z.boolean().optional().default(false),
-        url: zod_1.z.string().optional().default(''),
-        port: zod_1.z.union([zod_1.z.string(), zod_1.z.number()]).optional().default(''),
-        username: zod_1.z.string().optional().default(''),
-        password: zod_1.z.string().optional().default(''),
-        queryEngine: zod_1.z.boolean().optional().default(false)
+    debugLogs: z.boolean().optional().default(false),
+    proxy: z.object({
+        enable: z.boolean().optional().default(false),
+        url: z.string().optional().default(''),
+        port: z.union([z.string(), z.number()]).optional().default(''),
+        username: z.string().optional().default(''),
+        password: z.string().optional().default(''),
+        queryEngine: z.boolean().optional().default(false)
     }).optional().default({
         enable: false,
         url: '',
@@ -127,9 +118,9 @@ exports.ConfigSchema = zod_1.z.object({
     }),
     consoleLogFilter: LogFilterSchema,
     webhook: WebhookSchema,
-    geminiApiKey: zod_1.z.string().optional().default(''),
-    geminiModel: zod_1.z.string().optional().default('gemini-1.5-flash'),
-    geminiEndpoint: zod_1.z.string().optional().default('https://generativelanguage.googleapis.com')
+    geminiApiKey: z.string().optional().default(''),
+    geminiModel: z.string().optional().default('gemini-1.5-flash'),
+    geminiEndpoint: z.string().optional().default('https://generativelanguage.googleapis.com')
 }).optional().default({
     baseURL: 'https://rewards.bing.com',
     sessionPath: 'sessions',
@@ -191,19 +182,19 @@ exports.ConfigSchema = zod_1.z.object({
     geminiEndpoint: 'https://generativelanguage.googleapis.com'
 });
 // Account
-exports.AccountSchema = zod_1.z.object({
-    email: zod_1.z.string(),
-    password: zod_1.z.string().optional().default(''),
-    totpSecret: zod_1.z.string().optional(),
-    recoveryEmail: zod_1.z.string().optional().default(''),
-    geoLocale: zod_1.z.string().optional().default('auto'),
-    langCode: zod_1.z.string().optional().default('en'),
-    proxy: zod_1.z.object({
-        proxyAxios: zod_1.z.boolean().optional().default(false),
-        url: zod_1.z.string().optional().default(''),
-        port: zod_1.z.coerce.number().optional().default(0),
-        password: zod_1.z.string().optional().default(''),
-        username: zod_1.z.string().optional().default('')
+export const AccountSchema = z.object({
+    email: z.string(),
+    password: z.string().optional().default(''),
+    totpSecret: z.string().optional(),
+    recoveryEmail: z.string().optional().default(''),
+    geoLocale: z.string().optional().default('auto'),
+    langCode: z.string().optional().default('en'),
+    proxy: z.object({
+        proxyAxios: z.boolean().optional().default(false),
+        url: z.string().optional().default(''),
+        port: z.coerce.number().optional().default(0),
+        password: z.string().optional().default(''),
+        username: z.string().optional().default('')
     }).optional().default({
         proxyAxios: false,
         url: '',
@@ -211,34 +202,34 @@ exports.AccountSchema = zod_1.z.object({
         password: '',
         username: ''
     }),
-    saveFingerprint: zod_1.z.object({
-        mobile: zod_1.z.boolean().optional().default(true),
-        desktop: zod_1.z.boolean().optional().default(true)
+    saveFingerprint: z.object({
+        mobile: z.boolean().optional().default(true),
+        desktop: z.boolean().optional().default(true)
     }).optional().default({
         mobile: true,
         desktop: true
     }),
-    points: zod_1.z.number().optional().default(0),
-    initialPoints: zod_1.z.number().optional().default(0),
-    collectedPoints: zod_1.z.number().optional().default(0),
-    duration: zod_1.z.number().optional().default(0),
-    rank: zod_1.z.string().optional().default(''),
-    lastUpdate: zod_1.z.string().optional().default('Never')
+    points: z.number().optional().default(0),
+    initialPoints: z.number().optional().default(0),
+    collectedPoints: z.number().optional().default(0),
+    duration: z.number().optional().default(0),
+    rank: z.string().optional().default(''),
+    lastUpdate: z.string().optional().default('Never')
 });
-function validateConfig(data) {
-    return exports.ConfigSchema.parse(data);
+export function validateConfig(data) {
+    return ConfigSchema.parse(data);
 }
-function validateAccounts(data) {
-    return zod_1.z.array(exports.AccountSchema).parse(data);
+export function validateAccounts(data) {
+    return z.array(AccountSchema).parse(data);
 }
-function checkNodeVersion() {
+export function checkNodeVersion() {
     try {
-        const requiredVersion = package_json_1.default.engines?.node;
+        const requiredVersion = pkg.engines?.node;
         if (!requiredVersion) {
             console.warn('No Node.js version requirement found in package.json "engines" field.');
             return;
         }
-        if (!semver_1.default.satisfies(process.version, requiredVersion)) {
+        if (!semver.satisfies(process.version, requiredVersion)) {
             console.error(`Current Node.js version ${process.version} does not satisfy requirement: ${requiredVersion}`);
             process.exit(1);
         }

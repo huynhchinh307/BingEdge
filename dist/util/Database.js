@@ -1,19 +1,3 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getDb = getDb;
-exports.closeDb = closeDb;
-exports.dbLoadAccounts = dbLoadAccounts;
-exports.dbLoadAccount = dbLoadAccount;
-exports.dbSaveAccount = dbSaveAccount;
-exports.dbDeleteAccount = dbDeleteAccount;
-exports.dbLoadConfig = dbLoadConfig;
-exports.dbSaveConfig = dbSaveConfig;
-exports.updateAccountStatus = updateAccountStatus;
-exports.getAccountStatus = getAccountStatus;
-exports.getAllAccountStatuses = getAllAccountStatuses;
 /**
  * Database.ts — SQLite single source of truth
  *
@@ -26,18 +10,18 @@ exports.getAllAccountStatuses = getAllAccountStatuses;
  * WAL mode: nhiều reader + 1 writer chạy song song an toàn.
  * File DB: <project_root>/rewards_data.db
  */
-const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
+import BetterSqlite3 from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
 // ──────────────────────────────────────────────
 // Singleton DB
 // ──────────────────────────────────────────────
 let _db = null;
-function getDb() {
+export function getDb() {
     if (_db)
         return _db;
-    const dbPath = path_1.default.join(process.cwd(), 'rewards_data.db');
-    _db = new better_sqlite3_1.default(dbPath);
+    const dbPath = path.join(process.cwd(), 'rewards_data.db');
+    _db = new BetterSqlite3(dbPath);
     _db.pragma('journal_mode = WAL');
     _db.pragma('synchronous = NORMAL');
     _db.pragma('foreign_keys = ON');
@@ -78,7 +62,7 @@ function getDb() {
     _migrateFromJson(_db);
     return _db;
 }
-function closeDb() {
+export function closeDb() {
     if (_db) {
         _db.close();
         _db = null;
@@ -92,15 +76,15 @@ function _migrateFromJson(db) {
     const accCount = db.prepare('SELECT COUNT(*) as c FROM accounts').get().c;
     if (accCount === 0) {
         const paths = [
-            path_1.default.join(process.cwd(), 'accounts.json'),
-            path_1.default.join(process.cwd(), 'dist', 'accounts.json'),
-            path_1.default.join(process.cwd(), 'src', 'accounts.json'),
+            path.join(process.cwd(), 'accounts.json'),
+            path.join(process.cwd(), 'dist', 'accounts.json'),
+            path.join(process.cwd(), 'src', 'accounts.json'),
         ];
         for (const p of paths) {
-            if (!fs_1.default.existsSync(p))
+            if (!fs.existsSync(p))
                 continue;
             try {
-                const list = JSON.parse(fs_1.default.readFileSync(p, 'utf-8'));
+                const list = JSON.parse(fs.readFileSync(p, 'utf-8'));
                 if (!Array.isArray(list) || list.length === 0)
                     continue;
                 const insertAcc = db.prepare(`
@@ -159,15 +143,15 @@ function _migrateFromJson(db) {
     const cfgCount = db.prepare('SELECT COUNT(*) as c FROM app_config').get().c;
     if (cfgCount === 0) {
         const paths = [
-            path_1.default.join(process.cwd(), 'config.json'),
-            path_1.default.join(process.cwd(), 'dist', 'config.json'),
-            path_1.default.join(process.cwd(), 'src', 'config.json'),
+            path.join(process.cwd(), 'config.json'),
+            path.join(process.cwd(), 'dist', 'config.json'),
+            path.join(process.cwd(), 'src', 'config.json'),
         ];
         for (const p of paths) {
-            if (!fs_1.default.existsSync(p))
+            if (!fs.existsSync(p))
                 continue;
             try {
-                const raw = fs_1.default.readFileSync(p, 'utf-8');
+                const raw = fs.readFileSync(p, 'utf-8');
                 JSON.parse(raw); // validate JSON
                 db.prepare('INSERT INTO app_config (id, data) VALUES (1, ?)').run(raw);
                 console.log(`[DB] Migrated config from ${p}`);
@@ -275,7 +259,7 @@ function _accountToRow(a, now) {
     };
 }
 /** Lấy tất cả accounts (chỉ credentials, không có runtime stats). */
-function dbLoadAccounts() {
+export function dbLoadAccounts() {
     try {
         return getDb().prepare('SELECT * FROM accounts ORDER BY created_at ASC').all()
             .map(_rowToAccount);
@@ -285,7 +269,7 @@ function dbLoadAccounts() {
     }
 }
 /** Lấy một account theo email. */
-function dbLoadAccount(email) {
+export function dbLoadAccount(email) {
     try {
         const row = getDb().prepare('SELECT * FROM accounts WHERE email = ?').get(email);
         return row ? _rowToAccount(row) : null;
@@ -295,7 +279,7 @@ function dbLoadAccount(email) {
     }
 }
 /** Thêm mới hoặc cập nhật một account (UPSERT). */
-function dbSaveAccount(account) {
+export function dbSaveAccount(account) {
     const now = Date.now();
     const row = _accountToRow(account, now);
     getDb().prepare(`
@@ -317,7 +301,7 @@ function dbSaveAccount(account) {
     `).run(row);
 }
 /** Xóa account theo email. Trả về true nếu xóa được. */
-function dbDeleteAccount(email) {
+export function dbDeleteAccount(email) {
     const result = getDb().prepare('DELETE FROM accounts WHERE email = ?').run(email);
     return result.changes > 0;
 }
@@ -325,7 +309,7 @@ function dbDeleteAccount(email) {
 // Config CRUD
 // ──────────────────────────────────────────────
 /** Đọc config từ DB. Trả về null nếu chưa có. */
-function dbLoadConfig() {
+export function dbLoadConfig() {
     try {
         const row = getDb().prepare('SELECT data FROM app_config WHERE id = 1').get();
         return row ? JSON.parse(row.data) : null;
@@ -335,7 +319,7 @@ function dbLoadConfig() {
     }
 }
 /** Lưu config vào DB (UPSERT). */
-function dbSaveConfig(config) {
+export function dbSaveConfig(config) {
     const data = typeof config === 'string' ? config : JSON.stringify(config, null, 2);
     // Validate JSON
     JSON.parse(data);
@@ -348,7 +332,7 @@ function dbSaveConfig(config) {
 // Account Status CRUD
 // ──────────────────────────────────────────────
 /** Upsert runtime status của một account. */
-function updateAccountStatus(email, status) {
+export function updateAccountStatus(email, status) {
     try {
         getDb().prepare(`
             INSERT INTO account_status
@@ -386,7 +370,7 @@ function updateAccountStatus(email, status) {
     }
 }
 /** Lấy status của một account. */
-function getAccountStatus(email) {
+export function getAccountStatus(email) {
     try {
         const row = getDb().prepare('SELECT * FROM account_status WHERE email = ?').get(email);
         return row ? _mapStatusRow(row) : null;
@@ -396,7 +380,7 @@ function getAccountStatus(email) {
     }
 }
 /** Lấy toàn bộ statuses dạng map { email → row }. */
-function getAllAccountStatuses() {
+export function getAllAccountStatuses() {
     try {
         const result = {};
         for (const row of getDb().prepare('SELECT * FROM account_status').all()) {

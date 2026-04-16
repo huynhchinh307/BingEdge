@@ -249,8 +249,30 @@ export function buildProxyConfig(account) {
         proxyUrl = 'http://' + proxyUrl
     }
 
+    let bypassString = undefined
+
+    // Chỉ áp dụng bypass list khi dùng proxy IPv6
+    // IPv4 proxy không cần bypass — tất cả traffic đi qua proxy bình thường
+    if (account.proxy.isProxyV6) {
+        const bypassFilePath = path.join(process.cwd(), 'bypass.txt')
+        if (fs.existsSync(bypassFilePath)) {
+            try {
+                const bypassContent = fs.readFileSync(bypassFilePath, 'utf8').trim()
+                if (bypassContent) {
+                    bypassString = bypassContent
+                }
+            } catch (e) {
+                log('WARN', `Failed to read bypass.txt: ${e.message}`)
+            }
+        }
+    }
+
     const proxy = {
         server: `${proxyUrl}:${account.proxy.port}`
+    }
+
+    if (bypassString) {
+        proxy.bypass = bypassString
     }
 
     if (account.proxy.username && account.proxy.password) {

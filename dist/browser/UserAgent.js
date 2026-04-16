@@ -1,11 +1,7 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserAgentManager = void 0;
-const axios_1 = __importDefault(require("axios"));
-class UserAgentManager {
+import axios from 'axios';
+export class UserAgentManager {
+    bot;
+    static NOT_A_BRAND_VERSION = '99';
     constructor(bot) {
         this.bot = bot;
     }
@@ -28,15 +24,15 @@ class UserAgentManager {
         const brandVersionFull = browserType === 'edge' ? app.edge_version : app.chrome_version;
         const brandVersionMajor = browserType === 'edge' ? app.edge_major_version : app.chrome_major_version;
         const uaMetadata = {
-            isMobile,
+            mobile: isMobile,
             platform: isMobile ? 'Android' : 'Windows',
             fullVersionList: [
-                { brand: 'Not/A)Brand', version: `${UserAgentManager.NOT_A_BRAND_VERSION}.0.0.0` },
+                { brand: 'Not/A)Brand', version: '99.0.0.0' },
                 { brand: brandName, version: brandVersionFull },
                 { brand: 'Chromium', version: app['chrome_version'] }
             ],
             brands: [
-                { brand: 'Not/A)Brand', version: UserAgentManager.NOT_A_BRAND_VERSION },
+                { brand: 'Not/A)Brand', version: '99' },
                 { brand: brandName, version: brandVersionMajor },
                 { brand: 'Chromium', version: app['chrome_major_version'] }
             ],
@@ -56,7 +52,7 @@ class UserAgentManager {
                     'Content-Type': 'application/json'
                 }
             };
-            const response = await (0, axios_1.default)(request);
+            const response = await axios(request);
             const data = response.data;
             return data.channels.Stable.version;
         }
@@ -74,7 +70,7 @@ class UserAgentManager {
                     'Content-Type': 'application/json'
                 }
             };
-            const response = await (0, axios_1.default)(request);
+            const response = await axios(request);
             const data = response.data;
             const stable = data.find(x => x.Product == 'Stable');
             return {
@@ -121,17 +117,19 @@ class UserAgentManager {
             fingerprint.fingerprint.navigator.userAgent = userAgentData.userAgent;
             fingerprint.fingerprint.navigator.appVersion = userAgentData.userAgent.replace(`${fingerprint.fingerprint.navigator.appCodeName}/`, '');
             fingerprint.headers['user-agent'] = userAgentData.userAgent;
+            fingerprint.headers['sec-ch-ua-mobile'] = isMobile ? '?1' : '?0';
+            fingerprint.headers['sec-ch-ua-platform'] = isMobile ? '"Android"' : '"Windows"';
             if (browserType === 'edge') {
                 fingerprint.headers['sec-ch-ua'] =
-                    `"Microsoft Edge";v="${componentData.edge_major_version}", "Not=A?Brand";v="${componentData.not_a_brand_major_version}", "Chromium";v="${componentData.chrome_major_version}"`;
+                    `"Microsoft Edge";v="${componentData.edge_major_version}", "Not/A)Brand";v="99", "Chromium";v="${componentData.chrome_major_version}"`;
                 fingerprint.headers['sec-ch-ua-full-version-list'] =
-                    `"Microsoft Edge";v="${componentData.edge_version}", "Not=A?Brand";v="${componentData.not_a_brand_version}", "Chromium";v="${componentData.chrome_version}"`;
+                    `"Microsoft Edge";v="${componentData.edge_version}", "Not/A)Brand";v="99.0.0.0", "Chromium";v="${componentData.chrome_version}"`;
             }
             else {
                 fingerprint.headers['sec-ch-ua'] =
-                    `"Google Chrome";v="${componentData.chrome_major_version}", "Not=A?Brand";v="${componentData.not_a_brand_major_version}", "Chromium";v="${componentData.chrome_major_version}"`;
+                    `"Google Chrome";v="${componentData.chrome_major_version}", "Not/A)Brand";v="99", "Chromium";v="${componentData.chrome_major_version}"`;
                 fingerprint.headers['sec-ch-ua-full-version-list'] =
-                    `"Google Chrome";v="${componentData.chrome_version}", "Not=A?Brand";v="${componentData.not_a_brand_version}", "Chromium";v="${componentData.chrome_version}"`;
+                    `"Google Chrome";v="${componentData.chrome_version}", "Not/A)Brand";v="99.0.0.0", "Chromium";v="${componentData.chrome_version}"`;
             }
             /*
             Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36 EdgA/129.0.0.0
@@ -149,6 +147,4 @@ class UserAgentManager {
         }
     }
 }
-exports.UserAgentManager = UserAgentManager;
-UserAgentManager.NOT_A_BRAND_VERSION = '99';
 //# sourceMappingURL=UserAgent.js.map

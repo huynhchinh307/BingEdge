@@ -1,4 +1,4 @@
-import { type Page, type BrowserContext } from 'playwright-chromium'
+import { type Page, type BrowserContext } from 'patchright'
 import { CheerioAPI, load } from 'cheerio'
 import { ClickOptions, createCursor } from 'ghost-cursor-playwright-port'
 
@@ -220,7 +220,7 @@ export default class BrowserUtils {
             )
 
             // Wait for selector to exist before clicking
-            await page.waitForSelector(selector, { timeout: 10000 })
+            await (page as any).waitForSelector(selector, { timeout: 10000 })
 
             const cursor = createCursor(page as any)
             await cursor.click(selector, options)

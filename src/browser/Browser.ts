@@ -1,6 +1,8 @@
-import { chromium, type Browser as PlaywrightBrowser, type BrowserContext } from 'playwright-chromium'
-import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
+import patchright, { type BrowserContext } from 'patchright'
 import { newInjectedContext } from 'fingerprint-injector'
+import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
+import fs from 'fs'
+import path from 'path'
 
 import type { MicrosoftRewardsBot } from '../index'
 import { loadSessionData, saveFingerprintData } from '../util/Load'
@@ -32,11 +34,11 @@ class Browser {
         '--ignore-ssl-errors',
         '--no-first-run',
         '--no-default-browser-check',
-        '--disable-user-media-security=true',
+        '--disable-web-authentication-ui',
+        '--disable-external-intent-requests',
         '--disable-blink-features=Attestation',
-        '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys',
-        '--disable-save-password-bubble',
-        '--disable-infobars'
+        '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys,WebAuthenticationProxy,U2F',
+        '--disable-save-password-bubble'
     ] as const
 
     constructor(bot: MicrosoftRewardsBot) {
@@ -44,13 +46,26 @@ class Browser {
     }
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
-        let browser: PlaywrightBrowser
-        const browserType = this.bot.config.browserType ?? 'chromium'
-
+        let browser: any
         try {
+            let bypassString = undefined
+            const bypassFilePath = path.join(process.cwd(), 'bypass.txt')
+
+            if (fs.existsSync(bypassFilePath)) {
+                try {
+                    const bypassContent = fs.readFileSync(bypassFilePath, 'utf8').trim()
+                    if (bypassContent) {
+                        bypassString = bypassContent
+                    }
+                } catch (e: any) {
+                    this.bot.logger.warn(this.bot.isMobile, 'BROWSER', `Failed to read bypass.txt: ${e.message}`)
+                }
+            }
+
             const proxyConfig = account.proxy.url
                 ? {
                       server: this.formatProxyServer(account.proxy),
+                      bypass: bypassString,
                       ...(account.proxy.username &&
                           account.proxy.password && {
                               username: account.proxy.username,
@@ -62,10 +77,10 @@ class Browser {
             this.bot.logger.info(
                 this.bot.isMobile, 
                 'BROWSER', 
-                `Launching Chromium (website fingerprint: ${browserType.toUpperCase()})`
+                `Launching stealth browser (Patchright)`
             )
 
-            browser = await chromium.launch({
+            browser = await patchright.chromium.launch({
                 headless: this.bot.config.headless,
                 ...(proxyConfig && { proxy: proxyConfig }),
                 args: [...Browser.BROWSER_ARGS]
@@ -86,11 +101,19 @@ class Browser {
 
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile))
 
-            // Use newInjectedContext for better consistency
-            const context = await newInjectedContext(browser as any, { fingerprint })
+            const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`
+
+            const context = await newInjectedContext(browser as any, {
+                fingerprint,
+                newContextOptions: {
+                    locale,
+                    bypassCSP: true,
+                    ignoreHTTPSErrors: true,
+                    permissions: []
+                }
+            })
 
             await context.addInitScript(() => {
-                // Disable WebAuthn which often triggers dialogs
                 Object.defineProperty(navigator, 'credentials', {
                     value: {
                         create: () => Promise.reject(new Error('WebAuthn disabled')),
@@ -140,8 +163,8 @@ class Browser {
 
         const fingerPrintData = new FingerprintGenerator().getFingerprint({
             devices: isMobile ? ['mobile'] : ['desktop'],
-            operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'linux'],
-            browsers: [{ name: fingerprintBrowser }]
+            operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'macos', 'linux'],
+            browsers: [fingerprintBrowser]
         })
 
         const userAgentManager = new UserAgentManager(this.bot)
@@ -152,3 +175,4 @@ class Browser {
 }
 
 export default Browser
+

@@ -1,13 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DoubleSearchPoints = void 0;
-const Workers_1 = require("../../Workers");
-class DoubleSearchPoints extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.cookieHeader = '';
-        this.fingerprintHeader = {};
-    }
+import { Workers } from '../../Workers.js';
+export class DoubleSearchPoints extends Workers {
+    cookieHeader = '';
+    fingerprintHeader = {};
     async doDoubleSearchPoints(promotion) {
         const offerId = promotion.offerId;
         const activityType = promotion.activityType;
@@ -67,5 +61,4 @@ class DoubleSearchPoints extends Workers_1.Workers {
         }
     }
 }
-exports.DoubleSearchPoints = DoubleSearchPoints;
 //# sourceMappingURL=DoubleSearchPoints.js.map

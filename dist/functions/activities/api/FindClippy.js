@@ -1,15 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.FindClippy = void 0;
-const Workers_1 = require("../../Workers");
-class FindClippy extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.cookieHeader = '';
-        this.fingerprintHeader = {};
-        this.gainedPoints = 0;
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import { Workers } from '../../Workers.js';
+export class FindClippy extends Workers {
+    cookieHeader = '';
+    fingerprintHeader = {};
+    gainedPoints = 0;
+    oldBalance = this.bot.userData.currentPoints;
     async doFindClippy(promotion) {
         const offerId = promotion.offerId;
         const activityType = promotion.activityType;
@@ -71,5 +65,4 @@ class FindClippy extends Workers_1.Workers {
         }
     }
 }
-exports.FindClippy = FindClippy;
 //# sourceMappingURL=FindClippy.js.map

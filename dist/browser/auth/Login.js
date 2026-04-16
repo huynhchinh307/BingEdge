@@ -1,50 +1,53 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Login = void 0;
-const Load_1 = require("../../util/Load");
-const MobileAccessLogin_1 = require("./methods/MobileAccessLogin");
-const EmailLogin_1 = require("./methods/EmailLogin");
-const PasswordlessLogin_1 = require("./methods/PasswordlessLogin");
-const Totp2FALogin_1 = require("./methods/Totp2FALogin");
-const GetACodeLogin_1 = require("./methods/GetACodeLogin");
-const RecoveryEmailLogin_1 = require("./methods/RecoveryEmailLogin");
-class Login {
+import { saveSessionData } from '../../util/Load.js';
+import { MobileAccessLogin } from './methods/MobileAccessLogin.js';
+import { EmailLogin } from './methods/EmailLogin.js';
+import { PasswordlessLogin } from './methods/PasswordlessLogin.js';
+import { TotpLogin } from './methods/Totp2FALogin.js';
+import { CodeLogin } from './methods/GetACodeLogin.js';
+import { RecoveryLogin } from './methods/RecoveryEmailLogin.js';
+export class Login {
+    bot;
+    emailLogin;
+    passwordlessLogin;
+    totp2FALogin;
+    codeLogin;
+    recoveryLogin;
+    selectors = {
+        primaryButton: 'button[data-testid="primaryButton"]',
+        secondaryButton: 'button[data-testid="secondaryButton"]',
+        emailIcon: '[data-testid="tile"]:has(svg path[d*="M5.25 4h13.5a3.25"])',
+        emailIconOld: 'img[data-testid="accessibleImg"][src*="picker_verify_email"]',
+        recoveryEmail: '[data-testid="proof-confirmation"]',
+        passwordIcon: '[data-testid="tile"]:has(svg path[d*="M11.78 10.22a.75.75"])',
+        accountLocked: '#serviceAbuseLandingTitle',
+        errorAlert: 'div[role="alert"]',
+        passwordEntry: '[data-testid="passwordEntry"]',
+        emailEntry: 'input#usernameEntry',
+        kmsiVideo: '[data-testid="kmsiVideo"]',
+        passKeyVideo: '[data-testid="biometricVideo"]',
+        passKeyError: '[data-testid="registrationImg"]',
+        passwordlessCheck: '[data-testid="deviceShieldCheckmarkVideo"]',
+        totpInput: 'input[name="otc"]',
+        totpInputOld: 'form[name="OneTimeCodeViewForm"]',
+        identityBanner: '[data-testid="identityBanner"]',
+        viewFooter: '[data-testid="viewFooter"] span[role="button"]',
+        bingProfile: '#id_n',
+        requestToken: 'input[name="__RequestVerificationToken"]',
+        requestTokenMeta: 'meta[name="__RequestVerificationToken"]'
+    };
     constructor(bot) {
         this.bot = bot;
-        this.selectors = {
-            primaryButton: 'button[data-testid="primaryButton"]',
-            secondaryButton: 'button[data-testid="secondaryButton"]',
-            emailIcon: '[data-testid="tile"]:has(svg path[d*="M5.25 4h13.5a3.25"])',
-            emailIconOld: 'img[data-testid="accessibleImg"][src*="picker_verify_email"]',
-            recoveryEmail: '[data-testid="proof-confirmation"]',
-            passwordIcon: '[data-testid="tile"]:has(svg path[d*="M11.78 10.22a.75.75"])',
-            accountLocked: '#serviceAbuseLandingTitle',
-            errorAlert: 'div[role="alert"]',
-            passwordEntry: '[data-testid="passwordEntry"]',
-            emailEntry: 'input#usernameEntry',
-            kmsiVideo: '[data-testid="kmsiVideo"]',
-            passKeyVideo: '[data-testid="biometricVideo"]',
-            passKeyError: '[data-testid="registrationImg"]',
-            passwordlessCheck: '[data-testid="deviceShieldCheckmarkVideo"]',
-            totpInput: 'input[name="otc"]',
-            totpInputOld: 'form[name="OneTimeCodeViewForm"]',
-            identityBanner: '[data-testid="identityBanner"]',
-            viewFooter: '[data-testid="viewFooter"] span[role="button"]',
-            bingProfile: '#id_n',
-            requestToken: 'input[name="__RequestVerificationToken"]',
-            requestTokenMeta: 'meta[name="__RequestVerificationToken"]'
-        };
-        this.emailLogin = new EmailLogin_1.EmailLogin(this.bot);
-        this.passwordlessLogin = new PasswordlessLogin_1.PasswordlessLogin(this.bot);
-        this.totp2FALogin = new Totp2FALogin_1.TotpLogin(this.bot);
-        this.codeLogin = new GetACodeLogin_1.CodeLogin(this.bot);
-        this.recoveryLogin = new RecoveryEmailLogin_1.RecoveryLogin(this.bot);
+        this.emailLogin = new EmailLogin(this.bot);
+        this.passwordlessLogin = new PasswordlessLogin(this.bot);
+        this.totp2FALogin = new TotpLogin(this.bot);
+        this.codeLogin = new CodeLogin(this.bot);
+        this.recoveryLogin = new RecoveryLogin(this.bot);
     }
     async login(page, account) {
         try {
             this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting login process');
             await page
-                .goto('https://rewards.bing.com/createuser?idru=%2F&userScenarioId=anonsignin', {
+                .goto('https://rewards.bing.com/', {
                 waitUntil: 'domcontentloaded'
             })
                 .catch(() => { });
@@ -375,7 +378,7 @@ class Login {
         const browser = page.context();
         const cookies = await browser.cookies();
         this.bot.logger.debug(this.bot.isMobile, 'LOGIN', `Retrieved ${cookies.length} cookies`);
-        await (0, Load_1.saveSessionData)(this.bot.config.sessionPath, cookies, email, this.bot.isMobile);
+        await saveSessionData(this.bot.config.sessionPath, cookies, email, this.bot.isMobile);
         this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Login completed, session saved');
     }
     async verifyBingSession(page) {
@@ -463,8 +466,7 @@ class Login {
     }
     async getAppAccessToken(page, email) {
         this.bot.logger.info(this.bot.isMobile, 'GET-APP-TOKEN', 'Requesting mobile access token');
-        return await new MobileAccessLogin_1.MobileAccessLogin(this.bot, page).get(email);
+        return await new MobileAccessLogin(this.bot, page).get(email);
     }
 }
-exports.Login = Login;
 //# sourceMappingURL=Login.js.map

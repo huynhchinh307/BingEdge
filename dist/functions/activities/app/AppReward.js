@@ -1,14 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AppReward = void 0;
-const crypto_1 = require("crypto");
-const Workers_1 = require("../../Workers");
-class AppReward extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.gainedPoints = 0;
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import { randomUUID } from 'crypto';
+import { Workers } from '../../Workers.js';
+export class AppReward extends Workers {
+    gainedPoints = 0;
+    oldBalance = this.bot.userData.currentPoints;
     async doAppReward(promotion) {
         if (!this.bot.accessToken) {
             this.bot.logger.warn(this.bot.isMobile, 'APP-REWARD', 'Skipping: App access token not available, this activity requires it!');
@@ -18,7 +12,7 @@ class AppReward extends Workers_1.Workers {
         this.bot.logger.info(this.bot.isMobile, 'APP-REWARD', `Starting AppReward | offerId=${offerId} | country=${this.bot.userData.geoLocale} | oldBalance=${this.oldBalance}`);
         try {
             const jsonData = {
-                id: (0, crypto_1.randomUUID)(),
+                id: randomUUID(),
                 amount: 1,
                 type: 101,
                 attributes: {
@@ -63,5 +57,4 @@ class AppReward extends Workers_1.Workers {
         }
     }
 }
-exports.AppReward = AppReward;
 //# sourceMappingURL=AppReward.js.map

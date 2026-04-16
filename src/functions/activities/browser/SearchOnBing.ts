@@ -1,7 +1,11 @@
 import type { AxiosRequestConfig } from 'axios'
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 import * as fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 import { Workers } from '../../Workers'
 import { QueryCore } from '../../QueryEngine'
@@ -87,6 +91,52 @@ export class SearchOnBing extends Workers {
         }
     }
 
+    /**
+     * Simulates human-like typing with variable delays, hesitation pauses, and
+     * occasional typos (wrong adjacent key → notice → Backspace → retype correctly).
+     */
+    private async humanType(page: Page, text: string): Promise<void> {
+        // QWERTY adjacency map — used to generate realistic miskey typos
+        const adjacentKeys: Record<string, string[]> = {
+            a: ['s', 'q', 'z'],       b: ['v', 'g', 'n'],       c: ['x', 'd', 'v'],
+            d: ['s', 'e', 'f', 'c'], e: ['w', 'r', 'd'],        f: ['d', 'r', 'g', 'v'],
+            g: ['f', 't', 'h', 'b'], h: ['g', 'y', 'j', 'n'],  i: ['u', 'o', 'k'],
+            j: ['h', 'u', 'k', 'm'], k: ['j', 'i', 'l'],        l: ['k', 'o', 'p'],
+            m: ['n', 'j', 'k'],       n: ['b', 'h', 'm'],        o: ['i', 'p', 'l'],
+            p: ['o', 'l'],            q: ['w', 'a'],              r: ['e', 't', 'f'],
+            s: ['a', 'w', 'd', 'x'], t: ['r', 'y', 'g'],        u: ['y', 'i', 'j'],
+            v: ['c', 'f', 'b'],       w: ['q', 'e', 's'],        x: ['z', 's', 'c'],
+            y: ['t', 'u', 'h'],       z: ['a', 'x'],
+        }
+
+        for (const char of text) {
+            const lower = char.toLowerCase()
+            const neighbors = adjacentKeys[lower]
+
+            // ~5% chance of a typo on any typeable character with known neighbors
+            if (neighbors && Math.random() < 0.05) {
+                const wrongChar = neighbors[Math.floor(Math.random() * neighbors.length)]
+                if (!wrongChar) continue
+                // Type the wrong key
+                await page.keyboard.type(wrongChar)
+                // Simulate the time to notice the mistake (200–600ms)
+                await this.bot.utils.wait(Math.floor(Math.random() * 400) + 200)
+                // Delete the wrong character
+                await page.keyboard.press('Backspace')
+                // Brief recovery pause before retyping
+                await this.bot.utils.wait(Math.floor(Math.random() * 150) + 80)
+            }
+
+            // Type the correct character
+            await page.keyboard.type(char)
+            // Base keystroke delay: 80–180ms
+            const base = Math.floor(Math.random() * 100) + 80
+            // ~8% chance of a longer hesitation pause (150–450ms)
+            const pause = Math.random() < 0.08 ? Math.floor(Math.random() * 300) + 150 : 0
+            await this.bot.utils.wait(base + pause)
+        }
+    }
+
     private async searchBing(page: Page, queries: string[]) {
         queries = [...new Set(queries)]
 
@@ -117,7 +167,7 @@ export class SearchOnBing extends Workers {
                 await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 })
                 await searchBox.fill('')
 
-                await page.keyboard.type(query, { delay: 50 })
+                await this.humanType(page, query)
                 await page.keyboard.press('Enter')
 
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 7000))

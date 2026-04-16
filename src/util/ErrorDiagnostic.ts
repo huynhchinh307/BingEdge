@@ -1,6 +1,6 @@
 import fs from 'fs/promises'
 import path from 'path'
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 
 export async function errorDiagnostic(page: Page, error: Error): Promise<void> {
     try {

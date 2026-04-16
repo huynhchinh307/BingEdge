@@ -1,15 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.UrlReward = void 0;
-const Workers_1 = require("../../Workers");
-class UrlReward extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.cookieHeader = '';
-        this.fingerprintHeader = {};
-        this.gainedPoints = 0;
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import { Workers } from '../../Workers.js';
+export class UrlReward extends Workers {
+    cookieHeader = '';
+    fingerprintHeader = {};
+    gainedPoints = 0;
+    oldBalance = this.bot.userData.currentPoints;
     async doUrlReward(promotion, page) {
         const url = promotion.destinationUrl;
         if (!this.bot.requestToken && this.bot.rewardsVersion === 'legacy') {
@@ -91,5 +85,4 @@ class UrlReward extends Workers_1.Workers {
         }
     }
 }
-exports.UrlReward = UrlReward;
 //# sourceMappingURL=UrlReward.js.map

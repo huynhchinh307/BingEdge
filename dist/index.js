@@ -1,32 +1,24 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.executionContext = exports.MicrosoftRewardsBot = void 0;
-exports.getCurrentContext = getCurrentContext;
-const node_async_hooks_1 = require("node:async_hooks");
-const node_fs_1 = __importDefault(require("node:fs"));
-const node_path_1 = __importDefault(require("node:path"));
-const cluster_1 = __importDefault(require("cluster"));
-const package_json_1 = __importDefault(require("../package.json"));
-const Browser_1 = __importDefault(require("./browser/Browser"));
-const BrowserFunc_1 = __importDefault(require("./browser/BrowserFunc"));
-const BrowserUtils_1 = __importDefault(require("./browser/BrowserUtils"));
-const Logger_1 = require("./logging/Logger");
-const Utils_1 = __importDefault(require("./util/Utils"));
-const Load_1 = require("./util/Load");
-const Validator_1 = require("./util/Validator");
-const Login_1 = require("./browser/auth/Login");
-const Workers_1 = require("./functions/Workers");
-const Activities_1 = __importDefault(require("./functions/Activities"));
-const SearchManager_1 = require("./functions/SearchManager");
-const Axios_1 = __importDefault(require("./util/Axios"));
-const Discord_1 = require("./logging/Discord");
-const Ntfy_1 = require("./logging/Ntfy");
-const executionContext = new node_async_hooks_1.AsyncLocalStorage();
-exports.executionContext = executionContext;
-function getCurrentContext() {
+import { AsyncLocalStorage } from 'node:async_hooks';
+import fs from 'node:fs';
+import path from 'node:path';
+import cluster from 'cluster';
+import pkg from '../package.json' with { type: 'json' };
+import Browser from './browser/Browser.js';
+import BrowserFunc from './browser/BrowserFunc.js';
+import BrowserUtils from './browser/BrowserUtils.js';
+import { Logger } from './logging/Logger.js';
+import Utils from './util/Utils.js';
+import { loadAccounts, loadConfig, saveAccounts, updateAccountStatus } from './util/Load.js';
+import { checkNodeVersion } from './util/Validator.js';
+import { Login } from './browser/auth/Login.js';
+import { Workers } from './functions/Workers.js';
+import Activities from './functions/Activities.js';
+import { SearchManager } from './functions/SearchManager.js';
+import AxiosClient from './util/Axios.js';
+import { sendDiscord, flushDiscordQueue } from './logging/Discord.js';
+import { sendNtfy, flushNtfyQueue } from './logging/Ntfy.js';
+const executionContext = new AsyncLocalStorage();
+export function getCurrentContext() {
     const context = executionContext.getStore();
     if (!context) {
         return { isMobile: false, account: {} };
@@ -34,17 +26,32 @@ function getCurrentContext() {
     return context;
 }
 async function flushAllWebhooks(timeoutMs = 5000) {
-    await Promise.allSettled([(0, Discord_1.flushDiscordQueue)(timeoutMs), (0, Ntfy_1.flushNtfyQueue)(timeoutMs)]);
+    await Promise.allSettled([flushDiscordQueue(timeoutMs), flushNtfyQueue(timeoutMs)]);
 }
-class MicrosoftRewardsBot {
+export class MicrosoftRewardsBot {
+    logger;
+    config;
+    utils;
+    activities = new Activities(this);
+    browser;
+    mainMobilePage;
+    mainDesktopPage;
+    userData;
+    rewardsVersion = 'legacy';
+    accessToken = '';
+    requestToken = '';
+    cookies;
+    fingerprint;
+    pointsCanCollect = 0;
+    activeWorkers;
+    exitedWorkers;
+    browserFactory = new Browser(this);
+    accounts;
+    workers;
+    login = new Login(this);
+    searchManager;
+    axios;
     constructor() {
-        this.activities = new Activities_1.default(this);
-        this.rewardsVersion = 'legacy';
-        this.accessToken = '';
-        this.requestToken = '';
-        this.pointsCanCollect = 0;
-        this.browserFactory = new Browser_1.default(this);
-        this.login = new Login_1.Login(this);
         this.userData = {
             userName: '',
             geoLocale: 'US',
@@ -53,17 +60,17 @@ class MicrosoftRewardsBot {
             currentPoints: 0,
             gainedPoints: 0
         };
-        this.logger = new Logger_1.Logger(this);
+        this.logger = new Logger(this);
         this.accounts = [];
         this.cookies = { mobile: [], desktop: [] };
-        this.utils = new Utils_1.default();
-        this.workers = new Workers_1.Workers(this);
-        this.searchManager = new SearchManager_1.SearchManager(this);
+        this.utils = new Utils();
+        this.workers = new Workers(this);
+        this.searchManager = new SearchManager(this);
         this.browser = {
-            func: new BrowserFunc_1.default(this),
-            utils: new BrowserUtils_1.default(this)
+            func: new BrowserFunc(this),
+            utils: new BrowserUtils(this)
         };
-        this.config = (0, Load_1.loadConfig)();
+        this.config = loadConfig();
         this.activeWorkers = this.config.clusters;
         this.exitedWorkers = [];
     }
@@ -71,7 +78,7 @@ class MicrosoftRewardsBot {
         return getCurrentContext().isMobile;
     }
     async initialize() {
-        this.accounts = (0, Load_1.loadAccounts)();
+        this.accounts = loadAccounts();
     }
     async run() {
         let accountsToRun = this.accounts;
@@ -84,8 +91,8 @@ class MicrosoftRewardsBot {
         }
         const totalAccounts = accountsToRun.length;
         const runStartTime = Date.now();
-        this.logger.info('main', 'RUN-START', `Starting Microsoft Rewards Script | v${package_json_1.default.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`);
-        if (cluster_1.default.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
+        this.logger.info('main', 'RUN-START', `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`);
+        if (cluster.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
             const ok = await this.testGeminiConnection();
             if (!ok) {
                 this.logger.error('main', 'GEMINI-INIT', 'Gemini AI connection test failed. Bot will not start to prevent invalid searches.');
@@ -95,7 +102,7 @@ class MicrosoftRewardsBot {
             this.logger.info('main', 'GEMINI-INIT', 'Gemini AI connection verified successfully.');
         }
         if (this.config.clusters > 1) {
-            if (cluster_1.default.isPrimary) {
+            if (cluster.isPrimary) {
                 this.runMaster(accountsToRun, runStartTime);
             }
             else {
@@ -116,7 +123,7 @@ class MicrosoftRewardsBot {
         }
         this.logger.info('main', 'GEMINI-CHECK', 'Testing Gemini API connectivity...');
         const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com');
-        const axios = new Axios_1.default({}); // Global test, proxy bypassed if not configured in request
+        const axios = new AxiosClient({}); // Global test, proxy bypassed if not configured in request
         try {
             let url = '';
             let data = {};
@@ -179,7 +186,7 @@ class MicrosoftRewardsBot {
         this.activeWorkers = accountChunks.length;
         const allAccountStats = [];
         for (const chunk of accountChunks) {
-            const worker = cluster_1.default.fork();
+            const worker = cluster.fork();
             worker.send?.({ chunk, runStartTime });
             worker.on('message', (msg) => {
                 if (msg.__stats) {
@@ -197,7 +204,7 @@ class MicrosoftRewardsBot {
                         }
                     });
                     // Periodically save
-                    (0, Load_1.saveAccounts)(this.accounts);
+                    saveAccounts(this.accounts);
                 }
                 const log = msg.__ipcLog;
                 if (log && typeof log.content === 'string') {
@@ -206,10 +213,10 @@ class MicrosoftRewardsBot {
                     const content = log.content;
                     const level = log.level;
                     if (webhook.discord?.enabled && webhook.discord.url) {
-                        (0, Discord_1.sendDiscord)(webhook.discord.url, content, level);
+                        sendDiscord(webhook.discord.url, content, level);
                     }
                     if (webhook.ntfy?.enabled && webhook.ntfy.url) {
-                        (0, Ntfy_1.sendNtfy)(webhook.ntfy, content, level);
+                        sendNtfy(webhook.ntfy, content, level);
                     }
                 }
             });
@@ -234,10 +241,10 @@ class MicrosoftRewardsBot {
                 process.exit(code ?? 0);
             }
         };
-        cluster_1.default.on('exit', (worker, code) => {
+        cluster.on('exit', (worker, code) => {
             void onWorkerDone('exit', worker, code);
         });
-        cluster_1.default.on('disconnect', worker => {
+        cluster.on('disconnect', worker => {
             void onWorkerDone('disconnect', worker, undefined);
         });
     }
@@ -272,7 +279,7 @@ class MicrosoftRewardsBot {
                     const accountEmail = account.email;
                     this.userData.userName = this.utils.getEmailUsername(accountEmail);
                     this.logger.info('main', 'ACCOUNT-START', `Starting account: ${accountEmail} | geoLocale: ${account.geoLocale}`);
-                    this.axios = new Axios_1.default(account.proxy);
+                    this.axios = new AxiosClient(account.proxy);
                     const result = await this.Main(account).catch(error => {
                         void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
                         return undefined;
@@ -289,7 +296,7 @@ class MicrosoftRewardsBot {
                         account.rank = result.rank;
                         account.lastUpdate = new Date().toISOString();
                         // Ghi status riêng theo email — tránh race condition khi nhiều worker cùng ghi accounts.json
-                        (0, Load_1.updateAccountStatus)(accountEmail, {
+                        updateAccountStatus(accountEmail, {
                             points: accountFinalPoints,
                             initialPoints: accountInitialPoints,
                             collectedPoints: collectedPoints,
@@ -351,7 +358,7 @@ class MicrosoftRewardsBot {
                 }
             }
         }
-        if (this.config.clusters <= 1 && !cluster_1.default.isWorker) {
+        if (this.config.clusters <= 1 && !cluster.isWorker) {
             const totalCollectedPoints = accountStats.reduce((sum, s) => sum + s.collectedPoints, 0);
             const totalInitialPoints = accountStats.reduce((sum, s) => sum + s.initialPoints, 0);
             const totalFinalPoints = accountStats.reduce((sum, s) => sum + s.finalPoints, 0);
@@ -366,36 +373,45 @@ class MicrosoftRewardsBot {
             return 'NO_PROXY';
         }
         // Normalize URL by stripping scheme prefix (http://, https://)
-        // so that 'proxy.example.com' and 'http://proxy.example.com' are treated as the same proxy
-        const normalizedUrl = account.proxy.url.replace(/^https?:\/\//i, '').toLowerCase().trim();
-        return `${account.proxy.username || ''}@${normalizedUrl}:${account.proxy.port}`;
+        let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
+        let port = account.proxy.port;
+        // If host already contains a port (e.g. "1.2.3.4:8080"), extract it and use it if port is not set
+        if (host.includes(':')) {
+            const parts = host.split(':');
+            if (parts[0])
+                host = parts[0];
+            if (parts[1] && (!port || port === 0)) {
+                port = parseInt(parts[1]);
+            }
+        }
+        return `${account.proxy.username || ''}@${host}:${port || 0}`;
     }
     async acquireProxyLock(proxyKey) {
-        const lockDir = node_path_1.default.join(process.cwd(), '.locks');
+        const lockDir = path.join(process.cwd(), '.locks');
         try {
-            if (!node_fs_1.default.existsSync(lockDir)) {
-                node_fs_1.default.mkdirSync(lockDir, { recursive: true });
+            if (!fs.existsSync(lockDir)) {
+                fs.mkdirSync(lockDir, { recursive: true });
             }
         }
         catch (e) { }
         const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
-        const lockPath = node_path_1.default.join(lockDir, `${safeKey}.lock`);
+        const lockPath = path.join(lockDir, `${safeKey}.lock`);
         try {
             // Try to create the lock file atomically
-            node_fs_1.default.writeFileSync(lockPath, process.pid.toString(), { flag: 'wx' });
+            fs.writeFileSync(lockPath, process.pid.toString(), { flag: 'wx' });
             return true;
         }
         catch (err) {
             if (err.code === 'EEXIST') {
                 try {
-                    const content = node_fs_1.default.readFileSync(lockPath, 'utf8').trim();
+                    const content = fs.readFileSync(lockPath, 'utf8').trim();
                     if (!content) {
-                        node_fs_1.default.unlinkSync(lockPath);
+                        fs.unlinkSync(lockPath);
                         return false;
                     }
                     const pid = parseInt(content);
                     if (isNaN(pid)) {
-                        node_fs_1.default.unlinkSync(lockPath);
+                        fs.unlinkSync(lockPath);
                         return false;
                     }
                     // Check if process is alive
@@ -405,7 +421,7 @@ class MicrosoftRewardsBot {
                     }
                     catch (e) {
                         // Dead process
-                        node_fs_1.default.unlinkSync(lockPath);
+                        fs.unlinkSync(lockPath);
                         return false;
                     }
                 }
@@ -419,11 +435,11 @@ class MicrosoftRewardsBot {
     releaseProxyLock(proxyKey) {
         try {
             const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
-            const lockPath = node_path_1.default.join(process.cwd(), '.locks', `${safeKey}.lock`);
-            if (node_fs_1.default.existsSync(lockPath)) {
-                const pid = parseInt(node_fs_1.default.readFileSync(lockPath, 'utf8').trim());
+            const lockPath = path.join(process.cwd(), '.locks', `${safeKey}.lock`);
+            if (fs.existsSync(lockPath)) {
+                const pid = parseInt(fs.readFileSync(lockPath, 'utf8').trim());
                 if (pid === process.pid) {
-                    node_fs_1.default.unlinkSync(lockPath);
+                    fs.unlinkSync(lockPath);
                 }
             }
         }
@@ -448,7 +464,9 @@ class MicrosoftRewardsBot {
                     this.logger.error('main', 'FLOW', `Failed to get mobile access token: ${error instanceof Error ? error.message : String(error)}`);
                 }
                 this.cookies.mobile = await initialContext.cookies();
-                this.fingerprint = mobileSession.fingerprint;
+                if (mobileSession) {
+                    this.fingerprint = mobileSession.fingerprint;
+                }
                 const data = await this.browser.func.getDashboardData();
                 const appData = await this.browser.func.getAppDashboardData();
                 // Set geo
@@ -493,16 +511,16 @@ class MicrosoftRewardsBot {
                     this.logger.error('main', 'FLOW', `Read to Earn error: ${e instanceof Error ? e.message : String(e)}`);
                 }
                 // Solve promotions in mobile context
-                if (this.config.workers.doDailySet)
+                if (this.config.workers.doDailySet && this.mainMobilePage)
                     await this.workers.doDailySet(data, this.mainMobilePage);
                 if (this.config.workers.doSpecialPromotions)
                     await this.workers.doSpecialPromotions(data);
-                if (this.config.workers.doMorePromotions)
+                if (this.config.workers.doMorePromotions && this.mainMobilePage)
                     await this.workers.doMorePromotions(this.mainMobilePage);
                 const searchPoints = await this.browser.func.getSearchPoints();
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true);
                 this.cookies.mobile = await initialContext.cookies();
-                const { mobilePoints, desktopPoints, rank: desktopRank } = await this.searchManager.doSearches(data, missingSearchPoints, mobileSession, account, accountEmail);
+                const { mobilePoints, desktopPoints, rank: desktopRank } = await this.searchManager.doSearches(data, missingSearchPoints, (mobileSession || {}), account, accountEmail);
                 mobileContextClosed = true;
                 let rank = desktopRank;
                 if (!rank) {
@@ -531,10 +549,10 @@ class MicrosoftRewardsBot {
         }
     }
 }
-exports.MicrosoftRewardsBot = MicrosoftRewardsBot;
+export { executionContext };
 async function main() {
     // Check before doing anything
-    (0, Validator_1.checkNodeVersion)();
+    checkNodeVersion();
     const rewardsBot = new MicrosoftRewardsBot();
     process.on('beforeExit', () => {
         void flushAllWebhooks();

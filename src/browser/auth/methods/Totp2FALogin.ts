@@ -1,4 +1,4 @@
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 import * as OTPAuth from 'otpauth'
 import type { MicrosoftRewardsBot } from '../../../index'
 import { getErrorMessage, promptInput } from './LoginUtils'

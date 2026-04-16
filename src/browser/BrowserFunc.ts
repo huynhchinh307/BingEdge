@@ -1,4 +1,4 @@
-import type { BrowserContext, Cookie } from 'playwright-chromium'
+import type { BrowserContext, Cookie } from 'patchright'
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import fs from 'node:fs'
 

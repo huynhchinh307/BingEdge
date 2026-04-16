@@ -154,6 +154,15 @@
             transition: .3s;
         }
 
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spin {
+            animation: spin 0.8s linear infinite;
+        }
+
         .slider::before {
             content: '';
             position: absolute;
@@ -864,6 +873,15 @@
             <p>A beautiful manager to control all your browser sessions</p>
         </div>
         <div style="display: flex; gap: 1rem;">
+            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="exportAccounts()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export
+            </button>
+            <input type="file" id="importFileInput" style="display: none;" accept=".json" onchange="importAccounts(event)">
+            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="document.getElementById('importFileInput').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Import
+            </button>
             <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="openAddAccountModal()">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -945,6 +963,12 @@
                             <input type="number" id="threadCount" min="1" max="20" value="2"
                                 style="width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.07);border:1px solid var(--border-color);border-radius:8px;color:#fff;font-size:0.9rem;text-align:center;"
                                 title="Number of bots to run in parallel">
+                            <button id="checkProxiesBtn" class="btn" style="padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);" onclick="checkAllProxies()" title="Check all proxies">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            </button>
+                            <button id="bulkGroupBtn" class="btn" style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);" onclick="bulkChangeGroup()" title="Move selected to group">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                            </button>
                             <button id="runBotsBtn" class="btn bot-btn" style="padding: 0.75rem 1.25rem;"
                                 onclick="runSelectedBots()">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -1098,6 +1122,12 @@
                             <input type="text" id="accLangCode" class="form-input" value="en"
                                 style="padding: 0.4rem 0.6rem;">
                         </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Group Name</label>
+                            <input type="text" id="accGroupName" class="form-input" list="groupSuggestions" value="Ungrouped"
+                                style="padding: 0.4rem 0.6rem;">
+                            <datalist id="groupSuggestions"></datalist>
+                        </div>
                     </div>
 
                     <div
@@ -1153,6 +1183,19 @@
                                 <label style="font-size: 0.8rem;">Pass</label>
                                 <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()"
                                     style="padding: 0.4rem 0.6rem;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <button type="button" class="btn" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);" id="btnTestProxy" onclick="testProxy()">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                Check Proxy IP
+                            </button>
+                            <div id="testProxyResult" style="font-size: 0.85rem; font-weight: 500; display: none;"></div>
+                            <div style="margin-left: auto; display: flex; align-items: center; gap: 1rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #fff; font-size: 0.85rem;">
+                                    <input type="checkbox" id="accProxyV6">
+                                    <span>Proxy V6</span>
+                                </label>
                             </div>
                         </div>
                         </div>
@@ -1702,137 +1745,226 @@
             listContainer.style.display = 'block';
             emptyState.style.display = 'none';
 
-            const newHTML = accounts.map(acc => {
-                const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile;
-                const isQueued = queuedEmails.has(acc.email);
-                const statusHtml = isRunning
-                    ? `<span class="status-badge active">Running</span>`
-                    : isQueued
-                        ? `<span class="status-badge queued">Queued</span>`
-                        : `<span class="status-badge">Idle</span>`;
+            // Update group suggestions for the modal
+            const groups = [...new Set(accounts.map(a => a.group || 'Ungrouped'))];
+            const datalist = document.getElementById('groupSuggestions');
+            if (datalist) {
+                datalist.innerHTML = groups.map(g => `<option value="${g}">`).join('');
+            }
 
-                const getBtnState = (type) => {
-                    let isActive = false;
-                    let label = '';
-                    let colorClass = '';
-                    let svg = '';
+            // Group accounts
+            const grouped = accounts.reduce((acc, obj) => {
+                const key = obj.group || 'Ungrouped';
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(obj);
+                return acc;
+            }, {});
 
-                    if (type === 'bot') {
-                        isActive = acc.isActiveBot;
-                        label = 'Bot';
-                        colorClass = 'bot-btn';
-                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
-                    } else if (type === 'mobile') {
-                        isActive = acc.isActiveMobile;
-                        label = 'Mob';
-                        colorClass = 'mobile-btn';
-                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
-                    } else {
-                        isActive = acc.isActiveDesktop;
-                        label = 'PC';
-                        colorClass = 'open-btn';
-                        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
-                    }
+            const sortedGroupNames = Object.keys(grouped).sort((a,b) => {
+                if (a === 'Ungrouped') return 1;
+                if (b === 'Ungrouped') return -1;
+                return a.localeCompare(b);
+            });
 
-                    if (isActive) {
-                        return `
-                            <div style="display: flex; overflow: hidden; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05);">
-                                <button class="btn stop-btn" style="border: none; border-radius: 0; padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                </button>
-                                <button class="btn open-btn" style="border: none; border-left: 1px solid var(--border-color); border-radius: 0; padding: 0.3rem 0.45rem;" onclick="viewLogs('${acc.email}', '${type}')" title="View Logs">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                                </button>
-                            </div>
-                        `;
-                    }
-                    return `
-                        <button class="btn ${colorClass}" style="padding: 0.3rem 0.45rem;" onclick="openSession('${acc.email}', '${type}')" title="Start ${label}">
-                            ${svg}
-                        </button>
-                    `;
-                };
+            let finalHTML = '';
 
-                const isChecked = selectedEmails.has(acc.email) ? 'checked' : '';
+            sortedGroupNames.forEach(groupName => {
+                const groupAccounts = grouped[groupName];
+                
+                const allSelected = groupAccounts.every(ga => selectedEmails.has(ga.email));
 
-                return `
-                    <tr>
-                        <td style="padding-left: 1.5rem;">
-                            <div class="checkbox-wrapper">
-                                <input type="checkbox" class="custom-checkbox item-checkbox" value="${acc.email}" ${isChecked} onchange="toggleSelect('${acc.email}', this.checked)">
-                            </div>
-                        </td>
-                        <td>
-                            <div style="font-size: 1rem; font-weight: 500;">${acc.email}</div>
-                            <div style="color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin-top: 0.2rem;">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                                ${acc.proxy}
-                            </div>
-                        </td>
-                        <td>
-                            ${(() => {
-                        if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.95rem;color:#f59e0b;font-weight:600;">Running...</span></div>`;
-                        if (acc.stats) {
-                            const s = acc.stats;
-                            const total = s.total ?? 0;
-                            const newBal = s.newBalance ?? null;
-                            const earned = total >= 0 ? `+${total}` : `${total}`;
-                            const color = total > 0 ? '#10b981' : total < 0 ? '#ef4444' : 'var(--text-muted)';
-                            return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
-                                        ${newBal !== null ? newBal.toLocaleString() : '—'} 
-                                        <span style="font-size:0.85rem;color:${color};font-weight:500;">(${earned})</span>
-                                    </div>`;
-                        } else if (acc.points) {
-                            return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
-                                        ${acc.points.toLocaleString()} 
-                                        <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">(saved)</span>
-                                    </div>`;
-                        }
-                        return '<span style="color:var(--text-muted);font-size:0.9rem;">—</span>';
-                    })()}
-                        </td>
-                        <td>
-                            ${(() => {
-                        const done = isCompletedToday(acc.lastUpdate);
-                        return done
-                            ? `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`
-                            : `<span class="status-badge" style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">⏳ Pending</span>`;
-                    })()}
-                        </td>
-                        <td>
-                            ${(() => {
-                        const r = acc.rank || '';
-                        let cls = 'rank-na';
-                        if (r.includes('Gold')) cls = 'rank-gold';
-                        else if (r.includes('Silver')) cls = 'rank-silver';
-                        else if (r.includes('Member')) cls = 'rank-member';
-
-                        return `<span class="rank-badge ${cls}">${r || 'N/A'}</span>`;
-                    })()}
-                        </td>
-                        <td>
-                            ${statusHtml}
-                        </td>
-                        <td style="padding-right: 1.5rem;">
-                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
-                                ${getBtnState('desktop')}
-                                ${getBtnState('mobile')}
-                                ${getBtnState('bot')}
-                                <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--primary); border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);" onclick="openEditModal('${acc.email}')" title="Edit Account">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                </button>
-                                <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" onclick="confirmDelete('${acc.email}')" title="Delete Account">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                                </button>
+                // Group Header Row
+                finalHTML += `
+                    <tr class="group-row" style="background: rgba(99, 102, 241, 0.05);">
+                        <td colspan="7" style="padding: 0.75rem 1.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.1);">
+                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--primary); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    ${groupName} (${groupAccounts.length})
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500; text-transform: none;">SELECT GROUP</span>
+                                    <input type="checkbox" class="custom-checkbox" onchange="toggleGroupSelect('${groupName}', this.checked)" ${allSelected ? 'checked' : ''}>
+                                </div>
                             </div>
                         </td>
                     </tr>
                 `;
-            }).join('');
 
-            if (tbody.innerHTML !== newHTML) {
-                tbody.innerHTML = newHTML;
-                updateSelectedCount(); // reset UI checkboxes properly based on set
+                groupAccounts.forEach(acc => {
+                    const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile;
+                    const isQueued = queuedEmails.has(acc.email);
+                    const statusHtml = isRunning
+                        ? `<span class="status-badge active">Running</span>`
+                        : isQueued
+                            ? `<span class="status-badge queued">Queued</span>`
+                            : `<span class="status-badge">Idle</span>`;
+
+                    const getBtnState = (type) => {
+                        let isActive = false;
+                        let label = '';
+                        let colorClass = '';
+                        let svg = '';
+
+                        if (type === 'bot') {
+                            isActive = acc.isActiveBot;
+                            label = 'Bot';
+                            colorClass = 'bot-btn';
+                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                        } else if (type === 'mobile') {
+                            isActive = acc.isActiveMobile;
+                            label = 'Mob';
+                            colorClass = 'mobile-btn';
+                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
+                        } else {
+                            isActive = acc.isActiveDesktop;
+                            label = 'PC';
+                            colorClass = 'open-btn';
+                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
+                        }
+
+                        if (isActive) {
+                            return `
+                                <div style="display: flex; overflow: hidden; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05);">
+                                    <button class="btn stop-btn" style="border: none; border-radius: 0; padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                    </button>
+                                    <button class="btn open-btn" style="border: none; border-left: 1px solid var(--border-color); border-radius: 0; padding: 0.3rem 0.45rem;" onclick="viewLogs('${acc.email}', '${type}')" title="View Logs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                    </button>
+                                </div>
+                            `;
+                        }
+                        return `
+                            <button class="btn ${colorClass}" style="padding: 0.3rem 0.45rem;" onclick="openSession('${acc.email}', '${type}')" title="Start ${label}">
+                                ${svg}
+                            </button>
+                        `;
+                    };
+
+                    const isChecked = selectedEmails.has(acc.email) ? 'checked' : '';
+
+                    finalHTML += `
+                        <tr data-group="${groupName}">
+                            <td style="padding-left: 1.5rem;">
+                                <div class="checkbox-wrapper">
+                                    <input type="checkbox" class="custom-checkbox item-checkbox" value="${acc.email}" ${isChecked} onchange="toggleSelect('${acc.email}', this.checked)">
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-size: 1rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+                                    ${acc.email}
+                                    ${acc.isProxyV6 ? '<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; line-height: 1;">V6</span>' : ''}
+                                </div>
+                                <div style="color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin-top: 0.2rem;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                    <span class="proxy-text" title="${acc.proxy}">${acc.proxy}</span>
+                                    <button class="btn-icon" onclick="checkProxyForAccount('${acc.email}', this)" style="padding: 2px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); display: flex;" title="Check IP">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    </button>
+                                    <span class="proxy-status" id="proxy-status-${acc.email.replace(/[@.]/g, '_')}" style="margin-left: 4px; font-weight: 600;"></span>
+                                </div>
+                            </td>
+                            <td>
+                                ${(() => {
+                            if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.95rem;color:#f59e0b;font-weight:600;">Running...</span></div>`;
+                            if (acc.stats) {
+                                const s = acc.stats;
+                                const total = s.total ?? 0;
+                                const newBal = s.newBalance ?? null;
+                                const earned = total >= 0 ? `+${total}` : `${total}`;
+                                const color = total > 0 ? '#10b981' : total < 0 ? '#ef4444' : 'var(--text-muted)';
+                                return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
+                                            ${newBal !== null ? newBal.toLocaleString() : '—'} 
+                                            <span style="font-size:0.85rem;color:${color};font-weight:500;">(${earned})</span>
+                                        </div>`;
+                            } else if (acc.points) {
+                                return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
+                                            ${acc.points.toLocaleString()} 
+                                            <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">(saved)</span>
+                                        </div>`;
+                            }
+                            return '<span style="color:var(--text-muted);font-size:0.9rem;">—</span>';
+                        })()}
+                            </td>
+                            <td>
+                                ${(() => {
+                            const done = isCompletedToday(acc.lastUpdate);
+                            return done
+                                ? `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`
+                                : `<span class="status-badge" style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">⏳ Pending</span>`;
+                        })()}
+                            </td>
+                            <td>
+                                ${(() => {
+                            const r = acc.rank || '';
+                            let cls = 'rank-na';
+                            if (r.includes('Gold')) cls = 'rank-gold';
+                            else if (r.includes('Silver')) cls = 'rank-silver';
+                            else if (r.includes('Member')) cls = 'rank-member';
+
+                            return `<span class="rank-badge ${cls}">${r || 'N/A'}</span>`;
+                        })()}
+                            </td>
+                            <td>
+                                ${statusHtml}
+                            </td>
+                            <td style="padding-right: 1.5rem;">
+                                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                                    ${getBtnState('desktop')}
+                                    ${getBtnState('mobile')}
+                                    ${getBtnState('bot')}
+                                    <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--primary); border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);" onclick="openEditModal('${acc.email}')" title="Edit Account">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                    <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" onclick="confirmDelete('${acc.email}')" title="Delete Account">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+
+            if (tbody.innerHTML !== finalHTML) {
+                tbody.innerHTML = finalHTML;
+                updateSelectedCount();
+            }
+        }
+
+        function toggleGroupSelect(groupName, checked) {
+            const groupAccounts = lastAccounts.filter(a => (a.group || 'Ungrouped') === groupName);
+            groupAccounts.forEach(a => {
+                if (checked) selectedEmails.add(a.email);
+                else selectedEmails.delete(a.email);
+            });
+            renderAccounts(lastAccounts);
+        }
+
+        async function bulkChangeGroup() {
+            if (selectedEmails.size === 0) {
+                showToast('Please select accounts first', 'error');
+                return;
+            }
+            const groupName = prompt('Enter group name for selected accounts:', 'Ungrouped');
+            if (groupName === null) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/accounts/bulk-update-group`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ emails: Array.from(selectedEmails), group: groupName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Moved ${data.count} accounts to group: ${groupName}`, 'success');
+                    fetchAccounts();
+                } else {
+                    showToast('Failed to update group: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Error updating group: ' + e.message, 'error');
             }
         }
 
@@ -2036,6 +2168,7 @@
                 document.getElementById('accRecovery').value = acc.recoveryEmail || '';
                 document.getElementById('accGeoLocale').value = acc.geoLocale || 'auto';
                 document.getElementById('accLangCode').value = acc.langCode || 'en';
+                document.getElementById('accGroupName').value = acc.group || 'Ungrouped';
 
                 const proxy = acc.proxy || {};
                 let rawUrl = (proxy.url || '').replace(/^(https?|socks[45])?:\/\//i, '');
@@ -2047,6 +2180,7 @@
                 document.getElementById('accProxyUser').value = proxy.username || '';
                 document.getElementById('accProxyPass').value = proxy.password || '';
                 document.getElementById('accProxyAxios').checked = !!proxy.proxyAxios;
+                document.getElementById('accProxyV6').checked = !!proxy.isProxyV6;
                 
                 const hasProxy = !!(rawUrl || proxy.port || proxy.username);
                 document.getElementById('accUseProxy').checked = hasProxy;
@@ -2084,6 +2218,14 @@
                 document.getElementById('accProxyUser').value = parts[2] || '';
                 document.getElementById('accProxyPass').value = parts[3] || '';
                 
+                // Extra fields detection (:v6, :bypass=...)
+                let isV6 = false;
+                for(let i=4; i<parts.length; i++) {
+                    const p = parts[i].toLowerCase();
+                    if(p === 'v6') isV6 = true;
+                }
+                document.getElementById('accProxyV6').checked = isV6;
+
                 // Set the detected or default proto
                 document.getElementById('accProxyProtoSelect').value = proto;
             }
@@ -2103,6 +2245,7 @@
 
             let str = `${proto}://${host}:${port}`;
             if (user && pass) str += `:${user}:${pass}`;
+            if (document.getElementById('accProxyV6').checked) str += `:v6`;
             document.getElementById('accProxyString').value = str;
         }
 
@@ -2117,12 +2260,14 @@
                 recoveryEmail: document.getElementById('accRecovery').value || "",
                 geoLocale: document.getElementById('accGeoLocale').value || "auto",
                 langCode: document.getElementById('accLangCode').value || "en",
+                group: document.getElementById('accGroupName').value || "Ungrouped",
                 proxy: document.getElementById('accUseProxy').checked ? {
                     proxyAxios: document.getElementById('accProxyAxios').checked,
                     url: document.getElementById('accProxyProtoSelect').value + "://" + (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, ''),
                     port: parseInt(document.getElementById('accProxyPort').value) || 0,
                     username: document.getElementById('accProxyUser').value || "",
-                    password: document.getElementById('accProxyPass').value || ""
+                    password: document.getElementById('accProxyPass').value || "",
+                    isProxyV6: document.getElementById('accProxyV6').checked
                 } : {},
                 saveFingerprint: {
                     mobile: document.getElementById('accFpMobile').checked,
@@ -2418,6 +2563,195 @@
                 document.getElementById('statUptime').innerText = formatUptime(d.uptime);
                 document.getElementById('statUptimeSub').innerText = `${d.platform} · online`;
             } catch (e) { /* silent */ }
+        }
+
+        async function exportAccounts() {
+            try {
+                const res = await fetch(`${API_URL}/api/accounts/export`);
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                const blob = new Blob([JSON.stringify(data.accounts, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `bing_accounts_export_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast(`Exported ${data.accounts.length} accounts!`, 'success');
+            } catch (e) {
+                showToast('Failed to export accounts: ' + e.message, 'error');
+            }
+        }
+
+        async function importAccounts(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const accounts = JSON.parse(e.target.result);
+                    if (!Array.isArray(accounts)) throw new Error('File does not contain an array of accounts');
+
+                    const res = await fetch(`${API_URL}/api/accounts/import`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accounts })
+                    });
+                    
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`Successfully imported ${data.count} accounts!`, 'success');
+                        fetchAccounts();
+                    } else throw new Error(data.error);
+                } catch (err) {
+                    showToast('Import failed: ' + err.message, 'error');
+                } finally {
+                    event.target.value = ''; // Reset input
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function testProxy() {
+            const proto = document.getElementById('accProxyProtoSelect').value;
+            const host = (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, '');
+            const port = document.getElementById('accProxyPort').value || "";
+            const user = document.getElementById('accProxyUser').value || "";
+            const pass = document.getElementById('accProxyPass').value || "";
+
+            const resultBox = document.getElementById('testProxyResult');
+            const btn = document.getElementById('btnTestProxy');
+
+            if (!host || !port) {
+                showToast('Host and Port are required for testing proxy', 'error');
+                return;
+            }
+
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = 'Testing...';
+            btn.disabled = true;
+            resultBox.style.display = 'none';
+
+            let proxyUrl = `${proto}://${host}`;
+            try {
+                const res = await fetch(`${API_URL}/api/test-proxy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: proxyUrl,
+                        port: parseInt(port),
+                        username: user,
+                        password: pass
+                    })
+                });
+                
+                const data = await res.json();
+                resultBox.style.display = 'block';
+
+                if (data.success) {
+                    resultBox.style.color = '#10b981';
+                    let info = `Connected! IP: ${data.ip}`;
+                    if (data.country) info += ` (${data.country}${data.city ? ', ' + data.city : ''})`;
+                    resultBox.innerText = info;
+                    if (data.isp) resultBox.title = `ISP: ${data.isp}`;
+                } else {
+                    resultBox.style.color = '#ef4444';
+                    resultBox.innerText = `Error: ${data.error}`;
+                }
+            } catch (err) {
+                resultBox.style.display = 'block';
+                resultBox.style.color = '#ef4444';
+                resultBox.innerText = `Failed to connect`;
+            } finally {
+                btn.innerHTML = oldHtml;
+                btn.disabled = false;
+            }
+        }
+
+        async function checkProxyForAccount(email, btn) {
+            const acc = lastAccounts.find(a => a.email === email);
+            if (!acc || !acc.proxy) return;
+            
+            const statusEl = document.getElementById(`proxy-status-${email.replace(/[@.]/g, '_')}`);
+            if (statusEl) {
+                statusEl.style.color = 'var(--text-muted)';
+                statusEl.innerText = '(checking...)';
+            }
+            
+            // Spin the icon
+            const svg = btn.querySelector('svg');
+            if (svg) svg.classList.add('spin');
+
+            try {
+                // Parse the proxy string or object
+                // In this dashboard, acc.proxy in the list is usually a string from the DB or a display string
+                // But from the server it might be an object if we didn't stringify it
+                let p = acc.proxy;
+                let proxyData = {};
+                
+                // The backend API returns proxy as a string if it's from current list rendering
+                // We need to parse it for the test endpoint
+                const match = p.match(/^((?:https?|socks[45]):\/\/)?([^:]+):(\d+)(?::([^:]+):([^:]+))?$/i);
+                if (match) {
+                    proxyData = {
+                        url: (match[1] || 'http://') + match[2],
+                        port: parseInt(match[3]),
+                        username: match[4] || '',
+                        password: match[5] || ''
+                    };
+                } else {
+                    throw new Error('Invalid proxy format');
+                }
+
+                const res = await fetch(`${API_URL}/api/test-proxy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(proxyData)
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    statusEl.style.color = '#10b981';
+                    statusEl.innerText = `${data.ip} (${data.country})`;
+                    statusEl.title = `ISP: ${data.isp || 'N/A'}\nCity: ${data.city || 'N/A'}`;
+                } else {
+                    statusEl.style.color = '#ef4444';
+                    statusEl.innerText = '(failed)';
+                    statusEl.title = data.error;
+                }
+            } catch (err) {
+                statusEl.style.color = '#ef4444';
+                statusEl.innerText = '(error)';
+            } finally {
+                if (svg) svg.classList.remove('spin');
+            }
+        }
+
+        async function checkAllProxies() {
+            const btn = document.getElementById('checkProxiesBtn');
+            const svg = btn.querySelector('svg');
+            if (svg) svg.classList.add('spin');
+            btn.disabled = true;
+
+            showToast('Starting bulk proxy check...', 'success');
+
+            // We use P-Queue logic or just parallel for each visible account
+            const promises = lastAccounts.map(acc => {
+                const rowBtn = document.querySelector(`button[onclick*="checkProxyForAccount('${acc.email}'"]`);
+                if (rowBtn) return checkProxyForAccount(acc.email, rowBtn);
+                return Promise.resolve();
+            });
+
+            await Promise.allSettled(promises);
+            
+            showToast('Bulk proxy check completed!', 'success');
+            if (svg) svg.classList.remove('spin');
+            btn.disabled = false;
         }
 
         fetchAccounts();

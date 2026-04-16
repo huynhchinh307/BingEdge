@@ -1,13 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.RecoveryLogin = void 0;
-const LoginUtils_1 = require("./LoginUtils");
-class RecoveryLogin {
+import { getErrorMessage, promptInput } from './LoginUtils.js';
+export class RecoveryLogin {
+    bot;
+    textInputSelector = '[data-testid="proof-confirmation"]';
+    maxManualSeconds = 60;
+    maxManualAttempts = 5;
     constructor(bot) {
         this.bot = bot;
-        this.textInputSelector = '[data-testid="proof-confirmation"]';
-        this.maxManualSeconds = 60;
-        this.maxManualAttempts = 5;
     }
     async fillEmail(page, email) {
         try {
@@ -43,7 +41,7 @@ class RecoveryLogin {
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
                     this.bot.logger.debug(this.bot.isMobile, 'LOGIN-RECOVERY', 'Network idle timeout reached');
                 });
-                const errorMessage = await (0, LoginUtils_1.getErrorMessage)(page);
+                const errorMessage = await getErrorMessage(page);
                 if (errorMessage) {
                     throw new Error(`Email verification failed: ${errorMessage}`);
                 }
@@ -54,7 +52,7 @@ class RecoveryLogin {
             for (let attempt = 1; attempt <= this.maxManualAttempts; attempt++) {
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Starting attempt ${attempt}/${this.maxManualAttempts}`);
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN-RECOVERY', `Prompting user for email input (timeout: ${this.maxManualSeconds}s)`);
-                const email = await (0, LoginUtils_1.promptInput)({
+                const email = await promptInput({
                     question: `Recovery email (waiting ${this.maxManualSeconds}s): `,
                     timeoutSeconds: this.maxManualSeconds,
                     validate: email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -88,7 +86,7 @@ class RecoveryLogin {
                 await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
                     this.bot.logger.debug(this.bot.isMobile, 'LOGIN-RECOVERY', 'Network idle timeout reached');
                 });
-                const errorMessage = await (0, LoginUtils_1.getErrorMessage)(page);
+                const errorMessage = await getErrorMessage(page);
                 if (errorMessage) {
                     this.bot.logger.warn(this.bot.isMobile, 'LOGIN-RECOVERY', `Error from page: "${errorMessage}" (attempt ${attempt}/${this.maxManualAttempts})`);
                     if (attempt === this.maxManualAttempts) {
@@ -120,5 +118,4 @@ class RecoveryLogin {
         }
     }
 }
-exports.RecoveryLogin = RecoveryLogin;
 //# sourceMappingURL=RecoveryEmailLogin.js.map

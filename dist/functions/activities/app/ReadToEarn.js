@@ -1,9 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReadToEarn = void 0;
-const crypto_1 = require("crypto");
-const Workers_1 = require("../../Workers");
-class ReadToEarn extends Workers_1.Workers {
+import { randomBytes } from 'crypto';
+import { Workers } from '../../Workers.js';
+export class ReadToEarn extends Workers {
     async doReadToEarn() {
         if (!this.bot.accessToken) {
             this.bot.logger.warn(this.bot.isMobile, 'READ-TO-EARN', 'Skipping: App access token not available, this activity requires it!');
@@ -28,7 +25,7 @@ class ReadToEarn extends Workers_1.Workers {
             let articlesRead = 0;
             let oldBalance = startBalance;
             for (let i = 0; i < articleCount; ++i) {
-                jsonData.id = (0, crypto_1.randomBytes)(64).toString('hex');
+                jsonData.id = randomBytes(64).toString('hex');
                 this.bot.logger.debug(this.bot.isMobile, 'READ-TO-EARN', `Submitting Read to Earn activity | article=${i + 1}/${articleCount} | id=${jsonData.id} | country=${jsonData.country}`);
                 const request = {
                     url: 'https://prod.rewardsplatform.microsoft.com/dapi/me/activities',
@@ -71,5 +68,4 @@ class ReadToEarn extends Workers_1.Workers {
         }
     }
 }
-exports.ReadToEarn = ReadToEarn;
 //# sourceMappingURL=ReadToEarn.js.map

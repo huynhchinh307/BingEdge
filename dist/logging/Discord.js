@@ -1,14 +1,7 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendDiscord = sendDiscord;
-exports.flushDiscordQueue = flushDiscordQueue;
-const axios_1 = __importDefault(require("axios"));
-const p_queue_1 = __importDefault(require("p-queue"));
+import axios from 'axios';
+import PQueue from 'p-queue';
 const DISCORD_LIMIT = 2000;
-const discordQueue = new p_queue_1.default({
+const discordQueue = new PQueue({
     interval: 1000,
     intervalCap: 2,
     carryoverConcurrencyCount: true
@@ -16,7 +9,7 @@ const discordQueue = new p_queue_1.default({
 function truncate(text) {
     return text.length <= DISCORD_LIMIT ? text : text.slice(0, DISCORD_LIMIT - 14) + ' …(truncated)';
 }
-async function sendDiscord(discordUrl, content, level) {
+export async function sendDiscord(discordUrl, content, level) {
     if (!discordUrl)
         return;
     const request = {
@@ -28,7 +21,7 @@ async function sendDiscord(discordUrl, content, level) {
     };
     await discordQueue.add(async () => {
         try {
-            await (0, axios_1.default)(request);
+            await axios(request);
         }
         catch (err) {
             const status = err?.response?.status;
@@ -37,7 +30,7 @@ async function sendDiscord(discordUrl, content, level) {
         }
     });
 }
-async function flushDiscordQueue(timeoutMs = 5000) {
+export async function flushDiscordQueue(timeoutMs = 5000) {
     await Promise.race([
         (async () => {
             await discordQueue.onIdle();

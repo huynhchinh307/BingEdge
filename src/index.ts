@@ -2,8 +2,8 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'node:fs'
 import path from 'node:path'
 import cluster, { Worker } from 'cluster'
-import type { BrowserContext, Cookie, Page } from 'playwright-chromium'
-import pkg from '../package.json'
+import type { BrowserContext, Cookie, Page } from 'patchright'
+import pkg from '../package.json' with { type: 'json' }
 
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator'
 
@@ -516,9 +516,19 @@ export class MicrosoftRewardsBot {
             return 'NO_PROXY'
         }
         // Normalize URL by stripping scheme prefix (http://, https://)
-        // so that 'proxy.example.com' and 'http://proxy.example.com' are treated as the same proxy
-        const normalizedUrl = account.proxy.url.replace(/^https?:\/\//i, '').toLowerCase().trim()
-        return `${account.proxy.username || ''}@${normalizedUrl}:${account.proxy.port}`
+        let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim()
+        let port = account.proxy.port
+        
+        // If host already contains a port (e.g. "1.2.3.4:8080"), extract it and use it if port is not set
+        if (host.includes(':')) {
+            const parts = host.split(':')
+            if (parts[0]) host = parts[0]
+            if (parts[1] && (!port || port === 0)) {
+                port = parseInt(parts[1])
+            }
+        }
+
+        return `${account.proxy.username || ''}@${host}:${port || 0}`
     }
 
     private async acquireProxyLock(proxyKey: string): Promise<boolean> {
@@ -607,7 +617,9 @@ export class MicrosoftRewardsBot {
                 }
 
                 this.cookies.mobile = await initialContext.cookies()
-                this.fingerprint = mobileSession.fingerprint
+                if (mobileSession) {
+                    this.fingerprint = mobileSession.fingerprint
+                }
 
                 const data: DashboardData = await this.browser.func.getDashboardData()
                 const appData: AppDashboardData = await this.browser.func.getAppDashboardData()
@@ -668,9 +680,9 @@ export class MicrosoftRewardsBot {
                 }
 
                 // Solve promotions in mobile context
-                if (this.config.workers.doDailySet) await this.workers.doDailySet(data, this.mainMobilePage)
+                if (this.config.workers.doDailySet && this.mainMobilePage) await this.workers.doDailySet(data, this.mainMobilePage as any)
                 if (this.config.workers.doSpecialPromotions) await this.workers.doSpecialPromotions(data)
-                if (this.config.workers.doMorePromotions) await this.workers.doMorePromotions(this.mainMobilePage)
+                if (this.config.workers.doMorePromotions && this.mainMobilePage) await this.workers.doMorePromotions(this.mainMobilePage as any)
 
                 const searchPoints = await this.browser.func.getSearchPoints()
                 const missingSearchPoints = this.browser.func.missingSearchPoints(searchPoints, true)
@@ -681,7 +693,7 @@ export class MicrosoftRewardsBot {
                     mobilePoints,
                     desktopPoints,
                     rank: desktopRank
-                } = await this.searchManager.doSearches(data, missingSearchPoints, mobileSession, account, accountEmail)
+                } = await this.searchManager.doSearches(data, missingSearchPoints, (mobileSession || {}) as any, account, accountEmail)
 
                 mobileContextClosed = true
 

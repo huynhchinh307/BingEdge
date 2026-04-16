@@ -1,10 +1,5 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const ms_1 = __importDefault(require("ms"));
-class Util {
+import ms from 'ms';
+export default class Util {
     async wait(time) {
         if (typeof time === 'string') {
             time = this.stringToNumber(time);
@@ -49,7 +44,7 @@ class Util {
             return input;
         }
         const value = input.trim();
-        const milisec = (0, ms_1.default)(value);
+        const milisec = ms(value);
         if (milisec === undefined) {
             throw new Error(`The input provided (${input}) cannot be parsed to a valid time! Use a format like "1 min", "1m" or "1 minutes"`);
         }
@@ -72,5 +67,4 @@ class Util {
         return Math.floor(this.randomNumber(minMs, maxMs));
     }
 }
-exports.default = Util;
 //# sourceMappingURL=Utils.js.map

@@ -1,9 +1,13 @@
+import type { MicrosoftRewardsBot } from '../index'
+import { QueryEngine } from '../interface/Config'
 import type { AxiosRequestConfig } from 'axios'
 import * as fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import type { GoogleSearch, GoogleTrendsResponse, RedditListing, WikipediaTopResponse } from '../interface/Search'
-import type { MicrosoftRewardsBot } from '../index'
-import { QueryEngine } from '../interface/Config'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export class QueryCore {
     constructor(private bot: MicrosoftRewardsBot) {}
@@ -596,3 +600,4 @@ export class QueryCore {
         }
     }
 }
+

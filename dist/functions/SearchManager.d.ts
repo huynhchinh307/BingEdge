@@ -1,4 +1,4 @@
-import type { BrowserContext } from 'playwright-chromium';
+import type { BrowserContext } from 'patchright';
 import type { BrowserFingerprintWithHeaders } from 'fingerprint-generator';
 import { MicrosoftRewardsBot } from '../index';
 import type { DashboardData } from '../interface/DashboardData';

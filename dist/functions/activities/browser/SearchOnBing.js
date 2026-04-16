@@ -1,56 +1,17 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SearchOnBing = void 0;
-const fs = __importStar(require("fs"));
-const path_1 = __importDefault(require("path"));
-const Workers_1 = require("../../Workers");
-const QueryEngine_1 = require("../../QueryEngine");
-class SearchOnBing extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.bingHome = 'https://bing.com';
-        this.cookieHeader = '';
-        this.fingerprintHeader = {};
-        this.gainedPoints = 0;
-        this.success = false;
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import * as fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+import { Workers } from '../../Workers.js';
+import { QueryCore } from '../../QueryEngine.js';
+export class SearchOnBing extends Workers {
+    bingHome = 'https://bing.com';
+    cookieHeader = '';
+    fingerprintHeader = {};
+    gainedPoints = 0;
+    success = false;
+    oldBalance = this.bot.userData.currentPoints;
     async doSearchOnBing(promotion, page) {
         const offerId = promotion.offerId;
         this.oldBalance = Number(this.bot.userData.currentPoints ?? 0);
@@ -85,6 +46,49 @@ class SearchOnBing extends Workers_1.Workers {
             this.bot.logger.error(this.bot.isMobile, 'SEARCH-ON-BING', `Error in doSearchOnBing | offerId=${promotion.offerId} | message=${error instanceof Error ? error.message : String(error)}`);
         }
     }
+    /**
+     * Simulates human-like typing with variable delays, hesitation pauses, and
+     * occasional typos (wrong adjacent key → notice → Backspace → retype correctly).
+     */
+    async humanType(page, text) {
+        // QWERTY adjacency map — used to generate realistic miskey typos
+        const adjacentKeys = {
+            a: ['s', 'q', 'z'], b: ['v', 'g', 'n'], c: ['x', 'd', 'v'],
+            d: ['s', 'e', 'f', 'c'], e: ['w', 'r', 'd'], f: ['d', 'r', 'g', 'v'],
+            g: ['f', 't', 'h', 'b'], h: ['g', 'y', 'j', 'n'], i: ['u', 'o', 'k'],
+            j: ['h', 'u', 'k', 'm'], k: ['j', 'i', 'l'], l: ['k', 'o', 'p'],
+            m: ['n', 'j', 'k'], n: ['b', 'h', 'm'], o: ['i', 'p', 'l'],
+            p: ['o', 'l'], q: ['w', 'a'], r: ['e', 't', 'f'],
+            s: ['a', 'w', 'd', 'x'], t: ['r', 'y', 'g'], u: ['y', 'i', 'j'],
+            v: ['c', 'f', 'b'], w: ['q', 'e', 's'], x: ['z', 's', 'c'],
+            y: ['t', 'u', 'h'], z: ['a', 'x'],
+        };
+        for (const char of text) {
+            const lower = char.toLowerCase();
+            const neighbors = adjacentKeys[lower];
+            // ~5% chance of a typo on any typeable character with known neighbors
+            if (neighbors && Math.random() < 0.05) {
+                const wrongChar = neighbors[Math.floor(Math.random() * neighbors.length)];
+                if (!wrongChar)
+                    continue;
+                // Type the wrong key
+                await page.keyboard.type(wrongChar);
+                // Simulate the time to notice the mistake (200–600ms)
+                await this.bot.utils.wait(Math.floor(Math.random() * 400) + 200);
+                // Delete the wrong character
+                await page.keyboard.press('Backspace');
+                // Brief recovery pause before retyping
+                await this.bot.utils.wait(Math.floor(Math.random() * 150) + 80);
+            }
+            // Type the correct character
+            await page.keyboard.type(char);
+            // Base keystroke delay: 80–180ms
+            const base = Math.floor(Math.random() * 100) + 80;
+            // ~8% chance of a longer hesitation pause (150–450ms)
+            const pause = Math.random() < 0.08 ? Math.floor(Math.random() * 300) + 150 : 0;
+            await this.bot.utils.wait(base + pause);
+        }
+    }
     async searchBing(page, queries) {
         queries = [...new Set(queries)];
         this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-SEARCH', `Starting search loop | queriesCount=${queries.length} | oldBalance=${this.oldBalance}`);
@@ -102,7 +106,7 @@ class SearchOnBing extends Workers_1.Workers {
                 await this.bot.utils.wait(500);
                 await this.bot.browser.utils.ghostClick(page, searchBar, { clickCount: 3 });
                 await searchBox.fill('');
-                await page.keyboard.type(query, { delay: 50 });
+                await this.humanType(page, query);
                 await page.keyboard.press('Enter');
                 await this.bot.utils.wait(this.bot.utils.randomDelay(5000, 7000));
                 // Check for point updates
@@ -169,7 +173,7 @@ class SearchOnBing extends Workers_1.Workers {
         try {
             if (this.bot.config.searchOnBingLocalQueries) {
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', 'Using local queries config file');
-                const data = fs.readFileSync(path_1.default.join(__dirname, '../bing-search-activity-queries.json'), 'utf8');
+                const data = fs.readFileSync(path.join(__dirname, '../bing-search-activity-queries.json'), 'utf8');
                 queries = JSON.parse(data);
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', `Loaded queries config | source=local | entries=${queries.length}`);
             }
@@ -191,7 +195,7 @@ class SearchOnBing extends Workers_1.Workers {
             }
             else {
                 this.bot.logger.info(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', `No matching title in queries config | source=${this.bot.config.searchOnBingLocalQueries ? 'local' : 'remote'} | title="${promotion.title}"`);
-                const queryCore = new QueryEngine_1.QueryCore(this.bot);
+                const queryCore = new QueryCore(this.bot);
                 const promotionDescription = promotion.description.toLowerCase().trim();
                 const queryDescription = promotionDescription.replace('search on bing', '').trim();
                 this.bot.logger.debug(this.bot.isMobile, 'SEARCH-ON-BING-QUERY', `Requesting Bing suggestions | queryDescription="${queryDescription}"`);
@@ -214,5 +218,4 @@ class SearchOnBing extends Workers_1.Workers {
         }
     }
 }
-exports.SearchOnBing = SearchOnBing;
 //# sourceMappingURL=SearchOnBing.js.map

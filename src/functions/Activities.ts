@@ -1,5 +1,5 @@
 import type { MicrosoftRewardsBot } from '../index'
-import type { Page } from 'playwright-chromium'
+import type { Page } from 'patchright'
 
 // App
 import { DailyCheckIn } from './activities/app/DailyCheckIn'

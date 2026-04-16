@@ -1,15 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Search = void 0;
-const QueryEngine_1 = require("../../QueryEngine");
-const Workers_1 = require("../../Workers");
-class Search extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.bingHome = 'https://bing.com';
-        this.searchPageURL = '';
-        this.searchCount = 0;
-    }
+import { QueryCore } from '../../QueryEngine.js';
+import { Workers } from '../../Workers.js';
+export class Search extends Workers {
+    bingHome = 'https://bing.com';
+    searchPageURL = '';
+    searchCount = 0;
     async doSearch(data, page, isMobile) {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0);
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`);
@@ -20,7 +14,7 @@ class Search extends Workers_1.Workers {
             let missingPointsTotal = missingPoints.totalPoints;
             this.bot.logger.debug(isMobile, 'SEARCH-BING', `Initial search counters | mobile=${missingPoints.mobilePoints} | desktop=${missingPoints.desktopPoints} | edge=${missingPoints.edgePoints}`);
             this.bot.logger.info(isMobile, 'SEARCH-BING', `Search points remaining | Edge=${missingPoints.edgePoints} | Desktop=${missingPoints.desktopPoints} | Mobile=${missingPoints.mobilePoints}`);
-            const queryCore = new QueryEngine_1.QueryCore(this.bot);
+            const queryCore = new QueryCore(this.bot);
             const locale = (this.bot.userData.geoLocale ?? 'US').toUpperCase();
             const langCode = (this.bot.userData.langCode ?? 'en').toLowerCase();
             this.bot.logger.debug(isMobile, 'SEARCH-BING', `Resolving search queries via QueryCore | locale=${locale} | lang=${langCode} | related=true`);
@@ -145,6 +139,49 @@ class Search extends Workers_1.Workers {
             return totalGainedPoints;
         }
     }
+    /**
+     * Simulates human-like typing with variable delays, hesitation pauses, and
+     * occasional typos (wrong adjacent key → notice → Backspace → retype correctly).
+     */
+    async humanType(page, text) {
+        // QWERTY adjacency map — used to generate realistic miskey typos
+        const adjacentKeys = {
+            a: ['s', 'q', 'z'], b: ['v', 'g', 'n'], c: ['x', 'd', 'v'],
+            d: ['s', 'e', 'f', 'c'], e: ['w', 'r', 'd'], f: ['d', 'r', 'g', 'v'],
+            g: ['f', 't', 'h', 'b'], h: ['g', 'y', 'j', 'n'], i: ['u', 'o', 'k'],
+            j: ['h', 'u', 'k', 'm'], k: ['j', 'i', 'l'], l: ['k', 'o', 'p'],
+            m: ['n', 'j', 'k'], n: ['b', 'h', 'm'], o: ['i', 'p', 'l'],
+            p: ['o', 'l'], q: ['w', 'a'], r: ['e', 't', 'f'],
+            s: ['a', 'w', 'd', 'x'], t: ['r', 'y', 'g'], u: ['y', 'i', 'j'],
+            v: ['c', 'f', 'b'], w: ['q', 'e', 's'], x: ['z', 's', 'c'],
+            y: ['t', 'u', 'h'], z: ['a', 'x'],
+        };
+        for (const char of text) {
+            const lower = char.toLowerCase();
+            const neighbors = adjacentKeys[lower];
+            // ~5% chance of a typo on any typeable character with known neighbors
+            if (neighbors && Math.random() < 0.05) {
+                const wrongChar = neighbors[Math.floor(Math.random() * neighbors.length)];
+                if (!wrongChar)
+                    continue;
+                // Type the wrong key
+                await page.keyboard.type(wrongChar);
+                // Simulate the time to notice the mistake (200–600ms)
+                await this.bot.utils.wait(Math.floor(Math.random() * 400) + 200);
+                // Delete the wrong character
+                await page.keyboard.press('Backspace');
+                // Brief recovery pause before retyping
+                await this.bot.utils.wait(Math.floor(Math.random() * 150) + 80);
+            }
+            // Type the correct character
+            await page.keyboard.type(char);
+            // Base keystroke delay: 80–180ms
+            const base = Math.floor(Math.random() * 100) + 80;
+            // ~8% chance of a longer hesitation pause (150–450ms)
+            const pause = Math.random() < 0.08 ? Math.floor(Math.random() * 300) + 150 : 0;
+            await this.bot.utils.wait(base + pause);
+        }
+    }
     async bingSearch(searchPage, query, isMobile) {
         const maxAttempts = 5;
         const refreshThreshold = 10; // Page gets sluggish after x searches?
@@ -169,7 +206,7 @@ class Search extends Workers_1.Workers {
                 await this.bot.utils.wait(1000);
                 await this.bot.browser.utils.ghostClick(searchPage, searchBar, { clickCount: 3 });
                 await searchBox.fill('');
-                await searchPage.keyboard.type(query, { delay: 50 });
+                await this.humanType(searchPage, query);
                 await searchPage.keyboard.press('Enter');
                 this.bot.logger.debug(isMobile, 'SEARCH-BING', `Submitted query to Bing | attempt=${i + 1}/${maxAttempts} | query="${query}"`);
                 await this.bot.utils.wait(3000);
@@ -236,5 +273,4 @@ class Search extends Workers_1.Workers {
         }
     }
 }
-exports.Search = Search;
 //# sourceMappingURL=Search.js.map

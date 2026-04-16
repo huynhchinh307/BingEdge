@@ -1,14 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DailyCheckIn = void 0;
-const crypto_1 = require("crypto");
-const Workers_1 = require("../../Workers");
-class DailyCheckIn extends Workers_1.Workers {
-    constructor() {
-        super(...arguments);
-        this.gainedPoints = 0;
-        this.oldBalance = this.bot.userData.currentPoints;
-    }
+import { randomUUID } from 'crypto';
+import { Workers } from '../../Workers.js';
+export class DailyCheckIn extends Workers {
+    gainedPoints = 0;
+    oldBalance = this.bot.userData.currentPoints;
     async doDailyCheckIn() {
         if (!this.bot.accessToken) {
             this.bot.logger.warn(this.bot.isMobile, 'DAILY-CHECK-IN', 'Skipping: App access token not available, this activity requires it!');
@@ -54,7 +48,7 @@ class DailyCheckIn extends Workers_1.Workers {
     async submitDaily(type) {
         try {
             const jsonData = {
-                id: (0, crypto_1.randomUUID)(),
+                id: randomUUID(),
                 amount: 1,
                 type: type,
                 attributes: {
@@ -85,5 +79,4 @@ class DailyCheckIn extends Workers_1.Workers {
         }
     }
 }
-exports.DailyCheckIn = DailyCheckIn;
 //# sourceMappingURL=DailyCheckIn.js.map

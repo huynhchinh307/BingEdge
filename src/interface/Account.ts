@@ -13,6 +13,7 @@ export interface Account {
     duration?: number
     rank?: string
     lastUpdate?: string
+    group?: string
 }
 
 export interface AccountProxy {
@@ -21,6 +22,8 @@ export interface AccountProxy {
     port: number
     password: string
     username: string
+    isProxyV6?: boolean
+    bypass?: string
 }
 
 export interface ConfigSaveFingerprint {

@@ -1,13 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const node_fs_1 = __importDefault(require("node:fs"));
-const Load_1 = require("../util/Load");
-class BrowserFunc {
+import fs from 'node:fs';
+import { saveSessionData } from '../util/Load.js';
+export default class BrowserFunc {
+    bot;
+    accountRank = '';
     constructor(bot) {
-        this.accountRank = '';
         this.bot = bot;
     }
     /**
@@ -32,7 +28,7 @@ class BrowserFunc {
             };
             const response = await this.bot.axios.request(request);
             // Save dashboard data to file for analysis
-            node_fs_1.default.writeFileSync('dashboard_data.json', JSON.stringify(response.data, null, 2));
+            fs.writeFileSync('dashboard_data.json', JSON.stringify(response.data, null, 2));
             this.bot.logger.warn(this.bot.isMobile, 'SHOW-DASHBOARD-DATA', 'Saved raw dashboard data to dashboard_data.json!');
             if (response.data?.dashboard) {
                 this.accountRank = response.data.dashboard.userStatus?.levelInfo?.activeLevelName || '';
@@ -237,7 +233,7 @@ class BrowserFunc {
             const cookies = await browser.cookies();
             // Save cookies
             this.bot.logger.debug(this.bot.isMobile, 'CLOSE-BROWSER', `Saving ${cookies.length} cookies to session folder!`);
-            await (0, Load_1.saveSessionData)(this.bot.config.sessionPath, cookies, email, this.bot.isMobile);
+            await saveSessionData(this.bot.config.sessionPath, cookies, email, this.bot.isMobile);
             await this.bot.utils.wait(2000);
             // Close browser
             await browser.close();
@@ -368,5 +364,4 @@ class BrowserFunc {
         };
     }
 }
-exports.default = BrowserFunc;
 //# sourceMappingURL=BrowserFunc.js.map

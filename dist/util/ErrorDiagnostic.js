@@ -1,16 +1,10 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.errorDiagnostic = errorDiagnostic;
-const promises_1 = __importDefault(require("fs/promises"));
-const path_1 = __importDefault(require("path"));
-async function errorDiagnostic(page, error) {
+import fs from 'fs/promises';
+import path from 'path';
+export async function errorDiagnostic(page, error) {
     try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const folderName = `error-${timestamp}`;
-        const outputDir = path_1.default.join(process.cwd(), 'diagnostics', folderName);
+        const outputDir = path.join(process.cwd(), 'diagnostics', folderName);
         if (!page) {
             return;
         }
@@ -30,11 +24,11 @@ ${error.stack || 'No stack trace available'}
             page.content(),
             page.screenshot({ fullPage: true, type: 'png' })
         ]);
-        await promises_1.default.mkdir(outputDir, { recursive: true });
+        await fs.mkdir(outputDir, { recursive: true });
         await Promise.all([
-            promises_1.default.writeFile(path_1.default.join(outputDir, 'dump.html'), htmlContent),
-            promises_1.default.writeFile(path_1.default.join(outputDir, 'screenshot.png'), screenshotBuffer),
-            promises_1.default.writeFile(path_1.default.join(outputDir, 'error.txt'), errorLog)
+            fs.writeFile(path.join(outputDir, 'dump.html'), htmlContent),
+            fs.writeFile(path.join(outputDir, 'screenshot.png'), screenshotBuffer),
+            fs.writeFile(path.join(outputDir, 'error.txt'), errorLog)
         ]);
         console.log(`Diagnostics saved to: ${outputDir}`);
     }
