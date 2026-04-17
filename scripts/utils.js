@@ -244,23 +244,22 @@ export function buildProxyConfig(account) {
         return null
     }
 
-    let proxyUrl = account.proxy.url
-    if (!proxyUrl.includes('://')) {
-        proxyUrl = 'http://' + proxyUrl
+    let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '')
+    const protocolMatch = account.proxy.url.match(/^(https?|socks[45])/i)
+    let protocol = protocolMatch ? protocolMatch[1].toLowerCase() : 'http'
+
+    // Xử lý địa chỉ IPv6 (phải bọc trong ngoặc vuông nếu chứa dấu : và chưa có ngoặc)
+    if (host.includes(':') && !host.startsWith('[') && !host.includes('.')) {
+        host = `[${host}]`
     }
 
     let bypassString = undefined
-
-    // Chỉ áp dụng bypass list khi dùng proxy IPv6
-    // IPv4 proxy không cần bypass — tất cả traffic đi qua proxy bình thường
     if (account.proxy.isProxyV6) {
         const bypassFilePath = path.join(process.cwd(), 'bypass.txt')
         if (fs.existsSync(bypassFilePath)) {
             try {
                 const bypassContent = fs.readFileSync(bypassFilePath, 'utf8').trim()
-                if (bypassContent) {
-                    bypassString = bypassContent
-                }
+                if (bypassContent) bypassString = bypassContent
             } catch (e) {
                 log('WARN', `Failed to read bypass.txt: ${e.message}`)
             }
@@ -268,7 +267,7 @@ export function buildProxyConfig(account) {
     }
 
     const proxy = {
-        server: `${proxyUrl}:${account.proxy.port}`
+        server: `${protocol}://${host}:${account.proxy.port}`
     }
 
     if (bypassString) {

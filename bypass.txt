@@ -1,1 +1,1 @@
-*.live.com,*.hsprotect.net,*.px-client.net,*.px-cdn.net,*.microsoft.com,crcldu.com,*.perimeterx.net
+*.live.com,*.hsprotect.net,*.px-client.net,*.px-cdn.net,*.microsoft.com,crcldu.com,*.perimeterx.net,*.live.com

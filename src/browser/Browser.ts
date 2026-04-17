@@ -7,6 +7,7 @@ import path from 'path'
 import type { MicrosoftRewardsBot } from '../index'
 import { loadSessionData, saveFingerprintData } from '../util/Load'
 import { UserAgentManager } from './UserAgent'
+import AxiosClient from '../util/Axios'
 
 import type { Account, AccountProxy } from '../interface/Account'
 
@@ -19,6 +20,7 @@ https://www.browserscan.net/
 */
 
 interface BrowserCreationResult {
+    browser: any
     context: BrowserContext
     fingerprint: BrowserFingerprintWithHeaders
 }
@@ -103,24 +105,70 @@ class Browser {
 
             const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`
 
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Syncing location and timezone with IP...`)
+            const ipLocation = await this.getIpLocation(account.proxy)
+
             const context = await newInjectedContext(browser as any, {
                 fingerprint,
                 newContextOptions: {
                     locale,
+                    timezoneId: ipLocation?.timezone,
+                    geolocation: ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : undefined,
                     bypassCSP: true,
                     ignoreHTTPSErrors: true,
-                    permissions: []
+                    permissions: ['geolocation']
                 }
             })
 
-            await context.addInitScript(() => {
+            await context.addInitScript((locationData) => {
+                // Mock Geolocation
+                if (locationData) {
+                    const { latitude, longitude } = locationData;
+                    navigator.geolocation.getCurrentPosition = (success) => {
+                        success({
+                            coords: {
+                                latitude,
+                                longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        } as any);
+                    };
+                    
+                    navigator.geolocation.watchPosition = (success) => {
+                        success({
+                            coords: {
+                                latitude,
+                                longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        } as any);
+                        return 1337; // Dummy ID
+                    };
+                }
+
+                // Disable Credentials
                 Object.defineProperty(navigator, 'credentials', {
                     value: {
                         create: () => Promise.reject(new Error('WebAuthn disabled')),
                         get: () => Promise.reject(new Error('WebAuthn disabled'))
                     }
                 })
-            })
+            }, ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : null)
+
+            // Grant permissions explicitly for common domains
+            await context.grantPermissions(['geolocation'], { origin: 'https://rewards.bing.com' })
+            await context.grantPermissions(['geolocation'], { origin: 'https://www.bing.com' })
+            await context.grantPermissions(['geolocation'], { origin: 'https://microsoft.com' })
 
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000))
 
@@ -140,7 +188,7 @@ class Browser {
             )
             this.bot.logger.debug(this.bot.isMobile, 'BROWSER-FINGERPRINT', JSON.stringify(fingerprint))
 
-            return { context: context as unknown as BrowserContext, fingerprint }
+            return { browser, context: context as unknown as BrowserContext, fingerprint }
         } catch (error) {
             await browser.close().catch(() => {})
             throw error
@@ -155,6 +203,34 @@ class Browser {
         } catch {
             return `${proxy.url}:${proxy.port}`
         }
+    }
+
+    private async getIpLocation(proxy: AccountProxy) {
+        // Force proxy usage for this check to get the location of the proxy IP
+        const axios = new AxiosClient({ ...proxy, proxyAxios: true })
+        try {
+            // Using ip-api.com (HTTP) because proxy might not support HTTPS easily or to avoid cert issues for this simple check
+            const response = await axios.request({
+                url: 'http://ip-api.com/json',
+                method: 'GET',
+                timeout: 10000
+            })
+            
+            const data = response.data
+            if (data.status === 'success') {
+                this.bot.logger.debug(this.bot.isMobile, 'BROWSER-IP-LOC', `Detected: ${data.city}, ${data.country} (${data.lat}, ${data.lon}) | Timezone: ${data.timezone}`)
+                return {
+                    lat: data.lat,
+                    lon: data.lon,
+                    timezone: data.timezone
+                }
+            } else {
+                this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to get IP location: ${data.message || 'Unknown error'}`)
+            }
+        } catch (error: any) {
+            this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to fetch IP location: ${error.message}`)
+        }
+        return null
     }
 
     async generateFingerprint(isMobile: boolean) {

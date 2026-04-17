@@ -40,6 +40,66 @@ if (!account) {
     process.exit(1)
 }
 
+async function getIpLocation(proxyConfig) {
+    const { default: axios } = await import('axios')
+    let axiosAgent = null
+
+    if (proxyConfig && proxyConfig.server) {
+        const { HttpsProxyAgent } = await import('https-proxy-agent')
+        const { HttpProxyAgent } = await import('http-proxy-agent')
+        const { SocksProxyAgent } = await import('socks-proxy-agent')
+        
+        const serverUrl = proxyConfig.server.includes('://') ? proxyConfig.server : `http://${proxyConfig.server}`
+        const urlObj = new URL(serverUrl)
+        
+        let proxyUrl = serverUrl
+        if (proxyConfig.username && proxyConfig.password) {
+            proxyUrl = `${urlObj.protocol}//${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@${urlObj.host}`
+        }
+
+        if (urlObj.protocol === 'socks4:' || urlObj.protocol === 'socks5:') {
+            axiosAgent = new SocksProxyAgent(proxyUrl)
+        } else if (urlObj.protocol === 'https:') {
+            axiosAgent = new HttpsProxyAgent(proxyUrl)
+        } else {
+            axiosAgent = new HttpProxyAgent(proxyUrl)
+        }
+    }
+
+    const services = [
+        'http://v6.ipify.org?format=json',
+        'http://api64.ipify.org?format=json',
+        'http://ip.nf/me.json',
+        'http://ip-api.com/json'
+    ]
+
+    for (const url of services) {
+        try {
+            const response = await axios.get(url, {
+                httpsAgent: axiosAgent,
+                httpAgent: axiosAgent,
+                timeout: 15000, // Tăng lên 15s cho Proxy v6 chậm
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            })
+            
+            if (response.data) {
+                const d = response.data
+                const data = {
+                    lat: parseFloat(d.ip?.latitude || d.lat || d.latitude || 0),
+                    lon: parseFloat(d.ip?.longitude || d.lon || d.longitude || 0),
+                    timezone: d.ip?.timezone || d.timezone || 'UTC'
+                }
+                if (data.lat !== 0 || data.timezone !== 'UTC') {
+                    return data
+                }
+            }
+        } catch (e) {
+            continue
+        }
+    }
+    return null
+}
+
 async function main() {
     const runtimeBase = getRuntimeBase(projectRoot, args.dev)
     const sessionBase = getSessionPath(runtimeBase, config.sessionPath, args.email)
@@ -182,23 +242,89 @@ async function main() {
         ]
     })
 
+    log('INFO', 'Syncing location and timezone with IP...')
+    const ipLocation = await getIpLocation(proxy)
+    if (ipLocation) {
+        log('INFO', `  Detected: ${ipLocation.lat}, ${ipLocation.lon} | Timezone: ${ipLocation.timezone}`)
+    }
+
     let context
     if (fingerprint) {
-        context = await newInjectedContext(browser, { fingerprint })
-
-        await context.addInitScript(() => {
-            Object.defineProperty(navigator, 'credentials', {
-                value: {
-                    create: () => Promise.reject(new Error('WebAuthn disabled')),
-                    get: () => Promise.reject(new Error('WebAuthn disabled'))
-                }
-            })
+        context = await newInjectedContext(browser, { 
+            fingerprint,
+            newContextOptions: {
+                timezoneId: ipLocation?.timezone,
+                geolocation: ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : undefined,
+                permissions: ['geolocation']
+            }
         })
+
+        if (ipLocation) {
+            await context.addInitScript((locationData) => {
+                const mockGeo = {
+                    getCurrentPosition: (success) => {
+                        success({
+                            coords: {
+                                latitude: locationData.latitude,
+                                longitude: locationData.longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        });
+                    },
+                    watchPosition: (success) => {
+                        success({
+                            coords: {
+                                latitude: locationData.latitude,
+                                longitude: locationData.longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        });
+                        return 1337; 
+                    },
+                    clearWatch: () => {},
+                };
+                
+                // Ghi đè thực sự navigator.geolocation
+                Object.defineProperty(navigator, 'geolocation', {
+                    value: mockGeo,
+                    configurable: true,
+                    enumerable: true,
+                    writable: true
+                });
+                
+                // Vô hiệu hóa WebAuthn
+                Object.defineProperty(navigator, 'credentials', {
+                    value: {
+                        create: () => Promise.reject(new Error('WebAuthn disabled')),
+                        get: () => Promise.reject(new Error('WebAuthn disabled'))
+                    }
+                });
+            }, { latitude: ipLocation.lat, longitude: ipLocation.lon })
+        }
+
+        // Cấp quyền cho các domain quan trọng
+        await context.grantPermissions(['geolocation'], { origin: 'https://rewards.bing.com' })
+        await context.grantPermissions(['geolocation'], { origin: 'https://www.bing.com' })
+        await context.grantPermissions(['geolocation'], { origin: 'https://microsoft.com' })
+        await context.grantPermissions(['geolocation'], { origin: 'https://rewards.microsoft.com' })
 
         log('SUCCESS', 'Fingerprint injected into browser context')
     } else {
         context = await browser.newContext({
-            viewport: isMobile ? { width: 375, height: 667 } : { width: 1366, height: 768 }
+            viewport: args.mobile ? { width: 375, height: 667 } : { width: 1366, height: 768 },
+            timezoneId: ipLocation?.timezone,
+            geolocation: ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : undefined,
+            permissions: ['geolocation']
         })
     }
 
@@ -208,10 +334,17 @@ async function main() {
     }
 
     const page = await context.newPage()
-    await page.goto(config.baseURL, { waitUntil: 'domcontentloaded' })
 
-    log('SUCCESS', 'Browser opened with session loaded')
-    log('INFO', `Navigated to: ${config.baseURL}`)
+    try {
+        // Luôn mở trang trắng theo yêu cầu của người dùng
+        await page.goto('about:blank')
+        log('SUCCESS', 'Browser opened with blank page')
+    } catch (e) {
+        log('WARN', `Could not open blank page: ${e.message}`)
+    }
+
+    log('SUCCESS', 'Browser session is ready')
+    log('INFO', 'Browser is at about:blank. You can now type your URL manually.')
 
     const saveCookies = async () => {
         if (context) {

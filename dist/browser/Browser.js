@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { loadSessionData, saveFingerprintData } from '../util/Load.js';
 import { UserAgentManager } from './UserAgent.js';
+import AxiosClient from '../util/Axios.js';
 class Browser {
     bot;
     static BROWSER_ARGS = [
@@ -68,23 +69,65 @@ class Browser {
             const sessionData = await loadSessionData(this.bot.config.sessionPath, account.email, account.saveFingerprint, this.bot.isMobile);
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile));
             const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`;
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Syncing location and timezone with IP...`);
+            const ipLocation = await this.getIpLocation(account.proxy);
             const context = await newInjectedContext(browser, {
                 fingerprint,
                 newContextOptions: {
                     locale,
+                    timezoneId: ipLocation?.timezone,
+                    geolocation: ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : undefined,
                     bypassCSP: true,
                     ignoreHTTPSErrors: true,
-                    permissions: []
+                    permissions: ['geolocation']
                 }
             });
-            await context.addInitScript(() => {
+            await context.addInitScript((locationData) => {
+                // Mock Geolocation
+                if (locationData) {
+                    const { latitude, longitude } = locationData;
+                    navigator.geolocation.getCurrentPosition = (success) => {
+                        success({
+                            coords: {
+                                latitude,
+                                longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        });
+                    };
+                    navigator.geolocation.watchPosition = (success) => {
+                        success({
+                            coords: {
+                                latitude,
+                                longitude,
+                                accuracy: 100,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null,
+                            },
+                            timestamp: Date.now(),
+                        });
+                        return 1337; // Dummy ID
+                    };
+                }
+                // Disable Credentials
                 Object.defineProperty(navigator, 'credentials', {
                     value: {
                         create: () => Promise.reject(new Error('WebAuthn disabled')),
                         get: () => Promise.reject(new Error('WebAuthn disabled'))
                     }
                 });
-            });
+            }, ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : null);
+            // Grant permissions explicitly for common domains
+            await context.grantPermissions(['geolocation'], { origin: 'https://rewards.bing.com' });
+            await context.grantPermissions(['geolocation'], { origin: 'https://www.bing.com' });
+            await context.grantPermissions(['geolocation'], { origin: 'https://microsoft.com' });
             context.setDefaultTimeout(this.bot.utils.stringToNumber(this.bot.config?.globalTimeout ?? 30000));
             await context.addCookies(sessionData.cookies);
             if ((account.saveFingerprint.mobile && this.bot.isMobile) ||
@@ -93,7 +136,7 @@ class Browser {
             }
             this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Created browser with User-Agent: "${fingerprint.fingerprint.navigator.userAgent}"`);
             this.bot.logger.debug(this.bot.isMobile, 'BROWSER-FINGERPRINT', JSON.stringify(fingerprint));
-            return { context: context, fingerprint };
+            return { browser, context: context, fingerprint };
         }
         catch (error) {
             await browser.close().catch(() => { });
@@ -109,6 +152,34 @@ class Browser {
         catch {
             return `${proxy.url}:${proxy.port}`;
         }
+    }
+    async getIpLocation(proxy) {
+        // Force proxy usage for this check to get the location of the proxy IP
+        const axios = new AxiosClient({ ...proxy, proxyAxios: true });
+        try {
+            // Using ip-api.com (HTTP) because proxy might not support HTTPS easily or to avoid cert issues for this simple check
+            const response = await axios.request({
+                url: 'http://ip-api.com/json',
+                method: 'GET',
+                timeout: 10000
+            });
+            const data = response.data;
+            if (data.status === 'success') {
+                this.bot.logger.debug(this.bot.isMobile, 'BROWSER-IP-LOC', `Detected: ${data.city}, ${data.country} (${data.lat}, ${data.lon}) | Timezone: ${data.timezone}`);
+                return {
+                    lat: data.lat,
+                    lon: data.lon,
+                    timezone: data.timezone
+                };
+            }
+            else {
+                this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to get IP location: ${data.message || 'Unknown error'}`);
+            }
+        }
+        catch (error) {
+            this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to fetch IP location: ${error.message}`);
+        }
+        return null;
     }
     async generateFingerprint(isMobile) {
         const browserType = this.bot.config.browserType ?? 'chromium';

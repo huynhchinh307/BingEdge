@@ -34,6 +34,7 @@ interface ExecutionContext {
 }
 
 interface BrowserSession {
+    browser: any
     context: BrowserContext
     fingerprint: BrowserFingerprintWithHeaders
 }
@@ -594,7 +595,6 @@ export class MicrosoftRewardsBot {
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
 
         let mobileSession: BrowserSession | null = null
-        let mobileContextClosed = false
 
         try {
             return await executionContext.run({ isMobile: true, account }, async () => {
@@ -695,8 +695,6 @@ export class MicrosoftRewardsBot {
                     rank: desktopRank
                 } = await this.searchManager.doSearches(data, missingSearchPoints, (mobileSession || {}) as any, account, accountEmail)
 
-                mobileContextClosed = true
-
                 let rank = desktopRank
                 if (!rank) {
                     rank = this.browser.func.getAccountRank()
@@ -720,12 +718,29 @@ export class MicrosoftRewardsBot {
                 }
             })
         } finally {
-            if (mobileSession && !mobileContextClosed) {
+            if (mobileSession) {
                 try {
                     await executionContext.run({ isMobile: true, account }, async () => {
-                        await this.browser.func.closeBrowser(mobileSession!.context, accountEmail)
+                        const cookies = await mobileSession!.context.cookies()
+                        this.logger.debug(true, 'CLOSE-BROWSER', `Saving ${cookies.length} cookies to session folder!`)
+                        
+                        const { saveSessionData } = await import('./util/Load')
+                        await saveSessionData(this.config.sessionPath, cookies, accountEmail, true)
+                        
+                        await this.utils.wait(1000)
+
+                        // CLOSE THE BROWSER PROCESS COMPLETELY
+                        const b = mobileSession!.browser
+                        if (b) await b.close().catch(() => {})
+                        this.logger.info(true, 'CLOSE-BROWSER', 'Browser closed cleanly!')
                     })
-                } catch {}
+                } catch (e: any) {
+                    this.logger.error(true, 'CLOSE-BROWSER', `Failed to close browser: ${e.message}`)
+                    // If clean close failed, try to close browser object directly if available
+                    if (mobileSession && (mobileSession as any).browser) {
+                        try { await (mobileSession as any).browser.close() } catch {}
+                    }
+                }
             }
         }
     }

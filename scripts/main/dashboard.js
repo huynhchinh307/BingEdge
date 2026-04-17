@@ -382,14 +382,15 @@ const server = http.createServer((req, res) => {
         req.on('end', async () => {
             try {
                 const proxyInfo = JSON.parse(body);
-                const rawUrl = proxyInfo.url || '';
-                if (!rawUrl || !proxyInfo.port) {
-                    throw new Error('Missing Proxy Host or Port');
-                }
-                const protoMatch = rawUrl.match(/^(https?|socks[45])/i);
-                let proto = protoMatch ? protoMatch[1].toLowerCase() : 'http';
-                const host = rawUrl.replace(/^(https?|socks[45])?:\/\//i, '');
+                let host = (proxyInfo.url || '').replace(/^(https?|socks[45]):\/\//i, '').trim();
+                const protocolMatch = (proxyInfo.url || '').match(/^(https?|socks[45])/i);
+                let proto = protocolMatch ? protocolMatch[1].toLowerCase() : 'http';
                 
+                // Xử lý IPv6 host
+                if (host.includes(':') && !host.startsWith('[') && !host.includes('.')) {
+                    host = `[${host}]`;
+                }
+
                 let proxyUrlStr = `${proto}://`;
                 if (proxyInfo.username && proxyInfo.password) {
                     proxyUrlStr += `${encodeURIComponent(proxyInfo.username)}:${encodeURIComponent(proxyInfo.password)}@`;
@@ -405,27 +406,44 @@ const server = http.createServer((req, res) => {
                     agent = new HttpsProxyAgent(proxyUrlStr);
                 }
 
-                const response = await axios.get('http://ip-api.com/json/', {
-                    httpsAgent: agent,
-                    httpAgent: agent,
-                    timeout: 10000 
-                });
+                const checkServices = [
+                    'http://api64.ipify.org?format=json',
+                    'http://ip.nf/me.json',
+                    'http://ip-api.com/json'
+                ];
 
-                if (response.data && response.data.status === 'success') {
+                let lastError = null;
+                let response = null;
+
+                for (const url of checkServices) {
+                    try {
+                        response = await axios.get(url, {
+                            httpsAgent: agent,
+                            httpAgent: agent,
+                            timeout: 8000,
+                            headers: { 'User-Agent': 'Mozilla/5.0' }
+                        });
+                        if (response.data) break;
+                    } catch (e) {
+                        lastError = e;
+                        continue;
+                    }
+                }
+
+                if (response && response.data) {
+                    const d = response.data;
+                    const ip = d.ip?.address || d.ip || d.query;
+                    const country = d.ip?.country || d.country || d.country_name || 'Unknown';
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ 
                         success: true, 
-                        ip: response.data.query,
-                        country: response.data.country,
-                        city: response.data.city,
-                        isp: response.data.isp
+                        ip: ip,
+                        country: country,
+                        city: d.ip?.city || d.city || '',
+                        isp: d.ip?.asn || d.isp || d.org || ''
                     }));
-                } else if (response.data && response.data.query) {
-                    // Fallback if status is not success but query is there
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, ip: response.data.query }));
                 } else {
-                    throw new Error('Invalid response from IP service: ' + (response.data?.message || 'Unknown error'));
+                    throw new Error(`Tất cả dịch vụ kiểm tra IP đều thất bại qua Proxy này. Lỗi cuối: ${lastError?.message}`);
                 }
             } catch (e) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
