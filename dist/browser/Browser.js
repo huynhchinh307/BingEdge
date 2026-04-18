@@ -187,7 +187,15 @@ class Browser {
         const fingerPrintData = new FingerprintGenerator().getFingerprint({
             devices: isMobile ? ['mobile'] : ['desktop'],
             operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'macos', 'linux'],
-            browsers: [fingerprintBrowser]
+            browsers: [fingerprintBrowser],
+            ...(isMobile ? {} : {
+                screen: {
+                    minWidth: 1366,
+                    maxWidth: 1920,
+                    minHeight: 768,
+                    maxHeight: 1080
+                }
+            })
         });
         const userAgentManager = new UserAgentManager(this.bot);
         const updatedFingerPrintData = await userAgentManager.updateFingerprintUserAgent(fingerPrintData, isMobile);
