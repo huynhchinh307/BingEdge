@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
-import { getDirname, getProjectRoot, loadAccounts, log } from '../utils.js';
+import { getDirname, getProjectRoot, loadAccounts, log, safeRemoveDirectory } from '../utils.js';
 import axios from 'axios';
 import Database from 'better-sqlite3';
 
@@ -11,11 +11,79 @@ const __dirname = getDirname(import.meta.url);
 const projectRoot = getProjectRoot(__dirname);
 
 // Track active processes and their limits
-const activeProcesses = {};
+const activeProcesses = {}; // key -> pid
+const activeProxies = {};   // proxyKey -> { email, type, pid }
 const processLogs = {}; // key -> string[]
+
+/**
+ * Get proxy key for an account (consistent with src/index.ts logic)
+ */
+function getProxyKey(account) {
+    if (!account.proxy || !account.proxy.url) {
+        return 'NO_PROXY';
+    }
+    // Normalize URL by stripping scheme prefix
+    let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
+    let port = account.proxy.port;
+    
+    // If host already contains a port, extract it
+    if (host.includes(':')) {
+        const parts = host.split(':');
+        if (parts[0]) host = parts[0];
+        if (parts[1] && (!port || port === 0)) {
+            port = parseInt(parts[1]);
+        }
+    }
+    
+    return `${account.proxy.username || ''}@${host}:${port || 0}`;
+}
+
+/**
+ * Check if a proxy is already in use by another active process
+ */
+function isProxyInUse(proxyKey, excludeEmail) {
+    if (proxyKey === 'NO_PROXY') return false; // Allow multiple no-proxy accounts
+    
+    for (const [activeEmail, info] of Object.entries(activeProxies)) {
+        if (activeEmail !== excludeEmail && info.proxyKey === proxyKey) {
+            return { email: activeEmail, type: info.type, pid: info.pid };
+        }
+    }
+    return false;
+}
 
 // Persist account stats in memory only (parsed from live bot logs)
 let accountStats = {}; // email -> { total, oldBalance, newBalance, duration, completedAt }
+
+// Session path for deleting session files (matches config sessionPath: 'browser/sessions')
+const sessionPath = path.join(projectRoot, 'dist', 'browser', 'sessions');
+
+/**
+ * Delete session files for an account to force re-login
+ */
+function deleteSessionFiles(email) {
+    try {
+        const mobileSession = path.join(sessionPath, email, 'session_mobile.json');
+        const desktopSession = path.join(sessionPath, email, 'session_desktop.json');
+        let deleted = false;
+
+        if (fs.existsSync(mobileSession)) {
+            fs.unlinkSync(mobileSession);
+            log('INFO', `Dashboard: Deleted mobile session for ${email}`);
+            deleted = true;
+        }
+        if (fs.existsSync(desktopSession)) {
+            fs.unlinkSync(desktopSession);
+            log('INFO', `Dashboard: Deleted desktop session for ${email}`);
+            deleted = true;
+        }
+
+        return deleted;
+    } catch (err) {
+        log('ERROR', `Dashboard: Failed to delete session for ${email}: ${err.message}`);
+        return false;
+    }
+}
 
 /**
  * Read-write SQLite connection dùng chung cho accounts, config, account_status.
@@ -226,6 +294,16 @@ function sampleCpu() {
     lastCpuSample = currentCpus;
 }
 setInterval(sampleCpu, 1000);
+
+function isPidAlive(pid) {
+    if (!pid) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 const server = http.createServer((req, res) => {
     // CORS headers
@@ -466,6 +544,11 @@ const server = http.createServer((req, res) => {
                 if (result.changes === 0) throw new Error('Account not found');
                 // Xóa cả status
                 db.prepare('DELETE FROM account_status WHERE email = ?').run(email);
+
+                // Xóa thư mục session tương ứng
+                const targetSessionDir = path.join(sessionPath, email);
+                log('INFO', `Dashboard: Permanently deleting session directory for ${email}`);
+                safeRemoveDirectory(targetSessionDir, projectRoot);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch(e) {
@@ -706,10 +789,21 @@ const server = http.createServer((req, res) => {
             
             const cleanAccounts = accounts.map(a => {
                 const proxy = _safeParse(a.proxy, {});
-                const isActiveDesktop     = activeProcesses[`${a.email}-desktop`]      !== undefined;
-                const isActiveMobile      = activeProcesses[`${a.email}-mobile`]       !== undefined;
-                const isActiveBot         = activeProcesses[`${a.email}-bot`]          !== undefined;
-                const isActiveExtraSearch = activeProcesses[`${a.email}-extra-search`] !== undefined;
+                
+                // Helper to check if process is TRULY active
+                const checkActive = (type) => {
+                    const pid = activeProcesses[`${a.email}-${type}`];
+                    if (!pid) return false;
+                    if (isPidAlive(pid)) return true;
+                    // Auto-cleanup if dead
+                    delete activeProcesses[`${a.email}-${type}`];
+                    return false;
+                };
+
+                const isActiveDesktop     = checkActive('desktop');
+                const isActiveMobile      = checkActive('mobile');
+                const isActiveBot         = checkActive('bot');
+                const isActiveExtraSearch = checkActive('extra-search');
 
                 let host = (proxy?.url || '').replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
                 let port = proxy?.port;
@@ -749,12 +843,58 @@ const server = http.createServer((req, res) => {
                     stats,
                     points:     ds?.points ?? 0,
                     rank:       accountStats[a.email]?.rank || ds?.rank || 'N/A',
-                    lastUpdate: ds?.lastUpdate || 'Never'
+                    lastUpdate: ds?.lastUpdate || 'Never',
+                    needsRelogin: accountStats[a.email]?.needsRelogin || false,
+                    reloginAt: accountStats[a.email]?.reloginAt || null
                 };
             });
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, accounts: cleanAccounts }));
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+        return;
+    }
+
+    // API to get active proxy usage status for debugging
+    if (req.method === 'GET' && req.url === '/api/active-proxies') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            success: true,
+            activeProcesses: Object.keys(activeProcesses).length,
+            activeProxies: Object.entries(activeProxies).map(([email, info]) => ({
+                email,
+                proxyKey: info.proxyKey,
+                type: info.type,
+                pid: info.pid
+            }))
+        }));
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/clear-locks') {
+        try {
+            const lockDir = path.join(projectRoot, '.locks');
+            if (fs.existsSync(lockDir)) {
+                const files = fs.readdirSync(lockDir);
+                let count = 0;
+                for (const file of files) {
+                    if (file.endsWith('.lock')) {
+                        try {
+                            fs.unlinkSync(path.join(lockDir, file));
+                            count++;
+                        } catch (e) {}
+                    }
+                }
+                log('SUCCESS', `Dashboard: Cleared ${count} proxy locks`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: `Cleared ${count} locks` }));
+            } else {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'No locks found' }));
+            }
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: e.message }));
@@ -780,6 +920,19 @@ const server = http.createServer((req, res) => {
             try {
                 const data = JSON.parse(body);
                 const { email, type } = data; // type: 'desktop' | 'mobile' | 'bot'
+
+                // Validate email and type
+                if (!email || typeof email !== 'string') {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or missing email' }));
+                    return;
+                }
+                if (!type || typeof type !== 'string') {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or missing type' }));
+                    return;
+                }
+
                 const key = `${email}-${type}`;
 
                 if (activeProcesses[key]) {
@@ -788,8 +941,29 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                log('INFO', `Dashboard: Opening ${type} session for ${email}`);
-                if (accountStats[email]) delete accountStats[email].isProxyBusy; 
+                // Check for proxy conflicts with other active processes
+                const accountsResult = loadAccounts(projectRoot);
+                const accounts = accountsResult.data || [];
+                const account = accounts.find(a => a.email === email);
+                const proxyKey = account ? getProxyKey(account) : 'NO_PROXY';
+                
+                const proxyConflict = isProxyInUse(proxyKey, email);
+                if (proxyConflict) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ 
+                        success: false, 
+                        error: `Proxy ${proxyKey} is already in use by ${proxyConflict.email} (${proxyConflict.type})`,
+                        proxyBusy: true 
+                    }));
+                    return;
+                }
+
+                log('INFO', `Dashboard: Opening ${type} session for ${email} (proxy: ${proxyKey})`);
+                if (accountStats[email]) {
+                    delete accountStats[email].isProxyBusy;
+                    delete accountStats[email].needsRelogin;
+                    delete accountStats[email].status;
+                } 
 
                 let args;
                 if (type === 'bot') {
@@ -805,6 +979,7 @@ const server = http.createServer((req, res) => {
                 const cp = spawn('node', args, { cwd: projectRoot });
                 
                 activeProcesses[key] = cp.pid;
+                activeProxies[email] = { proxyKey, type, pid: cp.pid };
                 processLogs[key] = [];
                 let lineBuffer = '';
 
@@ -820,6 +995,28 @@ const server = http.createServer((req, res) => {
                         if (clean.includes('[PROXY-BUSY]')) {
                             if (!accountStats[email]) accountStats[email] = {};
                             accountStats[email].isProxyBusy = true;
+                        }
+                        // Detect session invalid (401/400) - needs re-login
+                        if (clean.includes('Session invalid (401)') || clean.includes('Session invalid (400)') || clean.includes('clearing session to force re-login')) {
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].needsRelogin = true;
+                            accountStats[email].status = 'needs-relogin';
+                            accountStats[email].reloginAt = new Date().toISOString();
+                            log('WARN', `Dashboard: Account ${email} needs re-login (session invalidated)`);
+                            // Delete session files to force fresh login
+                            deleteSessionFiles(email);
+                        }
+                        // Detect successful re-login → clear needsRelogin badge
+                        if (
+                            clean.includes('SESSION-RETRY') ||
+                            clean.includes('Logged into Microsoft Rewards successfully') ||
+                            clean.includes('Successfully logged in')
+                        ) {
+                            if (accountStats[email]?.needsRelogin) {
+                                delete accountStats[email].needsRelogin;
+                                delete accountStats[email].status;
+                                log('INFO', `Dashboard: Account ${email} re-login successful, clearing needsRelogin flag`);
+                            }
                         }
                     }
                 };
@@ -846,18 +1043,38 @@ const server = http.createServer((req, res) => {
                 cp.stdout.on('data', addLog);
                 cp.stderr.on('data', addLog);
 
-                cp.on('exit', () => {
+                const cleanup = (code) => {
                     // Flush any remaining buffered content
                     if (lineBuffer.trim()) processLine(lineBuffer);
                     lineBuffer = '';
-                    log('INFO', `Dashboard: Session closed for ${key}`);
-                    delete activeProcesses[key];
-                });
+                    if (activeProcesses[key]) {
+                        // Handle exit code 88 (Proxy Busy)
+                        if (code === 88) {
+                            log('WARN', `Dashboard: Session for ${key} exited with code 88 (Proxy Busy)`);
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].isProxyBusy = true;
+                            accountStats[email].status = 'proxy-busy';
+                        } else if (code !== 0 && code !== null) {
+                            log('ERROR', `Dashboard: Session for ${key} exited with error code ${code}`);
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].status = 'error';
+                            accountStats[email].exitCode = code;
+                        } else {
+                            log('INFO', `Dashboard: Session closed for ${key}`);
+                        }
+                        delete activeProcesses[key];
+                        delete activeProxies[email];
+                    }
+                };
+
+                cp.on('exit', cleanup);
+                cp.on('close', cleanup);
 
 
                 cp.on('error', (err) => {
                     log('ERROR', `Dashboard: Error in ${key}: ${err.message}`);
                     delete activeProcesses[key];
+                    delete activeProxies[email];
                 });
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -881,10 +1098,15 @@ const server = http.createServer((req, res) => {
 
                 const pid = activeProcesses[key];
                 if (pid) {
-                    process.kill(pid);
+                    try {
+                        process.kill(pid);
+                    } catch (e) {
+                        log('WARN', `Dashboard: Could not kill process ${pid} for ${key}: ${e.message}`);
+                    }
                     delete activeProcesses[key];
+                    delete activeProxies[email];
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, message: 'Process stopped' }));
+                    res.end(JSON.stringify({ success: true, message: 'Process stopped and cleaned up' }));
                 } else {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: false, error: 'Process not found or already closed' }));

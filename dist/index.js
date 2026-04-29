@@ -5,6 +5,7 @@ import cluster from 'cluster';
 import pkg from '../package.json' with { type: 'json' };
 import Browser from './browser/Browser.js';
 import BrowserFunc from './browser/BrowserFunc.js';
+import { SessionInvalidError } from './browser/BrowserFunc.js';
 import BrowserUtils from './browser/BrowserUtils.js';
 import { Logger } from './logging/Logger.js';
 import Utils from './util/Utils.js';
@@ -40,6 +41,7 @@ export class MicrosoftRewardsBot {
     rewardsVersion = 'legacy';
     accessToken = '';
     requestToken = '';
+    email = '';
     cookies;
     fingerprint;
     pointsCanCollect = 0;
@@ -103,11 +105,17 @@ export class MicrosoftRewardsBot {
         if (cluster.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
             const ok = await this.testGeminiConnection();
             if (!ok) {
-                this.logger.error('main', 'GEMINI-INIT', 'Gemini AI connection test failed. Bot will not start to prevent invalid searches.');
-                await flushAllWebhooks();
-                process.exit(1);
+                this.logger.warn('main', 'GEMINI-INIT', 'Gemini AI connection test failed. Removing gemini from query engines and using default engines instead.');
+                // Remove gemini from query engines and fallback to defaults
+                this.config.searchSettings.queryEngines = this.config.searchSettings.queryEngines.filter(e => e !== 'gemini');
+                // Add default engines if no engines left
+                if (this.config.searchSettings.queryEngines.length === 0) {
+                    this.config.searchSettings.queryEngines = ['google', 'wikipedia', 'reddit', 'local'];
+                }
             }
-            this.logger.info('main', 'GEMINI-INIT', 'Gemini AI connection verified successfully.');
+            else {
+                this.logger.info('main', 'GEMINI-INIT', 'Gemini AI connection verified successfully.');
+            }
         }
         if (this.config.clusters > 1) {
             if (cluster.isPrimary) {
@@ -191,54 +199,89 @@ export class MicrosoftRewardsBot {
             targetWorker.push(...group);
         }
         const accountChunks = workerChunks.filter(c => c && c.length > 0);
-        this.activeWorkers = accountChunks.length;
+        const expectedWorkers = accountChunks.length;
+        let spawnedWorkers = 0;
+        this.activeWorkers = 0; // Will be set to actual spawned count
+        this.exitedWorkers = [];
         const allAccountStats = [];
+        this.logger.info('main', 'CLUSTER-PRIMARY', `Spawning ${expectedWorkers} workers for ${accountChunks.reduce((sum, c) => sum + c.length, 0)} accounts...`);
         for (const chunk of accountChunks) {
-            const worker = cluster.fork();
-            worker.send?.({ chunk, runStartTime });
-            worker.on('message', (msg) => {
-                if (msg.__stats) {
-                    allAccountStats.push(...msg.__stats);
-                    // Update master account list with new points
-                    msg.__stats.forEach(s => {
-                        const acc = this.accounts.find(a => a.email.toLowerCase() === s.email.toLowerCase());
-                        if (acc) {
-                            acc.points = s.finalPoints;
-                            acc.initialPoints = s.initialPoints;
-                            acc.collectedPoints = s.collectedPoints;
-                            acc.duration = s.duration;
-                            acc.rank = s.rank;
-                            acc.lastUpdate = new Date().toISOString();
+            try {
+                const worker = cluster.fork();
+                spawnedWorkers++;
+                worker.on('error', (err) => {
+                    this.logger.error('main', 'CLUSTER-WORKER-ERROR', `Worker failed to spawn: ${err.message}`);
+                    // If worker fails immediately, we need to adjust counts
+                    if (!this.exitedWorkers.includes(worker.process?.pid || 0)) {
+                        // This shouldn't happen if fork() succeeded, but handle just in case
+                    }
+                });
+                worker.on('exit', (code, signal) => {
+                    if (code !== 0 && code !== null) {
+                        this.logger.error('main', 'CLUSTER-WORKER-EXIT', `Worker ${worker.process?.pid} exited with code ${code}, signal: ${signal}`);
+                    }
+                });
+                // Wait a bit for worker to be ready, then send message
+                worker.on('online', () => {
+                    this.logger.info('main', 'CLUSTER-WORKER-ONLINE', `Worker ${worker.process?.pid} is online`);
+                    worker.send?.({ chunk, runStartTime });
+                });
+                worker.on('message', (msg) => {
+                    if (msg.__stats) {
+                        allAccountStats.push(...msg.__stats);
+                        // Update master account list with new points
+                        msg.__stats.forEach(s => {
+                            const acc = this.accounts.find(a => a.email.toLowerCase() === s.email.toLowerCase());
+                            if (acc) {
+                                acc.points = s.finalPoints;
+                                acc.initialPoints = s.initialPoints;
+                                acc.collectedPoints = s.collectedPoints;
+                                acc.duration = s.duration;
+                                acc.rank = s.rank;
+                                acc.lastUpdate = new Date().toISOString();
+                            }
+                        });
+                        // Periodically save
+                        saveAccounts(this.accounts);
+                    }
+                    const log = msg.__ipcLog;
+                    if (log && typeof log.content === 'string') {
+                        const config = this.config;
+                        const webhook = config.webhook;
+                        const content = log.content;
+                        const level = log.level;
+                        if (webhook.discord?.enabled && webhook.discord.url) {
+                            sendDiscord(webhook.discord.url, content, level);
                         }
-                    });
-                    // Periodically save
-                    saveAccounts(this.accounts);
-                }
-                const log = msg.__ipcLog;
-                if (log && typeof log.content === 'string') {
-                    const config = this.config;
-                    const webhook = config.webhook;
-                    const content = log.content;
-                    const level = log.level;
-                    if (webhook.discord?.enabled && webhook.discord.url) {
-                        sendDiscord(webhook.discord.url, content, level);
+                        if (webhook.ntfy?.enabled && webhook.ntfy.url) {
+                            sendNtfy(webhook.ntfy, content, level);
+                        }
                     }
-                    if (webhook.ntfy?.enabled && webhook.ntfy.url) {
-                        sendNtfy(webhook.ntfy, content, level);
-                    }
-                }
-            });
+                });
+            }
+            catch (err) {
+                this.logger.error('main', 'CLUSTER-WORKER-SPAWN-FAILED', `Failed to spawn worker for chunk with ${chunk.length} accounts: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }
+        // Update activeWorkers to actual spawned count
+        this.activeWorkers = spawnedWorkers;
+        this.logger.info('main', 'CLUSTER-PRIMARY', `Successfully spawned ${spawnedWorkers}/${expectedWorkers} workers`);
+        // Safety check: if no workers spawned, exit immediately
+        if (spawnedWorkers === 0) {
+            this.logger.error('main', 'CLUSTER-PRIMARY', 'No workers could be spawned. Exiting.');
+            process.exit(1);
         }
         const onWorkerDone = async (label, worker, code) => {
             const { pid } = worker.process;
-            this.activeWorkers -= 1;
+            // Check if already exited BEFORE decrementing to prevent double-counting
+            // (both 'exit' and 'disconnect' can fire for the same worker)
             if (!pid || this.exitedWorkers.includes(pid)) {
+                this.logger.debug(false, 'CLUSTER-WORKER', `Worker ${pid} already counted as exited, ignoring ${label} event`);
                 return;
             }
-            else {
-                this.exitedWorkers.push(pid);
-            }
-            this.logger.warn('main', `CLUSTER-WORKER-${label.toUpperCase()}`, `Worker ${worker.process?.pid ?? '?'} ${label} | Code: ${code ?? 'n/a'} | Active workers: ${this.activeWorkers}`);
+            this.exitedWorkers.push(pid);
+            this.activeWorkers -= 1;
+            this.logger.warn('main', `CLUSTER-WORKER-${label.toUpperCase()}`, `Worker ${worker.process?.pid ?? '?'} ${label} | Code: ${code ?? 'n/a'} | Active workers: ${this.activeWorkers}/${accountChunks.length}`);
             if (this.activeWorkers <= 0) {
                 const totalCollectedPoints = allAccountStats.reduce((sum, s) => sum + s.collectedPoints, 0);
                 const totalInitialPoints = allAccountStats.reduce((sum, s) => sum + s.initialPoints, 0);
@@ -280,9 +323,14 @@ export class MicrosoftRewardsBot {
         while (queue.length > 0) {
             const account = queue.shift();
             const proxyKey = this.getProxyKey(account);
-            // Try to acquire global lock for this proxy
+            // Try to acquire global lock for this proxy (with built-in retry)
             if (await this.acquireProxyLock(proxyKey)) {
+                let heartbeatInterval = null;
                 try {
+                    // Start heartbeat to keep lock fresh during long operations
+                    heartbeatInterval = setInterval(() => {
+                        this.heartbeatLock(proxyKey);
+                    }, 30000); // Every 30 seconds
                     const accountStartTime = Date.now();
                     const accountEmail = account.email;
                     this.userData.userName = this.utils.getEmailUsername(accountEmail);
@@ -296,10 +344,30 @@ export class MicrosoftRewardsBot {
                         });
                     }
                     else {
-                        result = await this.Main(account).catch(error => {
+                        const runWithSessionRetry = async () => {
+                            try {
+                                return await this.Main(account);
+                            }
+                            catch (error) {
+                                if (error instanceof SessionInvalidError) {
+                                    this.logger.warn(true, 'FLOW', `[SESSION-RETRY] Session was cleared for ${accountEmail} (${error.message}). Auto-retrying with fresh login...`);
+                                    // Wait a moment for browser cleanup before retry
+                                    await this.utils.wait(3000);
+                                    // Retry once — session is cleared so Login will run fresh
+                                    return await this.Main(account);
+                                }
+                                throw error;
+                            }
+                        };
+                        result = await runWithSessionRetry().catch(error => {
                             void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
                             return undefined;
                         });
+                    }
+                    // Stop heartbeat
+                    if (heartbeatInterval) {
+                        clearInterval(heartbeatInterval);
+                        heartbeatInterval = null;
                     }
                     const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1);
                     if (result) {
@@ -346,32 +414,24 @@ export class MicrosoftRewardsBot {
                     }
                 }
                 finally {
+                    // Stop heartbeat if still running
+                    if (heartbeatInterval) {
+                        clearInterval(heartbeatInterval);
+                    }
                     this.releaseProxyLock(proxyKey);
                 }
             }
             else {
-                // Proxy is busy (another process is using it)
-                if (queue.length > 0) {
-                    // Put back to try other accounts in this worker's queue first
-                    queue.push(account);
-                    this.logger.info(false, 'MAIN', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Moving to next account in queue...`);
-                    await this.utils.wait(3000);
+                // Failed to acquire lock after all retries
+                if (accounts.length === 1) {
+                    this.logger.warn(false, 'MAIN', `[PROXY-BUSY] Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Exiting to allow dashboard to switch accounts...`);
+                    // Exit with 88 to signal Proxy Busy
+                    process.exit(88);
                 }
                 else {
-                    // One of these might be true:
-                    // 1. This is a single account run from Dashboard (accounts.length === 1)
-                    // 2. This is the last account in a worker's chunk
-                    if (accounts.length === 1) {
-                        this.logger.warn(false, 'MAIN', `[PROXY-BUSY] Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Exiting to allow dashboard to switch accounts...`);
-                        // Exit with 88 to signal Proxy Busy
-                        process.exit(88);
-                    }
-                    else {
-                        // For multi-account clumps, we just wait a bit and retry
-                        this.logger.warn(false, 'MAIN', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Waiting...`);
-                        await this.utils.wait(10000);
-                        queue.unshift(account); // Try again later
-                    }
+                    // For multi-account clumps, put back to queue and continue with others
+                    this.logger.warn(false, 'MAIN', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use. Re-queueing account...`);
+                    queue.push(account); // Try again later
                 }
             }
         }
@@ -403,7 +463,12 @@ export class MicrosoftRewardsBot {
         }
         return `${account.proxy.username || ''}@${host}:${port || 0}`;
     }
-    async acquireProxyLock(proxyKey) {
+    async acquireProxyLock(proxyKey, maxRetries = 30, baseDelayMs = 1000) {
+        // Defensive validation
+        if (!proxyKey || typeof proxyKey !== 'string') {
+            this.logger.error(false, 'PROXY-LOCK', `Invalid proxyKey: ${proxyKey}`);
+            return false;
+        }
         const lockDir = path.join(process.cwd(), '.locks');
         try {
             if (!fs.existsSync(lockDir)) {
@@ -413,57 +478,215 @@ export class MicrosoftRewardsBot {
         catch (e) { }
         const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
         const lockPath = path.join(lockDir, `${safeKey}.lock`);
-        try {
-            // Try to create the lock file atomically
-            fs.writeFileSync(lockPath, process.pid.toString(), { flag: 'wx' });
-            return true;
-        }
-        catch (err) {
-            if (err.code === 'EEXIST') {
-                try {
-                    const content = fs.readFileSync(lockPath, 'utf8').trim();
-                    if (!content) {
-                        fs.unlinkSync(lockPath);
-                        return false;
+        const STALE_LOCK_MS = 5 * 60 * 1000; // 5 minutes
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // Try to create the lock file atomically with timestamp and PID
+                const lockContent = JSON.stringify({
+                    pid: process.pid,
+                    timestamp: Date.now()
+                });
+                fs.writeFileSync(lockPath, lockContent, { flag: 'wx' });
+                // Lock acquired successfully
+                this.logger.debug(false, 'PROXY-LOCK', `Acquired lock for ${proxyKey} (attempt ${attempt + 1})`);
+                return true;
+            }
+            catch (err) {
+                if (err.code === 'EEXIST') {
+                    // Lock exists - check if stale or owned by us
+                    const shouldRetry = await this.handleExistingLock(lockPath, proxyKey, STALE_LOCK_MS);
+                    if (!shouldRetry) {
+                        return false; // Lock is valid and owned by another process
                     }
-                    const pid = parseInt(content);
-                    if (isNaN(pid)) {
-                        fs.unlinkSync(lockPath);
-                        return false;
-                    }
-                    // Check if process is alive
-                    try {
-                        process.kill(pid, 0);
-                        return pid === process.pid;
-                    }
-                    catch (e) {
-                        // Dead process
-                        fs.unlinkSync(lockPath);
-                        return false;
+                    // Lock was stale and removed, retry immediately on next iteration
+                    if (attempt < maxRetries - 1) {
+                        const delay = Math.min(baseDelayMs * Math.pow(1.5, attempt), 30000); // Exponential backoff, max 30s
+                        this.logger.debug(false, 'PROXY-LOCK', `Waiting ${Math.round(delay / 1000)}s before retry ${attempt + 2}/${maxRetries} for ${proxyKey}`);
+                        await this.utils.wait(delay);
                     }
                 }
-                catch (e) {
+                else {
+                    // Other error (permission, disk full, etc.)
+                    this.logger.error(false, 'PROXY-LOCK', `Failed to acquire lock for ${proxyKey}: ${err.message}`);
                     return false;
                 }
             }
+        }
+        this.logger.warn(false, 'PROXY-LOCK', `Failed to acquire lock for ${proxyKey} after ${maxRetries} attempts`);
+        return false;
+    }
+    async handleExistingLock(lockPath, proxyKey, staleMs) {
+        try {
+            const content = fs.readFileSync(lockPath, 'utf8').trim();
+            if (!content) {
+                // Empty lock file - try to remove it atomically
+                try {
+                    fs.unlinkSync(lockPath);
+                    this.logger.debug(false, 'PROXY-LOCK', `Removed empty lock for ${proxyKey}, will retry`);
+                    return true; // Retry immediately
+                }
+                catch (e) {
+                    if (e.code === 'ENOENT') {
+                        return true; // Someone else removed it, retry
+                    }
+                    return false;
+                }
+            }
+            let lockData;
+            try {
+                lockData = JSON.parse(content);
+            }
+            catch {
+                // Invalid JSON - try to parse as plain PID (legacy format)
+                const pid = parseInt(content);
+                if (!isNaN(pid)) {
+                    lockData = { pid, timestamp: Date.now() }; // Assume recent if legacy format
+                }
+                else {
+                    // Completely invalid - remove it
+                    try {
+                        fs.unlinkSync(lockPath);
+                        this.logger.debug(false, 'PROXY-LOCK', `Removed invalid lock for ${proxyKey}, will retry`);
+                        return true;
+                    }
+                    catch (e) {
+                        return e.code === 'ENOENT';
+                    }
+                }
+            }
+            const { pid, timestamp } = lockData;
+            // Check if we already own this lock
+            if (pid === process.pid) {
+                // Update timestamp to prevent staleness
+                try {
+                    const updated = JSON.stringify({ pid: process.pid, timestamp: Date.now() });
+                    fs.writeFileSync(lockPath, updated);
+                }
+                catch (e) {
+                    // Non-critical, just log
+                    this.logger.debug(false, 'PROXY-LOCK', `Could not update lock timestamp for ${proxyKey}`);
+                }
+                return false; // Already have lock, don't retry
+            }
+            // Check if lock is stale (too old)
+            const isStale = timestamp ? (Date.now() - timestamp) > staleMs : false;
+            if (isStale) {
+                // Try to remove stale lock atomically
+                try {
+                    // Read again to make sure it hasn't changed (race condition check)
+                    const currentContent = fs.readFileSync(lockPath, 'utf8').trim();
+                    if (currentContent !== content) {
+                        // Lock was modified by someone else, retry
+                        return true;
+                    }
+                    fs.unlinkSync(lockPath);
+                    this.logger.info(false, 'PROXY-LOCK', `Removed stale lock for ${proxyKey} (PID ${pid}, ${Math.round((Date.now() - timestamp) / 1000 / 60)}min old)`);
+                    return true; // Retry immediately
+                }
+                catch (e) {
+                    if (e.code === 'ENOENT') {
+                        return true; // Someone else removed it, retry
+                    }
+                    return false;
+                }
+            }
+            // Lock is valid and not stale - check if process is alive
+            try {
+                process.kill(pid, 0);
+                // Process is alive, lock is valid
+                return true; // Tell caller to retry later
+            }
+            catch (e) {
+                // Process is dead but lock is not old enough to be "stale"
+                // This is edge case - be conservative and retry
+                try {
+                    fs.unlinkSync(lockPath);
+                    this.logger.warn(false, 'PROXY-LOCK', `Removed dead process lock for ${proxyKey} (PID ${pid})`);
+                    return true;
+                }
+                catch (e) {
+                    return e.code === 'ENOENT';
+                }
+            }
+        }
+        catch (e) {
+            this.logger.error(false, 'PROXY-LOCK', `Error checking lock for ${proxyKey}: ${e.message}`);
             return false;
         }
     }
     releaseProxyLock(proxyKey) {
+        // Defensive validation
+        if (!proxyKey || typeof proxyKey !== 'string') {
+            this.logger.error(false, 'PROXY-LOCK', `Invalid proxyKey in release: ${proxyKey}`);
+            return;
+        }
         try {
             const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
             const lockPath = path.join(process.cwd(), '.locks', `${safeKey}.lock`);
             if (fs.existsSync(lockPath)) {
-                const pid = parseInt(fs.readFileSync(lockPath, 'utf8').trim());
+                let content;
+                try {
+                    content = fs.readFileSync(lockPath, 'utf8').trim();
+                }
+                catch (e) {
+                    if (e.code === 'ENOENT')
+                        return; // Already gone
+                    throw e;
+                }
+                let pid;
+                try {
+                    const data = JSON.parse(content);
+                    pid = data.pid;
+                }
+                catch {
+                    // Legacy format
+                    pid = parseInt(content);
+                }
                 if (pid === process.pid) {
                     fs.unlinkSync(lockPath);
+                    this.logger.debug(false, 'PROXY-LOCK', `Released lock for ${proxyKey}`);
+                }
+                else {
+                    this.logger.warn(false, 'PROXY-LOCK', `Cannot release lock for ${proxyKey} - owned by PID ${pid}, not ${process.pid}`);
                 }
             }
         }
-        catch (e) { }
+        catch (e) {
+            this.logger.error(false, 'PROXY-LOCK', `Error releasing lock for proxy ${proxyKey}: ${e.message}`);
+        }
+    }
+    heartbeatLock(proxyKey) {
+        // Defensive validation
+        if (!proxyKey || typeof proxyKey !== 'string') {
+            return;
+        }
+        // Periodically refresh lock timestamp to prevent it from going stale
+        // This is called from the main processing loop
+        try {
+            const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_');
+            const lockPath = path.join(process.cwd(), '.locks', `${safeKey}.lock`);
+            if (fs.existsSync(lockPath)) {
+                const content = fs.readFileSync(lockPath, 'utf8').trim();
+                let data;
+                try {
+                    data = JSON.parse(content);
+                }
+                catch {
+                    return; // Legacy format, don't update
+                }
+                if (data.pid === process.pid) {
+                    data.timestamp = Date.now();
+                    fs.writeFileSync(lockPath, JSON.stringify(data));
+                }
+            }
+        }
+        catch (e) {
+            // Non-critical, ignore
+        }
     }
     async Main(account) {
         const accountEmail = account.email;
+        this.email = accountEmail;
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`);
         let mobileSession = null;
         try {
@@ -583,6 +806,7 @@ export class MicrosoftRewardsBot {
     }
     async MainSearchMore(account) {
         const accountEmail = account.email;
+        this.email = accountEmail;
         this.logger.info('main', 'FLOW-SEARCH-MORE', `Starting SearchMore session for ${accountEmail}`);
         try {
             return await executionContext.run({ isMobile: false, account }, async () => {

@@ -459,3 +459,96 @@ export function safeRemoveDirectory(dirPath, projectRoot) {
         return false
     }
 }
+
+export function getProxyKey(account) {
+    if (!account || !account.proxy) {
+        return 'NO_PROXY'
+    }
+    const p = account.proxy
+    const rawUrl = p.url || p.server
+    if (!rawUrl) {
+        return 'NO_PROXY'
+    }
+
+    let host = rawUrl.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim()
+    let port = p.port
+    if (host.includes(':')) {
+        const parts = host.split(':')
+        if (parts[0]) host = parts[0]
+        if (parts[1] && (!port || port === 0)) {
+            const pVal = parseInt(parts[1])
+            if (!isNaN(pVal)) port = pVal
+        }
+    }
+    return `${p.username || ''}@${host}:${port || 0}`
+}
+
+export async function acquireProxyLock(proxyKey, projectRoot) {
+    const lockDir = path.join(projectRoot || process.cwd(), '.locks')
+    if (!fs.existsSync(lockDir)) {
+        try { fs.mkdirSync(lockDir, { recursive: true }) } catch (e) { }
+    }
+    const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_')
+    const lockPath = path.join(lockDir, `${safeKey}.lock`)
+
+    const tryWrite = () => {
+        try {
+            fs.writeFileSync(lockPath, process.pid.toString(), { flag: 'wx' })
+            return true
+        } catch (err) {
+            if (err.code === 'EEXIST') {
+                try {
+                    const content = fs.readFileSync(lockPath, 'utf8').trim()
+                    if (!content) { 
+                        try { fs.unlinkSync(lockPath) } catch(e){}
+                        return "RETRY"
+                    }
+                    const pid = parseInt(content)
+                    if (isNaN(pid)) { 
+                        try { fs.unlinkSync(lockPath) } catch(e){}
+                        return "RETRY"
+                    }
+                    try {
+                        process.kill(pid, 0)
+                        if (pid === process.pid) return true
+                        return false // Truly alive
+                    } catch (e) {
+                        // PID dead
+                        try { fs.unlinkSync(lockPath) } catch(e){}
+                        return "RETRY"
+                    }
+                } catch (e) { return false }
+            }
+            return false
+        }
+    }
+
+    let result = tryWrite()
+    if (result === "RETRY") {
+        result = tryWrite()
+    }
+
+    if (result === true) return { success: true }
+    
+    // If we failed, try to get the PID of the holder
+    try {
+        const content = fs.readFileSync(lockPath, 'utf8').trim()
+        const pid = parseInt(content)
+        return { success: false, pid: isNaN(pid) ? undefined : pid }
+    } catch (e) {
+        return { success: false }
+    }
+}
+
+export function releaseProxyLock(proxyKey, projectRoot) {
+    try {
+        const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_')
+        const lockPath = path.join(projectRoot || process.cwd(), '.locks', `${safeKey}.lock`)
+        if (fs.existsSync(lockPath)) {
+            const content = fs.readFileSync(lockPath, 'utf8').trim()
+            if (parseInt(content) === process.pid) {
+                try { fs.unlinkSync(lockPath) } catch(e){}
+            }
+        }
+    } catch (e) { }
+}

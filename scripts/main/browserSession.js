@@ -16,7 +16,11 @@ import {
     loadCookies,
     loadFingerprint,
     buildProxyConfig,
-    setupCleanupHandlers
+    setupCleanupHandlers,
+    getProjectRoot as getRoot,
+    getProxyKey,
+    acquireProxyLock,
+    releaseProxyLock
 } from '../utils.js'
 
 const __dirname = getDirname(import.meta.url)
@@ -101,6 +105,14 @@ async function getIpLocation(proxyConfig) {
 }
 
 async function main() {
+    const proxyKey = getProxyKey(account)
+    const lock = await acquireProxyLock(proxyKey, projectRoot)
+    if (!lock.success) {
+        log('ERROR', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use by another session (PID: ${lock.pid || 'Unknown'}).`)
+        log('ERROR', '[PROXY-BUSY] Please close the other session or use the "Clear Locks" button on the Dashboard.')
+        process.exit(88)
+    }
+
     const runtimeBase = getRuntimeBase(projectRoot, args.dev)
     const sessionBase = getSessionPath(runtimeBase, config.sessionPath, args.email)
 
@@ -348,19 +360,24 @@ async function main() {
     }
 
     page.on('close', async () => {
-        await saveCookies()
-        log('INFO', 'Browser page closed. Exiting process...')
+        log('INFO', 'Browser page closed. Cleaning up...')
+        await saveCookies(sessionBase, await context.cookies(), sessionType)
+        releaseProxyLock(proxyKey, projectRoot)
+        log('INFO', 'Exiting process...')
         process.exit(0)
     })
 
     browser.on('disconnected', async () => {
-        await saveCookies()
-        log('INFO', 'Browser disconnected. Exiting process...')
+        log('INFO', 'Browser disconnected. Cleaning up...')
+        await saveCookies(sessionBase, await context.cookies(), sessionType)
+        releaseProxyLock(proxyKey, projectRoot)
+        log('INFO', 'Exiting process...')
         process.exit(0)
     })
 
     setupCleanupHandlers(async () => {
-        await saveCookies()
+        await saveCookies(sessionBase, await context.cookies(), sessionType)
+        releaseProxyLock(proxyKey, projectRoot)
         if (browser?.isConnected?.()) {
             await browser.close()
         }

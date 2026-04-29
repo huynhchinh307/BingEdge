@@ -10,16 +10,40 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f111a;
+            --bg-dark: #0a0c14;
+            --bg-app: #0a0c14;
             --bg-card: rgba(30, 33, 43, 0.6);
+            --bg-sidebar: rgba(20, 22, 30, 0.85);
+            --bg-elevated: rgba(30, 33, 43, 0.6);
+            --bg-input: rgba(0, 0, 0, 0.25);
             --primary: #6366f1;
             --primary-hover: #4f46e5;
             --accent: #ec4899;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --border-color: rgba(255, 255, 255, 0.08);
+            --border-subtle: rgba(255, 255, 255, 0.06);
             --success: #10b981;
             --danger: #ef4444;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        :root[data-theme="light"] {
+            --bg-dark: #f3f5fb;
+            --bg-app: #eef0f7;
+            --bg-card: rgba(255, 255, 255, 0.78);
+            --bg-sidebar: rgba(255, 255, 255, 0.92);
+            --bg-elevated: rgba(255, 255, 255, 0.7);
+            --bg-input: rgba(255, 255, 255, 0.85);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: rgba(15, 23, 42, 0.08);
+            --border-subtle: rgba(15, 23, 42, 0.06);
+            --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+            --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.08);
+            --shadow-lg: 0 25px 50px -12px rgba(15, 23, 42, 0.15);
         }
 
         * {
@@ -30,7 +54,7 @@
         }
 
         body {
-            background-color: var(--bg-dark);
+            background-color: var(--bg-app);
             background-image:
                 radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
                 radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
@@ -38,33 +62,250 @@
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1rem 1.5rem;
+            flex-direction: row;
+            align-items: stretch;
+            padding: 0;
             overflow-x: hidden;
             user-select: text !important;
             -webkit-user-select: text !important;
             -moz-user-select: text !important;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        .header {
+        :root[data-theme="light"] body {
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.10) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.10) 0px, transparent 50%);
+        }
+
+        /* App Shell layout */
+        .app-shell {
+            display: flex;
             width: 100%;
-            max-width: 1600px;
-            margin: 0 auto 3rem auto;
-            animation: fadeInDown 0.8s ease;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            background: var(--bg-sidebar);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-subtle);
+            padding: 1.25rem 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            z-index: 50;
+            animation: fadeInLeft 0.5s ease;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0.4rem 0.6rem 1rem 0.6rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #6366f1, #ec4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.15;
+        }
+
+        .brand-subtitle {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 0.15rem;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            flex: 1;
+        }
+
+        .nav-section-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            font-weight: 700;
+            padding: 0.75rem 0.75rem 0.25rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0.6rem 0.75rem;
+            border-radius: 10px;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid transparent;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .nav-item:hover {
+            background: rgba(99, 102, 241, 0.08);
+            color: var(--text-main);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(236, 72, 153, 0.10));
+            color: var(--text-main);
+            border-color: rgba(99, 102, 241, 0.28);
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--success);
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 0.08rem 0.45rem;
+            border-radius: 999px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .sidebar-footer {
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-main);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(99, 102, 241, 0.12);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .theme-toggle svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            padding: 1.5rem 2rem 4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .topbar {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-end;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            animation: fadeInDown 0.6s ease;
         }
 
-        .header h1 {
-            font-size: 3rem;
+        .topbar h1 {
+            font-size: 2.1rem;
             font-weight: 700;
             background: linear-gradient(to right, #818cf8, #f472b6);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
+            line-height: 1.1;
+        }
+
+        .topbar p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        @keyframes fadeInLeft {
+            from { opacity: 0; transform: translateX(-15px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (max-width: 960px) {
+            .sidebar { width: 64px; padding: 0.75rem 0.5rem; }
+            .sidebar-brand > div:last-child,
+            .nav-item span:not(.nav-badge),
+            .theme-toggle span,
+            .nav-section-label { display: none; }
+            .nav-item { justify-content: center; padding: 0.65rem; }
+            .theme-toggle { justify-content: center; padding: 0.65rem; }
+            .main-content { padding: 1rem; }
+        }
+
+        @media (max-width: 720px) {
+            .topbar { flex-direction: column; align-items: flex-start; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        /* Legacy header (kept for fallback if used elsewhere) */
+        .header {
+            display: none;
         }
 
         /* Config form styles */
@@ -192,16 +433,14 @@
 
         .dashboard-container {
             width: 100%;
-            max-width: 1600px;
         }
 
         .stats-bar {
             width: 100%;
-            max-width: 1600px;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
-            margin: 0 auto 1.5rem auto;
+            margin: 0 0 0.5rem 0;
         }
 
         .stat-card {
@@ -253,79 +492,6 @@
             grid-template-columns: minmax(0, 1fr);
             gap: 1.5rem;
             align-items: start;
-        }
-
-        /* Log Drawer */
-        .log-drawer {
-            position: fixed;
-            top: 0;
-            right: -580px;
-            width: 560px;
-            height: 100vh;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-card);
-            border-left: 1px solid var(--border-color);
-            box-shadow: -20px 0 60px rgba(0, 0, 0, 0.6);
-            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 1.5rem;
-            gap: 0;
-        }
-
-        .log-drawer.open {
-            right: 0;
-        }
-
-        .log-drawer-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 999;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(2px);
-        }
-
-        .log-drawer-overlay.open {
-            display: block;
-        }
-
-        /* Floating toggle button */
-        .log-fab {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            z-index: 998;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.7rem 1.1rem;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            border: none;
-            border-radius: 50px;
-            color: #fff;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
-            transition: transform 0.2s, box-shadow 0.2s;
-            letter-spacing: 0.01em;
-        }
-
-        .log-fab:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(99, 102, 241, 0.6);
-        }
-
-        .log-fab-badge {
-            background: #10b981;
-            border-radius: 50px;
-            padding: 0.1rem 0.45rem;
-            font-size: 0.75rem;
-            font-weight: 700;
-            min-width: 20px;
-            text-align: center;
-            display: none;
         }
 
         .glass-panel {
@@ -429,6 +595,11 @@
         .status-badge.queued {
             background: rgba(245, 158, 11, 0.12);
             color: #f59e0b;
+        }
+
+        .status-badge.proxy-busy {
+            background: rgba(239, 68, 68, 0.12);
+            color: #ef4444;
         }
 
         /* Rank Badge Styles */
@@ -753,50 +924,6 @@
             color: var(--text-muted);
         }
 
-        .terminal-panel {
-            margin-top: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            flex: 1;
-            min-height: 0;
-        }
-
-        .terminal-header {
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .terminal-header h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #fff;
-        }
-
-        .terminal-content {
-            flex: 1;
-            padding: 1rem 1.5rem;
-            background: #050510;
-            color: #10b981;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.9rem;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            border-radius: 12px;
-            line-height: 1.4;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.5);
-            user-select: text !important;
-        }
-
-        .system-ansi-color {
-            color: #f472b6;
-        }
-
         /* Forms and Modals */
         .form-input {
             width: 100%;
@@ -883,46 +1010,173 @@
         .close-btn:hover {
             color: var(--danger);
         }
+        .collapse-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .group-row:hover {
+            background: rgba(99, 102, 241, 0.08) !important;
+        }
+
+        /* Stat cards polish */
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: linear-gradient(to bottom, var(--primary), var(--accent));
+            opacity: 0.7;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(99, 102, 241, 0.28);
+        }
+
+        .glass-panel {
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Light theme tweaks */
+        :root[data-theme="light"] .stat-card,
+        :root[data-theme="light"] .glass-panel,
+        :root[data-theme="light"] .toolbar {
+            background: rgba(255, 255, 255, 0.85);
+        }
+        :root[data-theme="light"] .modal {
+            background: #ffffff;
+        }
+        :root[data-theme="light"] .form-input,
+        :root[data-theme="light"] .browser-type-btn {
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text-main);
+        }
+        :root[data-theme="light"] .form-input::placeholder { color: rgba(15,23,42,0.4); }
+        :root[data-theme="light"] .accounts-table tbody tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+        :root[data-theme="light"] .slider {
+            background: rgba(15, 23, 42, 0.18);
+        }
+        :root[data-theme="light"] .btn {
+            background: rgba(15, 23, 42, 0.04);
+            color: var(--text-main);
+        }
+        :root[data-theme="light"] .btn:hover {
+            background: rgba(15, 23, 42, 0.08);
+        }
+        :root[data-theme="light"] .stat-bar-track {
+            background: rgba(15, 23, 42, 0.08);
+        }
+        :root[data-theme="light"] .toast {
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-main);
+        }
+        :root[data-theme="light"] .sidebar {
+            background: rgba(255, 255, 255, 0.92);
+        }
+        :root[data-theme="light"] .nav-item:hover {
+            background: rgba(99, 102, 241, 0.08);
+        }
+        :root[data-theme="light"] .theme-toggle {
+            background: rgba(15, 23, 42, 0.04);
+        }
+        :root[data-theme="light"] .modal-overlay {
+            background: rgba(15, 23, 42, 0.45);
+        }
+        :root[data-theme="light"] .accounts-table th {
+            color: var(--text-muted);
+        }
+        :root[data-theme="light"] input[type="number"]#threadCount {
+            background: rgba(15, 23, 42, 0.05) !important;
+            color: var(--text-main) !important;
+        }
+        :root[data-theme="light"] .toolbar {
+            background: rgba(255, 255, 255, 0.92) !important;
+        }
     </style>
 </head>
 
 <body>
 
-    <div class="header">
-        <div>
-            <h1>Profile Dashboard</h1>
-            <p>A beautiful manager to control all your browser sessions</p>
-        </div>
-        <div style="display: flex; gap: 1rem;">
-            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="exportAccounts()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Export
-            </button>
-            <input type="file" id="importFileInput" style="display: none;" accept=".json" onchange="importAccounts(event)">
-            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="document.getElementById('importFileInput').click()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Import
-            </button>
-            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="openAddAccountModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Add Account
-            </button>
-            <button class="btn" style="padding: 0.75rem 1.25rem;" onclick="openConfigModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path
-                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
-                    </path>
-                </svg>
-                Settings
-            </button>
-        </div>
-    </div>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">BPM</div>
+                <div>
+                    <div class="brand-title">Bing Profile</div>
+                    <div class="brand-subtitle">Manager v2</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">Workspace</div>
+                <button class="nav-item active" type="button" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" type="button" onclick="openAddAccountModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                    <span>Add Account</span>
+                </button>
+                <div class="nav-section-label">Data</div>
+                <button class="nav-item" type="button" onclick="exportAccounts()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Export</span>
+                </button>
+                <button class="nav-item" type="button" onclick="document.getElementById('importFileInput').click()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span>Import</span>
+                </button>
+                <div class="nav-section-label">System</div>
+                <button class="nav-item" type="button" onclick="openConfigModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Settings</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" type="button">
+                    <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <span id="themeLabel">Light Mode</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="topbar">
+                    <div>
+                        <h1>Profile Dashboard</h1>
+                        <p>A beautiful manager to control all your browser sessions</p>
+                    </div>
+                    <div class="topbar-actions">
+                    <input type="file" id="importFileInput" style="display: none;" accept=".json" onchange="importAccounts(event)">
+                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="exportAccounts()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Export
+                    </button>
+                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="document.getElementById('importFileInput').click()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Import
+                    </button>
+                    <button class="btn btn-primary" style="padding: 0.55rem 1.1rem; font-size: 0.85rem;" onclick="openAddAccountModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Add Account
+                    </button>
+                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="openConfigModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        Settings
+                    </button>
+                </div>
+            </div>
 
     <div class="stats-bar" id="statsBar">
         <div class="stat-card">
@@ -984,11 +1238,23 @@
                             <input type="number" id="threadCount" min="1" max="20" value="2"
                                 style="width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.07);border:1px solid var(--border-color);border-radius:8px;color:#fff;font-size:0.9rem;text-align:center;"
                                 title="Number of bots to run in parallel">
+                            <button id="loadAccountsBtn" class="btn" style="padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);" onclick="loadAccountsManual()" title="Load/Refresh accounts list">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                Load
+                            </button>
+                            <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); cursor: pointer;" title="Auto refresh when sessions are active">
+                                <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh(this.checked)" style="cursor: pointer;">
+                                Auto
+                            </label>
                             <button id="checkProxiesBtn" class="btn" style="padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);" onclick="checkAllProxies()" title="Check all proxies">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                             </button>
                             <button id="bulkGroupBtn" class="btn" style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);" onclick="bulkChangeGroup()" title="Move selected to group">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                            </button>
+                            <button class="btn" onclick="clearAllLocks()" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); font-weight: 600; padding: 0.6rem 1rem;" title="Clear all proxy locks (.locks folder)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm3.012 3.012L21 10m-3 3l3 3m-3-3l-3-3m3 3l-3 3"></path><path d="M10.5 3.5a2.121 2.121 0 0 0-3 0l-4 4a2.121 2.121 0 0 0 0 3"></path><path d="M14.5 20.5a2.121 2.121 0 0 1 3 0l4-4a2.121 2.121 0 0 1 0-3"></path></svg>
+                                Clear Locks
                             </button>
                             <button id="runBotsBtn" class="btn bot-btn" style="padding: 0.75rem 1.25rem;"
                                 onclick="runSelectedBots()">
@@ -1034,43 +1300,7 @@
                     <p>No accounts found in accounts.json</p>
                 </div>
             </div>
-
-        </div>
-
-        <!-- Log Drawer Overlay -->
-        <div class="log-drawer-overlay" id="logDrawerOverlay" onclick="closeLogDrawer()"></div>
-
-        <!-- Log Drawer -->
-        <div class="log-drawer" id="logDrawer">
-            <div class="terminal-header">
-                <h3 id="terminalTitle" style="font-size:1rem;">Live Logs - No Selection</h3>
-                <button onclick="closeLogDrawer()"
-                    style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"
-                    title="Close">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-            </div>
-            <div class="terminal-panel" style="padding:0;border:none;box-shadow:none;background:transparent;">
-                <div id="terminal" class="terminal-content">Waiting for a task to start...</div>
-            </div>
-        </div>
-
-        <!-- Floating Log Button -->
-        <button class="log-fab" id="logFab" onclick="toggleLogDrawer()" title="Open Live Logs">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14,2 14,8 20,8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10,9 9,9 8,9" />
-            </svg>
-            Live Logs
-            <span class="log-fab-badge" id="logFabBadge">0</span>
-        </button>
+        </main>
     </div>
 
     <div id="toastContainer" class="toast-container"></div>
@@ -1217,6 +1447,47 @@
                                     <input type="checkbox" id="accProxyV6">
                                     <span>Proxy V6</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        <!-- V4 Fallback section -->
+                        <div id="v4FallbackBlock" style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div>
+                                    <label style="font-size: 0.8rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Proxy V4 Fallback</label>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Routes domains in <code>bypass.txt</code> through this V4 proxy instead of going direct.</div>
+                                </div>
+                                <label class="toggle-label" style="margin: 0; font-size: 0.85rem;">
+                                    <span>Enable</span>
+                                    <label class="toggle">
+                                        <input type="checkbox" id="accV4Enabled" onchange="toggleV4Fields()">
+                                        <span class="slider"></span>
+                                    </label>
+                                </label>
+                            </div>
+                            <div id="v4FieldsContainer" style="display:none;">
+                                <div class="cfg-field" style="margin-bottom: 0.5rem;">
+                                    <label style="font-size: 0.8rem;">V4 Quick Paste <span style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
+                                    <input type="text" id="accV4String" class="form-input" placeholder="v4-proxy.example.com:8080:user:pass" oninput="parseV4String(this.value)" style="padding: 0.4rem 0.6rem;">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
+                                    <div class="cfg-field">
+                                        <label style="font-size: 0.8rem;">Host</label>
+                                        <input type="text" id="accV4Url" class="form-input" placeholder="host" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                    </div>
+                                    <div class="cfg-field">
+                                        <label style="font-size: 0.8rem;">Port</label>
+                                        <input type="number" id="accV4Port" class="form-input" placeholder="80" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                    </div>
+                                    <div class="cfg-field">
+                                        <label style="font-size: 0.8rem;">User</label>
+                                        <input type="text" id="accV4User" class="form-input" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                    </div>
+                                    <div class="cfg-field">
+                                        <label style="font-size: 0.8rem;">Pass</label>
+                                        <input type="text" id="accV4Pass" class="form-input" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         </div>
@@ -1518,12 +1789,19 @@
 
     <script>
         const API_URL = window.location.origin;
-        let refreshInterval;
-        let logInterval = null;
-        let currentLogInfo = { email: null, type: null };
 
         const selectedEmails = new Set();
+        const collapsedGroups = new Set();
         let globalConfig = null;
+
+        function toggleGroupCollapse(groupName) {
+            if (collapsedGroups.has(groupName)) {
+                collapsedGroups.delete(groupName);
+            } else {
+                collapsedGroups.add(groupName);
+            }
+            renderAccounts(lastAccounts);
+        }
 
         async function fetchAccounts() {
             try {
@@ -1624,6 +1902,22 @@
             });
         }
 
+        async function clearAllLocks() {
+            if (!confirm('Are you sure you want to clear ALL proxy locks? Only do this if no bots are actually running but are showing "busy".')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/clear-locks`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                alert('Failed to clear locks: ' + e.message);
+            }
+        }
+
         async function runSelectedBots() {
             if (selectedEmails.size === 0) {
                 showToast('Please select at least one account', 'error');
@@ -1649,7 +1943,7 @@
             batchCancelled = false;
             document.getElementById('stopBotsBtn').style.display = '';
             document.getElementById('runBotsBtn').disabled = true;
-            showToast(`🚀 Queue: ${total} bots, starting ${threads} worker(s)`, 'success');
+            showToast(`🚀 Queue: ${total} bots, starting ${threads} worker(s) with 3s stagger`, 'success');
 
             function checkAllDone() {
                 if (activeCount === 0 && queue.length === 0 && batchRunning) {
@@ -1668,6 +1962,9 @@
                     checkAllDone();
                     return;
                 }
+
+                // Small initial delay to stagger browser launches and reduce CPU spike
+                await new Promise(r => setTimeout(r, 1500));
 
                 // Pick the next compatible account from queue
                 let email = null;
@@ -1742,14 +2039,17 @@
                 } finally {
                     activeCount--;
                     operatingProxies.delete(proxyId);
+                    // Small delay before starting next task to allow CPU to stabilize
+                    await new Promise(r => setTimeout(r, 2000));
                     // Start next task on this worker slot
                     runWorker();
                 }
             }
 
-            // Fire up the workers
+            // Fire up the workers with staggered delay to reduce CPU spike
+            const STAGGER_DELAY_MS = 3000; // 3 seconds between each worker start
             for (let i = 0; i < threads; i++) {
-                runWorker();
+                setTimeout(() => runWorker(), i * STAGGER_DELAY_MS);
             }
         }
 
@@ -1825,16 +2125,19 @@
                 
                 const allSelected = groupAccounts.every(ga => selectedEmails.has(ga.email));
 
+                const isCollapsed = collapsedGroups.has(groupName);
+
                 // Group Header Row
                 finalHTML += `
-                    <tr class="group-row" style="background: rgba(99, 102, 241, 0.05);">
+                    <tr class="group-row" style="background: rgba(99, 102, 241, 0.05); cursor: pointer;" onclick="if(event.target.type !== 'checkbox') toggleGroupCollapse('${groupName}')">
                         <td colspan="7" style="padding: 0.75rem 1.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.1);">
                             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                                 <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--primary); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <svg class="collapse-icon ${isCollapsed ? 'collapsed' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                     ${groupName} (${groupAccounts.length})
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" onclick="event.stopPropagation()">
                                     <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500; text-transform: none;">SELECT GROUP</span>
                                     <input type="checkbox" class="custom-checkbox" onchange="toggleGroupSelect('${groupName}', this.checked)" ${allSelected ? 'checked' : ''}>
                                 </div>
@@ -1843,14 +2146,20 @@
                     </tr>
                 `;
 
-                groupAccounts.forEach(acc => {
+                if (!isCollapsed) {
+                    groupAccounts.forEach(acc => {
                     const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile || acc.isActiveExtraSearch;
                     const isQueued = queuedEmails.has(acc.email);
-                    const statusHtml = isRunning
-                        ? `<span class="status-badge active">Running</span>`
-                        : isQueued
-                            ? `<span class="status-badge queued">Queued</span>`
-                            : `<span class="status-badge">Idle</span>`;
+                    const isProxyBusy = acc.stats?.isProxyBusy || acc.stats?.status === 'proxy-busy';
+                    const statusHtml = acc.needsRelogin
+                        ? `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;" title="Session expired, click Need Login badge to restart">Need Relogin</span>`
+                        : isProxyBusy
+                            ? `<span class="status-badge proxy-busy" title="Proxy is currently in use by another process">Proxy Busy</span>`
+                            : isRunning
+                                ? `<span class="status-badge active">Running</span>`
+                                : isQueued
+                                    ? `<span class="status-badge queued">Queued</span>`
+                                    : `<span class="status-badge">Idle</span>`;
 
                     const getBtnState = (type) => {
                         let isActive = false;
@@ -1882,14 +2191,9 @@
 
                         if (isActive) {
                             return `
-                                <div style="display: flex; overflow: hidden; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05);">
-                                    <button class="btn stop-btn" style="border: none; border-radius: 0; padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                    </button>
-                                    <button class="btn open-btn" style="border: none; border-left: 1px solid var(--border-color); border-radius: 0; padding: 0.3rem 0.45rem;" onclick="viewLogs('${acc.email}', '${type}')" title="View Logs">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                                    </button>
-                                </div>
+                                <button class="btn stop-btn" style="padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                </button>
                             `;
                         }
                         return `
@@ -1946,6 +2250,10 @@
                             </td>
                             <td>
                                 ${(() => {
+                            // Priority: Needs Re-login > Running > Completed > Pending
+                            if (acc.needsRelogin) {
+                                return `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer;" onclick="openSession('${acc.email}', 'bot')" title="Click to restart">🔒 Need Login</span>`;
+                            }
                             const done = isCompletedToday(acc.lastUpdate);
                             return done
                                 ? `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`
@@ -1982,7 +2290,8 @@
                             </td>
                         </tr>
                     `;
-                });
+                    });
+                }
             });
 
             if (lastTableHTML !== finalHTML) {
@@ -2046,7 +2355,7 @@
 
                 if (data.success) {
                     fetchAccounts();
-                    if (!silent) viewLogs(email, type); // chỉ tự mở log khi user bấm tay
+                    console.log(`[Session] Started ${type} session for ${email} - View logs in console`);
                 } else {
                     showToast(data.error, 'error');
                 }
@@ -2074,63 +2383,6 @@
             } catch (err) {
                 showToast('Failed to stop session', 'error');
             }
-        }
-
-        async function fetchLogs() {
-            if (!currentLogInfo.email) return;
-            try {
-                const { email, type } = currentLogInfo;
-                const res = await fetch(`${API_URL}/api/logs?email=${encodeURIComponent(email)}&type=${type}`);
-                const data = await res.json();
-                if (data.success) {
-                    const terminal = document.getElementById('terminal');
-                    const cleanLogs = data.logs.join('\n').replace(/\[(?:3[0-9]|9[0-9])m/g, '') // remove bash ansi
-                        .replace(/\[[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}[^\]]*\]/g, match => `<span class="system-ansi-color">${match}</span>`);
-
-                    const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 50;
-                    if (data.logs.length === 0) {
-                        terminal.innerHTML = '<i>Waiting for process logs...</i>';
-                    } else {
-                        terminal.innerHTML = cleanLogs;
-                    }
-                    if (isScrolledToBottom) {
-                        terminal.scrollTop = terminal.scrollHeight;
-                    }
-                    // Update badge
-                    const badge = document.getElementById('logFabBadge');
-                    if (data.logs.length > 0) {
-                        badge.textContent = data.logs.length;
-                        badge.style.display = 'inline-block';
-                    } else {
-                        badge.style.display = 'none';
-                    }
-                }
-            } catch { }
-        }
-
-        function toggleLogDrawer() {
-            const drawer = document.getElementById('logDrawer');
-            if (drawer.classList.contains('open')) closeLogDrawer();
-            else openLogDrawer();
-        }
-
-        function openLogDrawer() {
-            document.getElementById('logDrawer').classList.add('open');
-            document.getElementById('logDrawerOverlay').classList.add('open');
-        }
-
-        function closeLogDrawer() {
-            document.getElementById('logDrawer').classList.remove('open');
-            document.getElementById('logDrawerOverlay').classList.remove('open');
-        }
-
-        function viewLogs(email, type) {
-            currentLogInfo = { email, type };
-            document.getElementById('terminalTitle').innerText = `Live Logs: ${email} (${type})`;
-            document.getElementById('terminal').innerHTML = 'Connecting...';
-            if (!logInterval) logInterval = setInterval(fetchLogs, 1000);
-            fetchLogs();
-            openLogDrawer();
         }
 
         function showToast(message, type = 'success') {
@@ -2240,7 +2492,18 @@
                 document.getElementById('accProxyPass').value = proxy.password || '';
                 document.getElementById('accProxyAxios').checked = !!proxy.proxyAxios;
                 document.getElementById('accProxyV6').checked = !!proxy.isProxyV6;
-                
+
+                // Populate V4 fallback fields
+                const v4 = proxy.v4 || null;
+                const v4Enabled = !!(v4 && v4.url && v4.port);
+                document.getElementById('accV4Enabled').checked = v4Enabled;
+                document.getElementById('accV4Url').value = v4 ? (v4.url || '').replace(/^(https?|socks[45])?:\/\//i, '') : '';
+                document.getElementById('accV4Port').value = v4 ? (v4.port || '') : '';
+                document.getElementById('accV4User').value = v4 ? (v4.username || '') : '';
+                document.getElementById('accV4Pass').value = v4 ? (v4.password || '') : '';
+                toggleV4Fields();
+                syncV4String();
+
                 const hasProxy = !!(rawUrl || proxy.port || proxy.username);
                 document.getElementById('accUseProxy').checked = hasProxy;
                 toggleProxyFields();
@@ -2290,6 +2553,34 @@
             }
         }
 
+        function toggleV4Fields() {
+            const enabled = document.getElementById('accV4Enabled').checked;
+            document.getElementById('v4FieldsContainer').style.display = enabled ? 'block' : 'none';
+        }
+
+        function parseV4String(str) {
+            if (!str) return;
+            const working = str.replace(/^(https?|socks[45])?:\/\//i, '');
+            const parts = working.split(':');
+            if (parts.length >= 2) {
+                document.getElementById('accV4Url').value = parts[0] || '';
+                document.getElementById('accV4Port').value = parts[1] || '';
+                document.getElementById('accV4User').value = parts[2] || '';
+                document.getElementById('accV4Pass').value = parts[3] || '';
+            }
+        }
+
+        function syncV4String() {
+            const host = (document.getElementById('accV4Url').value || '').replace(/^(https?|socks[45])?:\/\//i, '');
+            const port = document.getElementById('accV4Port').value || '';
+            const user = document.getElementById('accV4User').value || '';
+            const pass = document.getElementById('accV4Pass').value || '';
+            if (!host) { document.getElementById('accV4String').value = ''; return; }
+            let str = `${host}:${port}`;
+            if (user && pass) str += `:${user}:${pass}`;
+            document.getElementById('accV4String').value = str;
+        }
+
         function syncProxyString() {
             const proto = document.getElementById('accProxyProtoSelect').value;
             const host = (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, '');
@@ -2320,14 +2611,29 @@
                 geoLocale: document.getElementById('accGeoLocale').value || "auto",
                 langCode: document.getElementById('accLangCode').value || "en",
                 group: document.getElementById('accGroupName').value || "Ungrouped",
-                proxy: document.getElementById('accUseProxy').checked ? {
-                    proxyAxios: document.getElementById('accProxyAxios').checked,
-                    url: document.getElementById('accProxyProtoSelect').value + "://" + (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, ''),
-                    port: parseInt(document.getElementById('accProxyPort').value) || 0,
-                    username: document.getElementById('accProxyUser').value || "",
-                    password: document.getElementById('accProxyPass').value || "",
-                    isProxyV6: document.getElementById('accProxyV6').checked
-                } : {},
+                proxy: document.getElementById('accUseProxy').checked ? (function() {
+                    const p = {
+                        proxyAxios: document.getElementById('accProxyAxios').checked,
+                        url: document.getElementById('accProxyProtoSelect').value + "://" + (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, ''),
+                        port: parseInt(document.getElementById('accProxyPort').value) || 0,
+                        username: document.getElementById('accProxyUser').value || "",
+                        password: document.getElementById('accProxyPass').value || "",
+                        isProxyV6: document.getElementById('accProxyV6').checked
+                    };
+                    if (document.getElementById('accV4Enabled').checked) {
+                        const v4Host = (document.getElementById('accV4Url').value || "").replace(/^(https?|socks[45])?:\/\//i, '');
+                        const v4Port = parseInt(document.getElementById('accV4Port').value) || 0;
+                        if (v4Host && v4Port) {
+                            p.v4 = {
+                                url: v4Host,
+                                port: v4Port,
+                                username: document.getElementById('accV4User').value || "",
+                                password: document.getElementById('accV4Pass').value || ""
+                            };
+                        }
+                    }
+                    return p;
+                })() : {},
                 saveFingerprint: {
                     mobile: document.getElementById('accFpMobile').checked,
                     desktop: document.getElementById('accFpDesktop').checked
@@ -2820,11 +3126,110 @@
             btn.disabled = false;
         }
 
-        fetchAccounts();
+        // Theme toggle
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('bpm-theme', next); } catch {}
+            updateThemeUI(next);
+        }
+
+        function updateThemeUI(theme) {
+            const label = document.getElementById('themeLabel');
+            const icon = document.getElementById('themeIcon');
+            if (!label || !icon) return;
+            if (theme === 'light') {
+                label.textContent = 'Dark Mode';
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+            } else {
+                label.textContent = 'Light Mode';
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+            }
+        }
+
+        (function initTheme() {
+            let saved = 'dark';
+            try { saved = localStorage.getItem('bpm-theme') || 'dark'; } catch {}
+            document.documentElement.setAttribute('data-theme', saved);
+            // Defer UI update until DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => updateThemeUI(saved));
+            } else {
+                updateThemeUI(saved);
+            }
+        })();
+
+        // State for auto refresh
+        let autoRefreshEnabled = true;
+        let accountsRefreshInterval = null;
+        let statsRefreshInterval = null;
+
+        function toggleAutoRefresh(enabled) {
+            autoRefreshEnabled = enabled;
+            updateRefreshIntervals();
+        }
+
+        function updateRefreshIntervals() {
+            // Check for any active sessions from lastAccounts data
+            const hasActiveSessions = lastAccounts.some(a =>
+                a.isActiveBot || a.isActiveDesktop || a.isActiveMobile || a.isActiveExtraSearch
+            );
+            const shouldRefreshAccounts = autoRefreshEnabled && hasActiveSessions;
+
+            // Accounts: manual load or auto when sessions active
+            if (shouldRefreshAccounts && !accountsRefreshInterval) {
+                accountsRefreshInterval = setInterval(fetchAccounts, 3000);
+                console.log('[AutoRefresh] Enabled - active sessions detected');
+            } else if (!shouldRefreshAccounts && accountsRefreshInterval) {
+                clearInterval(accountsRefreshInterval);
+                accountsRefreshInterval = null;
+                console.log('[AutoRefresh] Disabled - no active sessions');
+            }
+
+            // Stats: always auto-refresh but less frequently
+            if (!statsRefreshInterval) {
+                statsRefreshInterval = setInterval(fetchStats, 5000);
+            }
+        }
+
+        async function loadAccountsManual() {
+            const btn = document.getElementById('loadAccountsBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem; animation: spin 1s linear infinite;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Loading...';
+            await fetchAccounts();
+            btn.disabled = false;
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Load';
+        }
+
+        // Hook into session start/stop to update refresh intervals
+        const originalOpenSession = openSession;
+        openSession = async function(email, type, silent = false) {
+            const result = await originalOpenSession(email, type, silent);
+            // Trigger refresh after a short delay to allow backend to update status
+            setTimeout(updateRefreshIntervals, 500);
+            return result;
+        };
+
+        const originalStopSession = stopSession;
+        stopSession = async function(email, type) {
+            const result = await originalStopSession(email, type);
+            // Check intervals after session stops
+            setTimeout(updateRefreshIntervals, 1000);
+            return result;
+        };
+
+        // Initial load
+        loadAccountsManual();
         fetchStats();
-        refreshInterval = setInterval(fetchAccounts, 2000);
-        setInterval(fetchStats, 2000);
+        updateRefreshIntervals();
     </script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </body>
 
 </html>

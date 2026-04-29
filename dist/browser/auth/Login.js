@@ -30,10 +30,14 @@ export class Login {
         totpInput: 'input[name="otc"]',
         totpInputOld: 'form[name="OneTimeCodeViewForm"]',
         identityBanner: '[data-testid="identityBanner"]',
-        viewFooter: '[data-testid="viewFooter"] span[role="button"]',
+        viewFooter: '[data-testid="viewFooter"] >> [role="button"]',
+        otherWaysToSignIn: '[data-testid="viewFooter"] span[role="button"]',
+        otpCodeEntry: '[data-testid="codeEntry"]',
+        backButton: '#back-button',
         bingProfile: '#id_n',
         requestToken: 'input[name="__RequestVerificationToken"]',
-        requestTokenMeta: 'meta[name="__RequestVerificationToken"]'
+        requestTokenMeta: 'meta[name="__RequestVerificationToken"]',
+        otpInput: 'div[data-testid="codeEntry"]'
     };
     constructor(bot) {
         this.bot = bot;
@@ -47,7 +51,7 @@ export class Login {
         try {
             this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Starting login process');
             await page
-                .goto('https://rewards.bing.com/', {
+                .goto('https://rewards.bing.com/createuser?idru=%2F&userScenarioId=anonsignin', {
                 waitUntil: 'domcontentloaded'
             })
                 .catch(() => { });
@@ -134,7 +138,9 @@ export class Login {
             [this.selectors.emailIconOld, 'SIGN_IN_ANOTHER_WAY_EMAIL'],
             [this.selectors.passwordlessCheck, 'LOGIN_PASSWORDLESS'],
             [this.selectors.totpInput, '2FA_TOTP'],
-            [this.selectors.totpInputOld, '2FA_TOTP']
+            [this.selectors.totpInputOld, '2FA_TOTP'],
+            [this.selectors.otpCodeEntry, 'OTP_CODE_ENTRY'], // PR 450
+            [this.selectors.otpInput, 'OTP_CODE_ENTRY'] // My Fix
         ];
         const results = await Promise.all(stateChecks.map(async ([sel, state]) => {
             const visible = await this.checkSelector(page, sel);
@@ -177,8 +183,11 @@ export class Login {
             'KMSI_PROMPT',
             'PASSWORD_INPUT',
             'EMAIL_INPUT',
+            'SIGN_IN_ANOTHER_WAY', // Prefer password option over email code
             'SIGN_IN_ANOTHER_WAY_EMAIL',
-            'SIGN_IN_ANOTHER_WAY',
+            'OTP_CODE_ENTRY',
+            'GET_A_CODE',
+            'GET_A_CODE_2',
             'LOGIN_PASSWORDLESS',
             '2FA_TOTP'
         ];
@@ -232,12 +241,45 @@ export class Login {
                 return true;
             }
             case 'GET_A_CODE': {
-                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Attempting to bypass "Get code" via footer');
-                await this.bot.browser.utils.ghostClick(page, this.selectors.viewFooter);
-                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
-                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after footer click');
-                });
-                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Footer clicked, proceeding');
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Attempting to bypass "Get code" page');
+                // Try to find "Other ways to sign in" link
+                const otherWaysLink = await page
+                    .waitForSelector(this.selectors.otherWaysToSignIn, { state: 'visible', timeout: 3000 })
+                    .catch(() => null);
+                if (otherWaysLink) {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Found "Other ways to sign in" link');
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.otherWaysToSignIn);
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after clicking other ways');
+                    });
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', '"Other ways to sign in" clicked');
+                    return true;
+                }
+                // Fallback: try the generic viewFooter selector
+                const footerLink = await page
+                    .waitForSelector(this.selectors.viewFooter, { state: 'visible', timeout: 2000 })
+                    .catch(() => null);
+                if (footerLink) {
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.viewFooter);
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after footer click');
+                    });
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Footer link clicked');
+                    return true;
+                }
+                // If no links found, try clicking back button
+                const backBtn = await page
+                    .waitForSelector(this.selectors.backButton, { state: 'visible', timeout: 2000 })
+                    .catch(() => null);
+                if (backBtn) {
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'No sign in options found, clicking back button');
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.backButton);
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+                        this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after back button');
+                    });
+                    return true;
+                }
+                this.bot.logger.warn(this.bot.isMobile, 'LOGIN', 'Could not find way to bypass Get Code page');
                 return true;
             }
             case 'GET_A_CODE_2': {
@@ -349,6 +391,35 @@ export class Login {
                     this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after passwordless auth');
                 });
                 this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Passwordless authentication completed successfully');
+                return true;
+            }
+            case 'OTP_CODE_ENTRY': {
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'OTP code entry page detected, attempting to find password option');
+                // My Fix: Click "Use your password" footer
+                const footerLink = await page
+                    .waitForSelector(this.selectors.viewFooter, { state: 'visible', timeout: 2000 })
+                    .catch(() => null);
+                if (footerLink) {
+                    await this.bot.browser.utils.ghostClick(page, this.selectors.viewFooter);
+                    this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Footer link clicked');
+                }
+                else {
+                    // PR 450 Fix: Click Back Button if footer not found
+                    const backButton = await page
+                        .waitForSelector(this.selectors.backButton, { state: 'visible', timeout: 2000 })
+                        .catch(() => null);
+                    if (backButton) {
+                        await this.bot.browser.utils.ghostClick(page, this.selectors.backButton);
+                        this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Back button clicked');
+                    }
+                    else {
+                        this.bot.logger.warn(this.bot.isMobile, 'LOGIN', 'No navigation option found on OTP page');
+                    }
+                }
+                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+                    this.bot.logger.debug(this.bot.isMobile, 'LOGIN', 'Network idle timeout after OTP navigation');
+                });
+                this.bot.logger.info(this.bot.isMobile, 'LOGIN', 'Navigated back from OTP entry page');
                 return true;
             }
             case 'UNKNOWN': {

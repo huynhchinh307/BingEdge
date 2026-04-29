@@ -16,7 +16,10 @@ import {
     saveCookies,
     saveFingerprint,
     getRuntimeBase,
-    getSessionPath
+    getSessionPath,
+    getProxyKey,
+    acquireProxyLock,
+    releaseProxyLock
 } from '../utils.js'
 
 const __dirname = getDirname(import.meta.url)
@@ -129,7 +132,7 @@ async function humanType(page, selector, text) {
         // Variable typing speed with occasional longer pauses
         const delay = getRandomInt(100, 250)
         await page.keyboard.type(char, { delay })
-        if (Math.random() > 0.9) await page.waitForTimeout(getRandomInt(150, 400)) 
+        if (Math.random() > 0.9) await page.waitForTimeout(getRandomInt(150, 400))
     }
     await page.waitForTimeout(getRandomInt(400, 1000)) // Pause after typing
 }
@@ -140,7 +143,7 @@ async function fluentUIClick(page, selector) {
     await page.waitForTimeout(getRandomInt(200, 500))
     await element.focus()
     await page.waitForTimeout(getRandomInt(600, 1500)) // Human-like thinking time
-    
+
     // Attempt a real click first, as it's more human
     try {
         await element.click({ delay: getRandomInt(50, 150) })
@@ -188,12 +191,20 @@ async function getIpLocation(proxy) {
 
 async function main() {
     log('INFO', 'Starting Fully Automated Account Registration...')
+    let proxyKey = 'NO_PROXY'
 
     // 1. Rotation Proxy
     const rotatedProxy = await rotateProxy(config.proxyRotationUrl || args.rotationUrl)
-    if (!rotatedProxy) {
+    if (!rotatedProxy && (config.proxyRotationUrl || args.rotationUrl)) {
         log('ERROR', 'Could not rotate proxy. Check config.proxyRotationUrl')
-        // process.exit(1) // Keep going if optional
+    }
+
+    proxyKey = getProxyKey({ proxy: rotatedProxy })
+    const lock = await acquireProxyLock(proxyKey, projectRoot)
+    if (!lock.success) {
+        log('ERROR', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use (PID: ${lock.pid || 'Unknown'}).`)
+        log('ERROR', 'Please close the other session or use the "Clear Locks" button on the Dashboard.')
+        process.exit(88)
     }
 
     // 2. Order OTP
@@ -266,7 +277,7 @@ async function main() {
     let fingerprint = null
     const browserType = config.browserType ?? 'chromium'
     const fingerprintBrowser = browserType === 'edge' ? 'edge' : 'chrome'
-    
+
     const fingerprintGenerator = new FingerprintGenerator()
     fingerprint = fingerprintGenerator.getFingerprint({
         devices: ['desktop'],
@@ -299,7 +310,7 @@ async function main() {
 
     async function persistSessionData(silent = false) {
         if (isSaved || !currentContext) return
-        
+
         // If browser is already closed, we can't get cookies anymore. 
         // We should have saved them periodically before this.
         if (!browser.isConnected()) {
@@ -313,7 +324,7 @@ async function main() {
             const cookies = await currentContext.cookies()
             await saveCookies(sessionBase, cookies, 'desktop')
             await saveFingerprint(sessionBase, currentFingerprint, 'desktop')
-            
+
             // Note: Don't set isSaved = true if we are doing periodic saves
             if (silent) {
                 // Just update files silently
@@ -373,11 +384,11 @@ async function main() {
                         },
                         timestamp: Date.now(),
                     });
-                    return 1337; 
+                    return 1337;
                 },
-                clearWatch: () => {},
+                clearWatch: () => { },
             };
-            
+
             // Overwrite navigator.geolocation
             Object.defineProperty(navigator, 'geolocation', {
                 value: mockGeo,
@@ -508,18 +519,55 @@ async function main() {
 
         // 8. Name - Vietnamese Random (Expanded List)
         const lastNames = [
-            'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Phan', 'Vũ', 'Đặng', 'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý',
-            'Võ', 'Phùng', 'Chu', 'Trịnh', 'Trương', 'Đinh', 'Quách', 'Đào', 'Hà', 'Tạ', 'Cao', 'Lương', 'Mai', 'Liễu', 'Lục', 'Lâm',
-            'Đoàn', 'Lương', 'Huỳnh', 'Trần', 'Lưu', 'Kiều', 'Thái', 'Trịnh', 'Lương', 'Vương'
-        ]
-        const firstNames = [
-            'Anh', 'Bình', 'Chi', 'Dũng', 'Duy', 'Giang', 'Hùng', 'Hương', 'Huy', 'Khánh', 'Linh', 'Mai', 'Minh', 'Nam', 'Ngọc', 'Phong', 'Phúc', 'Quân', 'Sơn', 'Thảo', 'Tuấn', 'Tuyết', 'Vinh', 'Yên',
-            'Bảo', 'Cường', 'Diệp', 'Đạt', 'Đức', 'Gia', 'Hải', 'Hạnh', 'Hiếu', 'Hòa', 'Khôi', 'Lan', 'Long', 'My', 'Ngân', 'Nghĩa', 'Nhân', 'Oanh', 'Phương', 'Quang', 'Quốc', 'Sang', 'Tâm', 'Thạch',
-            'Thanh', 'Thành', 'Thịnh', 'Tiến', 'Trâm', 'Trung', 'Tú', 'Uyên', 'Việt', 'Vy', 'Xuân', 'Kim', 'Kỳ', 'Hà', 'Hân', 'Hải', 'Thụy', 'Tấn', 'Thắng', 'Tài', 'Khải', 'Trọng'
+            // Phổ biến nhất
+            'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 'Vũ', 'Võ', 'Đặng',
+            'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Lưu', 'Trương', 'Đinh', 'Cao',
+            // Khá phổ biến
+            'Phùng', 'Chu', 'Trịnh', 'Quách', 'Đào', 'Hà', 'Tạ', 'Lương', 'Mai', 'Liễu',
+            'Lục', 'Lâm', 'Đoàn', 'Kiều', 'Thái', 'Vương', 'Tống', 'Tô', 'Từ', 'Mạc',
+            'Châu', 'Phó', 'Hứa', 'Nghiêm', 'Âu', 'Diệp', 'Sầm', 'Giáp', 'Thân', 'Thạch',
+            // Ít phổ biến hơn nhưng hợp lệ
+            'Nông', 'Vi', 'Đoàn', 'Lã', 'Đới', 'Chiêu', 'Vương', 'Ông', 'Bạch', 'La',
+            'Văn', 'Kim', 'Đường', 'Tề', 'Khuất', 'Tưởng', 'Đồng', 'Khổng', 'Trang', 'Biên',
+            'Chung', 'Cái', 'Lại', 'Mã', 'Liêu', 'Trịnh', 'Hình', 'Hoa', 'Triệu', 'Thẩm'
         ]
 
+        // Tên đệm phổ biến
+        const middleNames = [
+            'Thị', 'Văn', 'Đức', 'Thành', 'Minh', 'Quang', 'Anh', 'Bảo', 'Hữu', 'Công',
+            'Ngọc', 'Tiến', 'Phước', 'Thế', 'Trung', 'Xuân', 'Như', 'Mỹ', 'Thanh', 'Tấn',
+            'Phú', 'Gia', 'Hồng', 'Khắc', 'Nhật', 'Trọng', 'Hoài', 'Bích', 'Kim', 'Tú'
+        ]
+
+        // Tên chính đa dạng (nam + nữ)
+        const givenNamesMale = [
+            'Hùng', 'Dũng', 'Tuấn', 'Minh', 'Nam', 'Phong', 'Sơn', 'Quân', 'Huy', 'Long',
+            'Vinh', 'Đạt', 'Cường', 'Hiếu', 'Nghĩa', 'Khôi', 'Bình', 'Thịnh', 'Tiến', 'Tài',
+            'Quang', 'Quốc', 'Thắng', 'Khải', 'Sang', 'Trung', 'Tú', 'Việt', 'Hải', 'Thành',
+            'Duy', 'Bảo', 'Đức', 'Nhân', 'Trọng', 'Khánh', 'Tâm', 'Hòa', 'Thạch', 'Tấn',
+            'Phúc', 'Gia', 'Khoa', 'Lộc', 'Phước', 'Thế', 'Nhật', 'Quý', 'Hậu', 'Thiện',
+            'Lâm', 'Cẩm', 'Đăng', 'Mạnh', 'Vũ', 'Tín', 'Nhân', 'Hào', 'Kiên', 'Lực',
+            'Dương', 'Hưng', 'Toàn', 'Tùng', 'Quân', 'Trí', 'Tùng', 'Đạo', 'Nguyên', 'Hào'
+        ]
+        const givenNamesFemale = [
+            'Linh', 'Hương', 'Ngọc', 'Thảo', 'Lan', 'Oanh', 'Phương', 'Hạnh', 'Tuyết', 'Yên',
+            'My', 'Ngân', 'Uyên', 'Vy', 'Xuân', 'Trâm', 'Diệp', 'Hà', 'Hân', 'Thụy',
+            'Chi', 'Giang', 'Kim', 'Mai', 'Anh', 'Lệ', 'Vân', 'Nhi', 'Quỳnh', 'Nhung',
+            'Trang', 'Huệ', 'Duyên', 'Phượng', 'Thương', 'Như', 'Bích', 'Cẩm', 'Mỹ', 'Hoa',
+            'Thanh', 'Thu', 'Lý', 'Tiên', 'Yến', 'Hồng', 'Trinh', 'Loan', 'Thắm', 'Hiền',
+            'Thùy', 'Châu', 'Ngà', 'Khánh', 'Tú', 'Nhàn', 'Thơm', 'Hoài', 'Tâm', 'Lam',
+            'Thẩm', 'Nguyệt', 'Bảo', 'Hà', 'Trúc', 'Liên', 'Thủy', 'Thái', 'Phúc', 'Ân'
+        ]
+
+        // Sinh ngẫu nhiên: kết hợp tên đệm + tên chính (có thể có hoặc không có tên đệm)
         const lastName = lastNames[getRandomInt(0, lastNames.length - 1)]
-        const firstName = firstNames[getRandomInt(0, firstNames.length - 1)]
+        const useMiddle = Math.random() > 0.45 // ~55% có tên đệm
+        const isMale = Math.random() > 0.5
+        const givenName = isMale
+            ? givenNamesMale[getRandomInt(0, givenNamesMale.length - 1)]
+            : givenNamesFemale[getRandomInt(0, givenNamesFemale.length - 1)]
+        const middle = middleNames[getRandomInt(0, middleNames.length - 1)]
+        const firstName = useMiddle ? `${middle} ${givenName}` : givenName
 
         log('INFO', `Entering Name: ${lastName} ${firstName}`)
         const firstNameSelector = 'input[name="FirstName"], input#firstNameInput, input[name="firstNameInput"]'
@@ -564,10 +612,10 @@ async function main() {
         log('INFO', 'Finalizing account setup. Waiting for final setup screens...')
         let finalized = false
         const startTime = Date.now()
-        
+
         while (!finalized) {
             const url = page.url()
-            
+
             // --- a. Handle Privacy Notice ---
             if (url.includes('privacynotice.account.microsoft.com')) {
                 log('INFO', 'Privacy Notice detected. Waiting for "OK" button...')
@@ -579,7 +627,7 @@ async function main() {
                     continue // Re-check URL after click
                 }
             }
-            
+
             // --- b. Handle Stay Signed In ---
             const stayBtn = page.locator('input#idSIButton9, button:has-text("Yes"), button:has-text("Có"), input[value="Yes"]').first()
             if (await stayBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -588,10 +636,10 @@ async function main() {
                 await page.waitForTimeout(3000)
                 continue // Re-check URL after click
             }
-            
+
             // --- c. Check for Final Destination ---
-            if (url.includes('account.microsoft.com') || 
-                url.includes('password/Change') || 
+            if (url.includes('account.microsoft.com') ||
+                url.includes('password/Change') ||
                 url.includes('rewards.bing.com') ||
                 url.includes('myaccount.microsoft.com')) {
                 log('SUCCESS', 'Final destination reached.')
@@ -659,6 +707,7 @@ async function main() {
 
     setupCleanupHandlers(async () => {
         await persistSessionData()
+        releaseProxyLock(proxyKey, projectRoot)
         if (browser?.isConnected?.()) {
             await browser.close()
         }

@@ -1,5 +1,19 @@
-import fs from 'node:fs';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { saveSessionData } from '../util/Load.js';
+/**
+ * Lỗi đặc biệt khi session bị xóa do 400/401 — dùng để trigger retry trong runTasks
+ */
+export class SessionInvalidError extends Error {
+    sessionCleared = true;
+    constructor(status) {
+        super(`Session invalid (HTTP ${status}) — session cleared, re-login required`);
+        this.name = 'SessionInvalidError';
+    }
+}
 export default class BrowserFunc {
     bot;
     accountRank = '';
@@ -12,24 +26,35 @@ export default class BrowserFunc {
      */
     async getDashboardData() {
         try {
+            // API requires X-Requested-With in both URL and header
+            // Try desktop cookies first (web API might need desktop session)
+            const cookiesToUse = this.bot.cookies.desktop?.length > 0 ? this.bot.cookies.desktop : this.bot.cookies.mobile;
+            const timestamp = Date.now();
             const request = {
-                url: 'https://rewards.bing.com/api/getuserinfo?type=1',
+                url: `https://rewards.bing.com/api/getuserinfo?type=1&X-Requested-With=XMLHttpRequest&_=${timestamp}`,
                 method: 'GET',
                 headers: {
                     ...(this.bot.fingerprint?.headers ?? {}),
-                    Cookie: this.buildCookieHeader(this.bot.cookies.mobile, [
+                    'Accept': 'application/json, text/plain, */*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Connection': 'keep-alive',
+                    'User-Agent': this.bot.fingerprint?.headers?.['User-Agent'] ||
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+                    Cookie: this.buildCookieHeader(cookiesToUse, [
                         'bing.com',
                         'live.com',
-                        'microsoftonline.com'
+                        'microsoftonline.com',
+                        'microsoft.com',
+                        'msn.com'
                     ]),
                     Referer: 'https://rewards.bing.com/',
                     Origin: 'https://rewards.bing.com'
-                }
+                },
+                timeout: 15000
             };
+            this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', `Sending ${cookiesToUse.length} cookies (desktop: ${this.bot.cookies.desktop?.length || 0}, mobile: ${this.bot.cookies.mobile?.length || 0})`);
             const response = await this.bot.axios.request(request);
-            // Save dashboard data to file for analysis
-            fs.writeFileSync('dashboard_data.json', JSON.stringify(response.data, null, 2));
-            this.bot.logger.warn(this.bot.isMobile, 'SHOW-DASHBOARD-DATA', 'Saved raw dashboard data to dashboard_data.json!');
             if (response.data?.dashboard) {
                 this.accountRank = response.data.dashboard.userStatus?.levelInfo?.activeLevelName || '';
                 return response.data.dashboard;
@@ -37,31 +62,24 @@ export default class BrowserFunc {
             throw new Error('Dashboard data missing from API response');
         }
         catch (error) {
-            this.bot.logger.warn(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'API failed, trying HTML fallback');
-            // Try using script from dashboard page
-            try {
-                const request = {
-                    url: this.bot.config.baseURL,
-                    method: 'GET',
-                    headers: {
-                        ...(this.bot.fingerprint?.headers ?? {}),
-                        Cookie: this.buildCookieHeader(this.bot.cookies.mobile),
-                        Referer: 'https://rewards.bing.com/',
-                        Origin: 'https://rewards.bing.com'
-                    }
-                };
-                const response = await this.bot.axios.request(request);
-                const match = response.data.match(/var\s+dashboard\s*=\s*({.*?});/s);
-                if (!match?.[1]) {
-                    throw new Error('Dashboard script not found in HTML');
-                }
-                return JSON.parse(match[1]);
+            // Microsoft changed to Next.js - HTML no longer contains var dashboard
+            // The API is now the only reliable method
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            const status = error?.response?.status;
+            const responseData = error?.response?.data;
+            this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', `Failed to get dashboard data: ${errorMsg} (Status: ${status || 'unknown'})`);
+            // Log response data for debugging auth errors
+            if ((status === 401 || status === 400) && responseData) {
+                this.bot.logger.debug(this.bot.isMobile, 'GET-DASHBOARD-DATA', `${status} Response: ${JSON.stringify(responseData).substring(0, 500)}`);
             }
-            catch (fallbackError) {
-                // If both fail
-                this.bot.logger.error(this.bot.isMobile, 'GET-DASHBOARD-DATA', 'Failed to get dashboard data');
-                throw fallbackError;
+            // If 400 or 401, session is invalid → clear to force re-login next run
+            if (status === 401 || status === 400) {
+                this.bot.logger.warn(this.bot.isMobile, 'GET-DASHBOARD-DATA', `Session invalid (${status}), clearing session files to force re-login on next run`);
+                await this.clearSessionFiles();
+                // Throw special error so runTasks can auto-retry this account
+                throw new SessionInvalidError(status);
             }
+            throw new Error(`Dashboard API failed: ${errorMsg}`);
         }
     }
     getAccountRank() {
@@ -72,6 +90,57 @@ export default class BrowserFunc {
             .filter(c => !domainFilter || domainFilter.some(d => c.domain?.includes(d)))
             .map(c => `${c.name}=${c.value}`)
             .join('; ');
+    }
+    /**
+     * Clear session files to force re-login
+     * Path must match Load.ts: path.join(__dirname, '../browser/', sessionPath, email)
+     */
+    async clearSessionFiles() {
+        try {
+            const sessionPath = this.bot.config.sessionPath;
+            const email = this.bot.email;
+            if (!email) {
+                this.bot.logger.warn(this.bot.isMobile, 'SESSION', 'Cannot clear session: email is empty');
+                return;
+            }
+            // Resolve path the same way as Load.ts saveSessionData()
+            const sessionDir = path.join(__dirname, '../browser/', sessionPath, email);
+            const mobileSession = path.join(sessionDir, 'session_mobile.json');
+            const desktopSession = path.join(sessionDir, 'session_desktop.json');
+            let deleted = 0;
+            if (fs.existsSync(mobileSession)) {
+                fs.unlinkSync(mobileSession);
+                deleted++;
+                this.bot.logger.info(this.bot.isMobile, 'SESSION', `Deleted mobile session: ${mobileSession}`);
+            }
+            if (fs.existsSync(desktopSession)) {
+                fs.unlinkSync(desktopSession);
+                deleted++;
+                this.bot.logger.info(this.bot.isMobile, 'SESSION', `Deleted desktop session: ${desktopSession}`);
+            }
+            if (deleted === 0) {
+                this.bot.logger.warn(this.bot.isMobile, 'SESSION', `No session files found at: ${sessionDir}`);
+            }
+            else {
+                this.bot.logger.info(this.bot.isMobile, 'SESSION', `Cleared ${deleted} session file(s) for ${email} — will re-login next run`);
+            }
+            // Clear in-memory cookies
+            this.bot.cookies.mobile = [];
+            this.bot.cookies.desktop = [];
+            // Also clear browser context cookies if page is available
+            try {
+                if (this.bot.mainMobilePage && !this.bot.mainMobilePage.isClosed()) {
+                    await this.bot.mainMobilePage.context().clearCookies();
+                    this.bot.logger.info(this.bot.isMobile, 'SESSION', 'Cleared browser context cookies');
+                }
+            }
+            catch (e) {
+                this.bot.logger.debug(this.bot.isMobile, 'SESSION', `Could not clear browser context cookies: ${e}`);
+            }
+        }
+        catch (err) {
+            this.bot.logger.error(this.bot.isMobile, 'SESSION', `Failed to clear session: ${err}`);
+        }
     }
     /**
      * Fetch user app dashboard data

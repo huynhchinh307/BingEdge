@@ -11,6 +11,14 @@ export declare class Workers {
     doSpecialPromotions(data: DashboardData): Promise<void>;
     private solveActivities;
     private revealDailySetElements;
+    /**
+     * Đóng tab một cách an toàn — thử nhiều cách nếu close() thất bại
+     */
+    private forceClosePage;
+    /**
+     * Dọn dẹp tất cả tab thừa — giữ lại tab dashboard chính
+     */
+    private cleanupOrphanTabs;
     private solveActivityViaUI;
     private isActivityUncompleted;
     private isActivityCompleted;

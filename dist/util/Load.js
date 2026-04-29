@@ -59,6 +59,13 @@ export function loadConfig() {
     }
 }
 export async function loadSessionData(sessionPath, email, saveFingerprint, isMobile) {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`);
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`);
+    }
     try {
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json';
         const cookieFile = path.join(__dirname, '../browser/', sessionPath, email, cookiesFileName);
@@ -94,6 +101,13 @@ export async function loadSessionData(sessionPath, email, saveFingerprint, isMob
     }
 }
 export async function saveSessionData(sessionPath, cookies, email, isMobile) {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`);
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`);
+    }
     try {
         const sessionDir = path.join(__dirname, '../browser/', sessionPath, email);
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json';
@@ -108,6 +122,13 @@ export async function saveSessionData(sessionPath, cookies, email, isMobile) {
     }
 }
 export async function saveFingerprintData(sessionPath, email, isMobile, fingerpint) {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`);
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`);
+    }
     try {
         const sessionDir = path.join(__dirname, '../browser/', sessionPath, email);
         const fingerprintFileName = isMobile ? 'session_fingerprint_mobile.json' : 'session_fingerprint_desktop.json';

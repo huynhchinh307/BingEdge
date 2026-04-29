@@ -85,6 +85,14 @@ export async function loadSessionData(
     saveFingerprint: ConfigSaveFingerprint,
     isMobile: boolean
 ) {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`)
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`)
+    }
+
     try {
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json'
         const cookieFile = path.join(__dirname, '../browser/', sessionPath, email, cookiesFileName)
@@ -130,6 +138,14 @@ export async function saveSessionData(
     email: string,
     isMobile: boolean
 ): Promise<string> {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`)
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`)
+    }
+
     try {
         const sessionDir = path.join(__dirname, '../browser/', sessionPath, email)
         const cookiesFileName = isMobile ? 'session_mobile.json' : 'session_desktop.json'
@@ -152,6 +168,14 @@ export async function saveFingerprintData(
     isMobile: boolean,
     fingerpint: BrowserFingerprintWithHeaders
 ): Promise<string> {
+    // Defensive validation to prevent undefined path errors
+    if (!sessionPath || typeof sessionPath !== 'string') {
+        throw new Error(`Invalid sessionPath: ${sessionPath}`)
+    }
+    if (!email || typeof email !== 'string') {
+        throw new Error(`Invalid email: ${email}`)
+    }
+
     try {
         const sessionDir = path.join(__dirname, '../browser/', sessionPath, email)
         const fingerprintFileName = isMobile ? 'session_fingerprint_mobile.json' : 'session_fingerprint_desktop.json'

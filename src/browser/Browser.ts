@@ -3,13 +3,14 @@ import { newInjectedContext } from 'fingerprint-injector'
 import { BrowserFingerprintWithHeaders, FingerprintGenerator } from 'fingerprint-generator'
 import fs from 'fs'
 import path from 'path'
+import { Server as ProxyChainServer } from 'proxy-chain'
 
 import type { MicrosoftRewardsBot } from '../index'
 import { loadSessionData, saveFingerprintData } from '../util/Load'
 import { UserAgentManager } from './UserAgent'
 import AxiosClient from '../util/Axios'
 
-import type { Account, AccountProxy } from '../interface/Account'
+import type { Account, AccountProxy, AccountProxyV4 } from '../interface/Account'
 
 /* Test Stuff
 https://abrahamjuliot.github.io/creepjs/
@@ -50,8 +51,9 @@ class Browser {
 
     async createBrowser(account: Account): Promise<BrowserCreationResult> {
         let browser: any
+        let chainServer: ProxyChainServer | null = null
         try {
-            let bypassString = undefined
+            let bypassString: string | undefined = undefined
             const bypassFilePath = path.join(process.cwd(), 'bypass.txt')
 
             if (fs.existsSync(bypassFilePath)) {
@@ -65,21 +67,59 @@ class Browser {
                 }
             }
 
-            const proxyConfig = account.proxy.url
-                ? {
-                      server: this.formatProxyServer(account.proxy),
-                      bypass: bypassString,
-                      ...(account.proxy.username &&
-                          account.proxy.password && {
-                              username: account.proxy.username,
-                              password: account.proxy.password
-                          })
-                  }
-                : undefined
+            const bypassPatterns = bypassString ? this.compileBypassPatterns(bypassString) : []
+            const hasV4Fallback = !!(
+                account.proxy.url &&
+                account.proxy.v4 &&
+                account.proxy.v4.url &&
+                account.proxy.v4.port &&
+                bypassPatterns.length > 0
+            )
+
+            let proxyConfig: { server: string; bypass?: string; username?: string; password?: string } | undefined
+
+            if (hasV4Fallback) {
+                // Spin up a local proxy-chain router that selects upstream per host.
+                // Browser sees only the local proxy (no auth), proxy-chain handles
+                // upstream auth for both V6 (default) and V4 (bypass-matched hosts).
+                const v6Upstream = this.toUpstreamUrl({
+                    url: account.proxy.url,
+                    port: account.proxy.port,
+                    username: account.proxy.username,
+                    password: account.proxy.password
+                })
+                const v4Upstream = this.toUpstreamUrl(account.proxy.v4!)
+
+                chainServer = new ProxyChainServer({
+                    port: 0,
+                    prepareRequestFunction: ({ hostname }: { hostname: string }) => {
+                        const useV4 = bypassPatterns.some(re => re.test(hostname))
+                        return { upstreamProxyUrl: useV4 ? v4Upstream : v6Upstream }
+                    }
+                })
+                await chainServer.listen()
+                const localPort = (chainServer as any).port
+                proxyConfig = { server: `http://127.0.0.1:${localPort}` }
+                this.bot.logger.info(
+                    this.bot.isMobile,
+                    'BROWSER',
+                    `Proxy router on 127.0.0.1:${localPort} | V6 default + V4 fallback for ${bypassPatterns.length} bypass pattern(s)`
+                )
+            } else if (account.proxy.url) {
+                proxyConfig = {
+                    server: this.formatProxyServer(account.proxy),
+                    bypass: bypassString,
+                    ...(account.proxy.username &&
+                        account.proxy.password && {
+                            username: account.proxy.username,
+                            password: account.proxy.password
+                        })
+                }
+            }
 
             this.bot.logger.info(
-                this.bot.isMobile, 
-                'BROWSER', 
+                this.bot.isMobile,
+                'BROWSER',
                 `Launching stealth browser (Patchright)`
             )
 
@@ -88,7 +128,19 @@ class Browser {
                 ...(proxyConfig && { proxy: proxyConfig }),
                 args: [...Browser.BROWSER_ARGS]
             })
+
+            // Cleanup local proxy server when browser closes
+            if (chainServer) {
+                const srv = chainServer
+                browser.on('disconnected', () => {
+                    srv.close(true).catch(() => {})
+                })
+            }
         } catch (error) {
+            // Make sure to release the local proxy server if launch failed
+            if (chainServer) {
+                chainServer.close(true).catch(() => {})
+            }
             const errorMessage = error instanceof Error ? error.message : String(error)
             this.bot.logger.error(this.bot.isMobile, 'BROWSER', `Launch failed: ${errorMessage}`)
             throw error
@@ -206,31 +258,131 @@ class Browser {
         }
     }
 
+    /**
+     * Convert a comma-separated bypass pattern list (e.g. `*.live.com, microsoft.com`)
+     * into anchored case-insensitive RegExp objects matching hostnames.
+     */
+    private compileBypassPatterns(bypass: string): RegExp[] {
+        return bypass
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .map(pat => {
+                const escaped = pat.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
+                return new RegExp(`^${escaped}$`, 'i')
+            })
+    }
+
+    /**
+     * Build a fully-qualified upstream proxy URL (with embedded credentials)
+     * suitable for passing to proxy-chain's `upstreamProxyUrl`.
+     */
+    private toUpstreamUrl(p: AccountProxyV4 | { url: string; port: number; username?: string; password?: string }): string {
+        let proto = 'http'
+        let host = p.url
+        try {
+            const u = new URL(p.url.includes('://') ? p.url : `http://${p.url}`)
+            proto = (u.protocol || 'http:').replace(':', '') || 'http'
+            host = u.hostname || host
+        } catch {
+            host = p.url.replace(/^(https?|socks[45]):\/\//i, '')
+        }
+        const auth = p.username && p.password
+            ? `${encodeURIComponent(p.username)}:${encodeURIComponent(p.password)}@`
+            : ''
+        return `${proto}://${auth}${host}:${p.port}`
+    }
+
+    private detectIpVersion(ip: string): 'v4' | 'v6' | 'unknown' {
+        if (!ip) return 'unknown'
+        // IPv4: xxx.xxx.xxx.xxx
+        if (/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return 'v4'
+        // IPv6: contains colons
+        if (/^([0-9a-fA-F:]+)$/.test(ip) && ip.includes(':')) return 'v6'
+        return 'unknown'
+    }
+
     private async getIpLocation(proxy: AccountProxy) {
+        // Nếu không có proxy → bỏ qua IP sync, trả về null ngay
+        if (!proxy?.url) {
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER-IP-LOC', 'No proxy configured, skipping IP location sync (using machine IP)')
+            return null
+        }
+
         // Force proxy usage for this check to get the location of the proxy IP
         const axios = new AxiosClient({ ...proxy, proxyAxios: true })
+
+        // Detect if proxy is IPv4 or IPv6 from url
+        let proxyHost = ''
         try {
-            // Using ip-api.com (HTTP) because proxy might not support HTTPS easily or to avoid cert issues for this simple check
-            const response = await axios.request({
-                url: 'http://ip-api.com/json',
-                method: 'GET',
-                timeout: 10000
-            })
-            
-            const data = response.data
-            if (data.status === 'success') {
-                this.bot.logger.debug(this.bot.isMobile, 'BROWSER-IP-LOC', `Detected: ${data.city}, ${data.country} (${data.lat}, ${data.lon}) | Timezone: ${data.timezone}`)
-                return {
-                    lat: data.lat,
-                    lon: data.lon,
-                    timezone: data.timezone
-                }
-            } else {
-                this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to get IP location: ${data.message || 'Unknown error'}`)
-            }
-        } catch (error: any) {
-            this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `Failed to fetch IP location: ${error.message}`)
+            const urlObj = new URL(proxy.url)
+            proxyHost = urlObj.hostname
+        } catch {
+            proxyHost = proxy.url.replace(/^(https?|socks[45]):\/\//i, '').split(':')[0] || ''
         }
+        const ipVersion = this.detectIpVersion(proxyHost)
+        this.bot.logger.debug(this.bot.isMobile, 'BROWSER-IP-LOC', `Proxy IP version detected: ${ipVersion} (${proxyHost})`)
+
+        // Try multiple IP geolocation APIs in parallel for speed
+        // Using HTTP for ip-api (faster, works with all proxies)
+        // Using HTTPS for ipapi (more reliable)
+        const ipServices = [
+            { name: 'ip-api', url: 'http://ip-api.com/json/?fields=status,lat,lon,timezone,country,city,query', timeout: 4000 },
+            { name: 'ipapi', url: 'https://ipapi.co/json/', timeout: 4000 },
+        ]
+
+        const requests = ipServices.map(async (service) => {
+            try {
+                const response = await axios.request({
+                    url: service.url,
+                    method: 'GET',
+                    timeout: service.timeout
+                })
+                return { service: service.name, data: response.data }
+            } catch (err: any) {
+                return { service: service.name, error: err.message }
+            }
+        })
+
+        // Race to get first successful response
+        const results = await Promise.allSettled(requests)
+
+        for (const result of results) {
+            if (result.status === 'fulfilled' && !result.value.error) {
+                const { service, data } = result.value
+
+                // Parse different API response formats
+                let location: { lat: number; lon: number; timezone: string } | null = null
+
+                if (service === 'ip-api' && data.status === 'success') {
+                    location = {
+                        lat: data.lat,
+                        lon: data.lon,
+                        timezone: data.timezone
+                    }
+                } else if (service === 'ipapi' && data.latitude) {
+                    location = {
+                        lat: data.latitude,
+                        lon: data.longitude,
+                        timezone: data.timezone
+                    }
+                }
+
+                if (location) {
+                    this.bot.logger.debug(this.bot.isMobile, 'BROWSER-IP-LOC', `Detected via ${service}: ${location.lat}, ${location.lon} | ${location.timezone}`)
+                    return location
+                }
+            }
+        }
+
+        // Log which services failed
+        const failed = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+            .filter(r => r.value.error)
+            .map(r => `${r.value.service}: ${r.value.error}`)
+            .join(', ')
+
+        this.bot.logger.warn(this.bot.isMobile, 'BROWSER-IP-LOC', `All IP location services failed${failed ? ' - ' + failed : ''}`)
         return null
     }
 

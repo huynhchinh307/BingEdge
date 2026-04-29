@@ -266,6 +266,61 @@ export class Workers {
         }
     }
 
+    /**
+     * Đóng tab một cách an toàn — thử nhiều cách nếu close() thất bại
+     */
+    private async forceClosePage(tab: Page, label: string): Promise<void> {
+        if (tab.isClosed()) {
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Tab "${label}" already closed`)
+            return
+        }
+
+        // Cách 1: close() bình thường
+        try {
+            await tab.close()
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Closed tab "${label}" via close()`)
+            return
+        } catch (e) {
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `close() failed for "${label}": ${e instanceof Error ? e.message : String(e)}`)
+        }
+
+        // Cách 2: navigate về blank rồi close
+        try {
+            await tab.goto('about:blank', { timeout: 3000 }).catch(() => {})
+            await tab.close()
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Closed tab "${label}" via blank + close()`)
+            return
+        } catch (e) {
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `blank+close() failed for "${label}": ${e instanceof Error ? e.message : String(e)}`)
+        }
+
+        // Cách 3: evaluate window.close() từ bên trong tab
+        try {
+            await tab.evaluate(() => window.close())
+            this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Closed tab "${label}" via window.close()`)
+        } catch (e) {
+            this.bot.logger.warn(this.bot.isMobile, 'DASHBOARD-UI', `All close attempts failed for "${label}": ${e instanceof Error ? e.message : String(e)}`)
+        }
+    }
+
+    /**
+     * Dọn dẹp tất cả tab thừa — giữ lại tab dashboard chính
+     */
+    private async cleanupOrphanTabs(mainPage: Page): Promise<void> {
+        const context = mainPage.context()
+        const allPages = context.pages()
+
+        if (allPages.length <= 1) return
+
+        this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Cleaning up ${allPages.length - 1} orphan tab(s)`)
+
+        for (const tab of allPages) {
+            if (tab === mainPage || tab.isClosed()) continue
+            await this.forceClosePage(tab, tab.url() || 'unknown')
+            await this.bot.utils.wait(200)
+        }
+    }
+
     private async solveActivityViaUI(activity: BasePromotion, page: Page): Promise<boolean> {
         const offerId = activity.offerId
         this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `Attempting UI solve for "${activity.title}" | offerId=${offerId}`)
@@ -306,9 +361,9 @@ export class Workers {
             await element.hover()
             await this.bot.utils.wait(500)
 
-            // Listen for new tab being opened
+            // Listen for new tab — tăng timeout lên 15s để catch tab mở chậm
             const [newPage] = await Promise.all([
-                page.context().waitForEvent('page', { timeout: 8000 }).catch(() => null),
+                page.context().waitForEvent('page', { timeout: 15000 }).catch(() => null),
                 element.click()
             ])
 
@@ -316,18 +371,28 @@ export class Workers {
             this.bot.logger.info(this.bot.isMobile, 'DASHBOARD-UI', `Visit started. Waiting ${Math.round(waitTime/1000)}s...`)
 
             if (newPage) {
+                // Chờ tab load xong hoặc timeout
+                await (newPage as Page).waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
                 await this.bot.utils.wait(waitTime)
-                await newPage.close()
+
+                // Đóng tab an toàn
+                await this.forceClosePage(newPage as Page, activity.title)
+
+                // Dọn sạch bất kỳ tab thừa nào còn sót lại
+                await this.cleanupOrphanTabs(page)
+
                 this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', 'Closed spawned tab')
             } else {
-                // If it opened in the same window (user's point)
+                // Tab mở trong same window
                 await this.bot.utils.wait(waitTime)
                 
-                // If it navigated away, go back to dashboard for next tasks
+                // Dọn tab thừa (trường hợp tab mở nhưng waitForEvent bị miss)
+                await this.cleanupOrphanTabs(page)
+
+                // Nếu navigate sang trang khác thì back về dashboard
                 if (!page.url().includes('rewards.bing.com/dashboard')) {
                     this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', 'Task opened in same tab, navigating back')
                     await page.goBack({ waitUntil: 'networkidle' }).catch(async () => {
-                        // Fallback if back fails
                         await page.goto('https://rewards.bing.com/dashboard', { waitUntil: 'networkidle' })
                     })
                 }
@@ -336,6 +401,8 @@ export class Workers {
             return true
         } catch (error) {
             this.bot.logger.debug(this.bot.isMobile, 'DASHBOARD-UI', `UI Solve failed for "${activity.title}": ${error instanceof Error ? error.message : String(error)}`)
+            // Dọn tab thừa ngay cả khi lỗi
+            await this.cleanupOrphanTabs(page).catch(() => {})
             return false
         }
     }

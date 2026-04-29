@@ -24,6 +24,19 @@ export interface AccountProxy {
     username: string
     isProxyV6?: boolean
     bypass?: string
+    /**
+     * Optional fallback IPv4 proxy. When set together with a non-empty bypass list
+     * (root `bypass.txt`), browser traffic to bypass-matched hosts will be routed
+     * through this proxy instead of the main (typically IPv6) one.
+     */
+    v4?: AccountProxyV4
+}
+
+export interface AccountProxyV4 {
+    url: string
+    port: number
+    username?: string
+    password?: string
 }
 
 export interface ConfigSaveFingerprint {

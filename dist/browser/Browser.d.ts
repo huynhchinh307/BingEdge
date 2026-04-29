@@ -13,6 +13,17 @@ declare class Browser {
     constructor(bot: MicrosoftRewardsBot);
     createBrowser(account: Account): Promise<BrowserCreationResult>;
     private formatProxyServer;
+    /**
+     * Convert a comma-separated bypass pattern list (e.g. `*.live.com, microsoft.com`)
+     * into anchored case-insensitive RegExp objects matching hostnames.
+     */
+    private compileBypassPatterns;
+    /**
+     * Build a fully-qualified upstream proxy URL (with embedded credentials)
+     * suitable for passing to proxy-chain's `upstreamProxyUrl`.
+     */
+    private toUpstreamUrl;
+    private detectIpVersion;
     private getIpLocation;
     generateFingerprint(isMobile: boolean): Promise<BrowserFingerprintWithHeaders>;
 }

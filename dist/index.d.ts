@@ -38,6 +38,7 @@ export declare class MicrosoftRewardsBot {
     rewardsVersion: 'legacy' | 'modern';
     accessToken: string;
     requestToken: string;
+    email: string;
     cookies: {
         mobile: Cookie[];
         desktop: Cookie[];
@@ -63,7 +64,9 @@ export declare class MicrosoftRewardsBot {
     private runTasks;
     private getProxyKey;
     private acquireProxyLock;
+    private handleExistingLock;
     private releaseProxyLock;
+    private heartbeatLock;
     Main(account: Account): Promise<{
         initialPoints: number;
         collectedPoints: number;
