@@ -22,6 +22,7 @@ export declare const ConfigSchema: z.ZodDefault<z.ZodOptional<z.ZodObject<{
         doMobileSearch: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
         doDailyCheckIn: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
         doReadToEarn: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+        doExtraSearch: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
     }, z.core.$strip>>>;
     searchOnBingLocalQueries: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
     globalTimeout: z.ZodDefault<z.ZodOptional<z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>>>;
@@ -42,6 +43,10 @@ export declare const ConfigSchema: z.ZodDefault<z.ZodOptional<z.ZodObject<{
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
         }, z.core.$strip>>>;
         readDelay: z.ZodDefault<z.ZodOptional<z.ZodObject<{
+            min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
+            max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
+        }, z.core.$strip>>>;
+        extraSearchCount: z.ZodDefault<z.ZodOptional<z.ZodObject<{
             min: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
             max: z.ZodUnion<readonly [z.ZodNumber, z.ZodString]>;
         }, z.core.$strip>>>;

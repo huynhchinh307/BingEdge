@@ -134,7 +134,9 @@ function getDb() {
                 },
                 geminiApiKey: '',
                 geminiModel: 'gemini-1.5-flash',
-                geminiEndpoint: 'https://generativelanguage.googleapis.com'
+                geminiEndpoint: 'https://generativelanguage.googleapis.com',
+                apiOtpKey: '',
+                proxyRotationUrl: ''
             };
             _db.prepare('INSERT INTO app_config (id, data) VALUES (1, ?)').run(JSON.stringify(defaultConfig, null, 2));
             log('INFO', '[DB] Initialized app_config with default values.');
@@ -704,9 +706,10 @@ const server = http.createServer((req, res) => {
             
             const cleanAccounts = accounts.map(a => {
                 const proxy = _safeParse(a.proxy, {});
-                const isActiveDesktop = activeProcesses[`${a.email}-desktop`] !== undefined;
-                const isActiveMobile  = activeProcesses[`${a.email}-mobile`]  !== undefined;
-                const isActiveBot     = activeProcesses[`${a.email}-bot`]     !== undefined;
+                const isActiveDesktop     = activeProcesses[`${a.email}-desktop`]      !== undefined;
+                const isActiveMobile      = activeProcesses[`${a.email}-mobile`]       !== undefined;
+                const isActiveBot         = activeProcesses[`${a.email}-bot`]          !== undefined;
+                const isActiveExtraSearch = activeProcesses[`${a.email}-extra-search`] !== undefined;
 
                 let host = (proxy?.url || '').replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
                 let port = proxy?.port;
@@ -742,6 +745,7 @@ const server = http.createServer((req, res) => {
                     isActiveDesktop,
                     isActiveMobile,
                     isActiveBot,
+                    isActiveExtraSearch,
                     stats,
                     points:     ds?.points ?? 0,
                     rank:       accountStats[a.email]?.rank || ds?.rank || 'N/A',
@@ -790,6 +794,8 @@ const server = http.createServer((req, res) => {
                 let args;
                 if (type === 'bot') {
                     args = ['./dist/index.js', '-email', email];
+                } else if (type === 'extra-search') {
+                    args = ['./dist/index.js', '-email', email, '-script', 'SearchMore'];
                 } else {
                     args = ['./scripts/main/browserSession.js', '-email', email, '-force'];
                     if (type === 'mobile') args.push('-mobile');

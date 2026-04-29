@@ -102,6 +102,8 @@ export class MicrosoftRewardsBot {
     private login = new Login(this)
     private searchManager: SearchManager
 
+    public scenario: 'Day' | 'SearchMore' = 'Day'
+
     public axios!: AxiosClient
 
     constructor() {
@@ -149,10 +151,18 @@ export class MicrosoftRewardsBot {
         const totalAccounts = accountsToRun.length
         const runStartTime = Date.now()
 
+        const scriptIndex = process.argv.indexOf('-script')
+        if (scriptIndex !== -1 && scriptIndex + 1 < process.argv.length) {
+            const scenario = process.argv[scriptIndex + 1]
+            if (scenario === 'SearchMore') {
+                this.scenario = 'SearchMore'
+            }
+        }
+
         this.logger.info(
             'main',
             'RUN-START',
-            `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
+            `Starting Microsoft Rewards Script | scenario=${this.scenario} | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`
         )
 
         if (cluster.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
@@ -180,7 +190,7 @@ export class MicrosoftRewardsBot {
         const apiKey = this.config.geminiApiKey
         const model = this.config.geminiModel || 'gemini-1.5-flash'
         const endpoint = (this.config.geminiEndpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
-        
+
         if (!apiKey) {
             this.logger.error('main', 'GEMINI-CHECK', 'Gemini API Key is missing in config.json!')
             return false
@@ -190,7 +200,7 @@ export class MicrosoftRewardsBot {
 
         const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com')
         const axios = new AxiosClient({} as any) // Global test, proxy bypassed if not configured in request
-        
+
         try {
             let url = ''
             let data: any = {}
@@ -235,7 +245,7 @@ export class MicrosoftRewardsBot {
         const proxyGroups = new Map<string, Account[]>()
         for (const account of accounts) {
             const proxyKey = this.getProxyKey(account)
-            
+
             if (!proxyGroups.has(proxyKey)) {
                 proxyGroups.set(proxyKey, [])
             }
@@ -268,7 +278,7 @@ export class MicrosoftRewardsBot {
             worker.on('message', (msg: { __ipcLog?: IpcLog; __stats?: AccountStats[] }) => {
                 if (msg.__stats) {
                     allAccountStats.push(...msg.__stats)
-                    
+
                     // Update master account list with new points
                     msg.__stats.forEach(s => {
                         const acc = this.accounts.find(a => a.email.toLowerCase() === s.email.toLowerCase())
@@ -284,7 +294,7 @@ export class MicrosoftRewardsBot {
                     // Periodically save
                     saveAccounts(this.accounts)
                 }
-                
+
                 const log = msg.__ipcLog
 
                 if (log && typeof log.content === 'string') {
@@ -392,14 +402,26 @@ export class MicrosoftRewardsBot {
 
                     this.axios = new AxiosClient(account.proxy)
 
-                    const result = await this.Main(account).catch(error => {
-                        void this.logger.error(
-                            true,
-                            'FLOW',
-                            `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
-                        )
-                        return undefined
-                    })
+                    let result
+                    if (this.scenario === 'SearchMore') {
+                        result = await this.MainSearchMore(account).catch(error => {
+                            void this.logger.error(
+                                false,
+                                'FLOW-SEARCH-MORE',
+                                `SearchMore flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
+                            )
+                            return undefined
+                        })
+                    } else {
+                        result = await this.Main(account).catch(error => {
+                            void this.logger.error(
+                                true,
+                                'FLOW',
+                                `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`
+                            )
+                            return undefined
+                        })
+                    }
 
                     const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1)
 
@@ -414,7 +436,7 @@ export class MicrosoftRewardsBot {
                         account.duration = parseFloat(durationSeconds)
                         account.rank = result.rank
                         account.lastUpdate = new Date().toISOString()
-                        
+
                         // Ghi status riêng theo email — tránh race condition khi nhiều worker cùng ghi accounts.json
                         updateAccountStatus(accountEmail, {
                             points: accountFinalPoints,
@@ -424,7 +446,7 @@ export class MicrosoftRewardsBot {
                             rank: result.rank,
                             lastUpdate: account.lastUpdate
                         })
-                        
+
                         const stats: AccountStats = {
                             email: accountEmail,
                             initialPoints: accountInitialPoints,
@@ -471,7 +493,7 @@ export class MicrosoftRewardsBot {
                     // One of these might be true:
                     // 1. This is a single account run from Dashboard (accounts.length === 1)
                     // 2. This is the last account in a worker's chunk
-                    
+
                     if (accounts.length === 1) {
                         this.logger.warn(
                             false,
@@ -519,7 +541,7 @@ export class MicrosoftRewardsBot {
         // Normalize URL by stripping scheme prefix (http://, https://)
         let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim()
         let port = account.proxy.port
-        
+
         // If host already contains a port (e.g. "1.2.3.4:8080"), extract it and use it if port is not set
         if (host.includes(':')) {
             const parts = host.split(':')
@@ -538,7 +560,7 @@ export class MicrosoftRewardsBot {
             if (!fs.existsSync(lockDir)) {
                 fs.mkdirSync(lockDir, { recursive: true })
             }
-        } catch (e) {}
+        } catch (e) { }
 
         const safeKey = Buffer.from(proxyKey).toString('base64').replace(/[/+=]/g, '_')
         const lockPath = path.join(lockDir, `${safeKey}.lock`)
@@ -587,7 +609,7 @@ export class MicrosoftRewardsBot {
                     fs.unlinkSync(lockPath)
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number; rank?: string }> {
@@ -627,7 +649,7 @@ export class MicrosoftRewardsBot {
                 // Set geo
                 this.userData.geoLocale =
                     account.geoLocale === 'auto' ? data.userProfile.attributes.country : account.geoLocale.toLowerCase()
-                this.userData.langCode = 
+                this.userData.langCode =
                     account.langCode ? account.langCode.toLowerCase() : 'en'
 
                 if (this.userData.geoLocale.length > 2) {
@@ -650,8 +672,7 @@ export class MicrosoftRewardsBot {
                 this.logger.info(
                     'main',
                     'POINTS',
-                    `Earnable today | Mobile: ${this.pointsCanCollect} | Browser: ${
-                        browserEarnable.mobileSearchPoints
+                    `Earnable today | Mobile: ${this.pointsCanCollect} | Browser: ${browserEarnable.mobileSearchPoints
                     } | App: ${appEarnable?.totalEarnablePoints ?? 0} | ${accountEmail} | locale: ${this.userData.geoLocale}`
                 )
 
@@ -723,25 +744,65 @@ export class MicrosoftRewardsBot {
                     await executionContext.run({ isMobile: true, account }, async () => {
                         const cookies = await mobileSession!.context.cookies()
                         this.logger.debug(true, 'CLOSE-BROWSER', `Saving ${cookies.length} cookies to session folder!`)
-                        
+
                         const { saveSessionData } = await import('./util/Load')
                         await saveSessionData(this.config.sessionPath, cookies, accountEmail, true)
-                        
+
                         await this.utils.wait(1000)
 
                         // CLOSE THE BROWSER PROCESS COMPLETELY
                         const b = mobileSession!.browser
-                        if (b) await b.close().catch(() => {})
+                        if (b) await b.close().catch(() => { })
                         this.logger.info(true, 'CLOSE-BROWSER', 'Browser closed cleanly!')
                     })
                 } catch (e: any) {
                     this.logger.error(true, 'CLOSE-BROWSER', `Failed to close browser: ${e.message}`)
                     // If clean close failed, try to close browser object directly if available
                     if (mobileSession && (mobileSession as any).browser) {
-                        try { await (mobileSession as any).browser.close() } catch {}
+                        try { await (mobileSession as any).browser.close() } catch { }
                     }
                 }
             }
+        }
+    }
+
+    async MainSearchMore(account: Account): Promise<{ initialPoints: number; collectedPoints: number; rank?: string }> {
+        const accountEmail = account.email
+        this.logger.info('main', 'FLOW-SEARCH-MORE', `Starting SearchMore session for ${accountEmail}`)
+
+        try {
+            return await executionContext.run({ isMobile: false, account }, async () => {
+                const data = {
+                    userProfile: { attributes: { country: account.geoLocale === 'auto' ? 'US' : account.geoLocale.toUpperCase() } },
+                    userStatus: { availablePoints: 0 }
+                } as any
+
+                // Delegate to SearchManager – it will handle browser session creation, login, and extra searches
+                const {
+                    desktopPoints,
+                    rank
+                } = await this.searchManager.doSearches(
+                    data,
+                    { mobilePoints: 0, desktopPoints: 0 },
+                    {} as any,
+                    account,
+                    accountEmail
+                )
+
+                this.logger.info(
+                    'main',
+                    'SEARCH-MORE',
+                    `SearchMore complete | Collected: +${desktopPoints} | Rank: ${rank || 'N/A'} | ${accountEmail}`
+                )
+
+                return {
+                    initialPoints: 0,
+                    collectedPoints: desktopPoints || 0,
+                    rank: rank || ''
+                }
+            })
+        } finally {
+            // SearchManager handles its own browser closing in doSearches/doDesktopSearchSequential
         }
     }
 }

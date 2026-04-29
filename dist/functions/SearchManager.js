@@ -6,9 +6,9 @@ export class SearchManager {
     }
     async doSearches(data, missingSearchPoints, mobileSession, account, accountEmail) {
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `Start | account=${accountEmail} | mobileMissing=${missingSearchPoints.mobilePoints} | desktopMissing=${missingSearchPoints.desktopPoints}`);
-        const doMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0;
+        const doMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0 && this.bot.scenario !== 'SearchMore';
         const shouldDoDesktopWorkers = false; // Daily Set/Promotions moved to mobile context
-        const doDesktop = (this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0) || shouldDoDesktopWorkers;
+        const doDesktop = (this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0) || shouldDoDesktopWorkers || this.bot.config.workers.doExtraSearch || this.bot.scenario === 'SearchMore';
         const mobileStatus = this.bot.config.workers.doMobileSearch
             ? missingSearchPoints.mobilePoints > 0
                 ? 'run'
@@ -58,8 +58,8 @@ export class SearchManager {
     async doParallelSearches(data, missingSearchPoints, mobileSession, account, accountEmail, executionContext) {
         this.bot.logger.info('main', 'SEARCH-MANAGER', 'Parallel start');
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `Parallel config | account=${accountEmail} | mobileMissing=${missingSearchPoints.mobilePoints} | desktopMissing=${missingSearchPoints.desktopPoints}`);
-        const shouldDoMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0;
-        const shouldDoDesktop = this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0;
+        const shouldDoMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0 && this.bot.scenario !== 'SearchMore';
+        const shouldDoDesktop = (this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0) || this.bot.config.workers.doExtraSearch || this.bot.scenario === 'SearchMore';
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `Parallel flags | mobile=${shouldDoMobile} | desktop=${shouldDoDesktop}`);
         let desktopSession = null;
         let mobileContextClosed = false;
@@ -142,8 +142,8 @@ export class SearchManager {
     async doSequentialSearches(data, missingSearchPoints, mobileSession, account, accountEmail, executionContext) {
         this.bot.logger.info('main', 'SEARCH-MANAGER', 'Sequential start');
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `Sequential config | account=${accountEmail} | mobileMissing=${missingSearchPoints.mobilePoints} | desktopMissing=${missingSearchPoints.desktopPoints}`);
-        const shouldDoMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0;
-        const shouldDoDesktop = this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0;
+        const shouldDoMobile = this.bot.config.workers.doMobileSearch && missingSearchPoints.mobilePoints > 0 && this.bot.scenario !== 'SearchMore';
+        const shouldDoDesktop = (this.bot.config.workers.doDesktopSearch && missingSearchPoints.desktopPoints > 0) || this.bot.config.workers.doExtraSearch || this.bot.scenario === 'SearchMore';
         this.bot.logger.debug('main', 'SEARCH-MANAGER', `Sequential flags | mobile=${shouldDoMobile} | desktop=${shouldDoDesktop}`);
         let mobilePoints = 0;
         let desktopPoints = 0;
@@ -249,8 +249,20 @@ export class SearchManager {
         return await executionContext.run({ isMobile: false, accountEmail }, async () => {
             try {
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-PARALLEL', `Search start | target=${missingSearchPoints.desktopPoints}`);
-                await this.doDesktopWorkers(data);
-                const pointsEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false);
+                let pointsEarned = 0;
+                if (this.bot.scenario !== 'SearchMore') {
+                    await this.doDesktopWorkers(data);
+                    pointsEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false);
+                }
+                // Extra searches
+                if (this.bot.config.workers.doExtraSearch || this.bot.scenario === 'SearchMore') {
+                    const min = Number(this.bot.config.searchSettings.extraSearchCount.min);
+                    const max = Number(this.bot.config.searchSettings.extraSearchCount.max);
+                    const extraCount = Math.floor(Math.random() * (max - min + 1)) + min;
+                    this.bot.logger.info('main', 'SEARCH-MORE', `Triggering extra searches (Parallel) | count=${extraCount} | ${accountEmail}`);
+                    const extraEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false, extraCount);
+                    pointsEarned += extraEarned;
+                }
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-PARALLEL', `Search done | earned=${pointsEarned}/${missingSearchPoints.desktopPoints}`);
                 this.bot.logger.debug('main', 'SEARCH-DESKTOP-PARALLEL', `Result | account=${accountEmail} | earned=${pointsEarned}`);
                 return pointsEarned;
@@ -285,7 +297,7 @@ export class SearchManager {
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-SEQUENTIAL', 'Skip: worker disabled in config');
                 return 0;
             }
-            if (missingSearchPoints.desktopPoints === 0) {
+            if (missingSearchPoints.desktopPoints === 0 && this.bot.scenario !== 'SearchMore') {
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-SEQUENTIAL', 'Skip: no points left');
                 return 0;
             }
@@ -294,8 +306,20 @@ export class SearchManager {
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-SEQUENTIAL', 'Init desktop session');
                 desktopSession = await this.createDesktopSession(account, accountEmail);
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-SEQUENTIAL', `Search start | target=${missingSearchPoints.desktopPoints}`);
-                await this.doDesktopWorkSequentialInternal(data);
-                const pointsEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false);
+                let pointsEarned = 0;
+                if (this.bot.scenario !== 'SearchMore') {
+                    await this.doDesktopWorkSequentialInternal(data);
+                    pointsEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false);
+                }
+                // Extra searches
+                if (this.bot.config.workers.doExtraSearch || this.bot.scenario === 'SearchMore') {
+                    const min = Number(this.bot.config.searchSettings.extraSearchCount.min);
+                    const max = Number(this.bot.config.searchSettings.extraSearchCount.max);
+                    const extraCount = Math.floor(Math.random() * (max - min + 1)) + min;
+                    this.bot.logger.info('main', 'SEARCH-MORE', `Triggering extra searches (Sequential) | count=${extraCount} | ${accountEmail}`);
+                    const extraEarned = await this.bot.activities.doSearch(data, this.bot.mainDesktopPage, false, extraCount);
+                    pointsEarned += extraEarned;
+                }
                 this.bot.logger.info('main', 'SEARCH-DESKTOP-SEQUENTIAL', `Search done | earned=${pointsEarned}/${missingSearchPoints.desktopPoints}`);
                 this.bot.logger.debug('main', 'SEARCH-DESKTOP-SEQUENTIAL', `Result | account=${accountEmail} | earned=${pointsEarned}`);
                 return pointsEarned;

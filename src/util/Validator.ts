@@ -78,7 +78,8 @@ export const ConfigSchema = z.object({
         doDesktopSearch: z.boolean().optional().default(true),
         doMobileSearch: z.boolean().optional().default(true),
         doDailyCheckIn: z.boolean().optional().default(true),
-        doReadToEarn: z.boolean().optional().default(true)
+        doReadToEarn: z.boolean().optional().default(true),
+        doExtraSearch: z.boolean().optional().default(false)
     }).optional().default({
         doDailySet: true,
         doSpecialPromotions: true,
@@ -88,7 +89,8 @@ export const ConfigSchema = z.object({
         doDesktopSearch: true,
         doMobileSearch: true,
         doDailyCheckIn: true,
-        doReadToEarn: true
+        doReadToEarn: true,
+        doExtraSearch: false
     }),
     searchOnBingLocalQueries: z.boolean().optional().default(false),
     globalTimeout: NumberOrString.optional().default(120000),
@@ -99,7 +101,8 @@ export const ConfigSchema = z.object({
         queryEngines: z.array(QueryEngineSchema).optional().default(['google', 'wikipedia', 'reddit', 'local']),
         searchResultVisitTime: NumberOrString.optional().default('5-10s'),
         searchDelay: DelaySchema.optional().default({ min: '2s', max: '5s' }),
-        readDelay: DelaySchema.optional().default({ min: '1s', max: '3s' })
+        readDelay: DelaySchema.optional().default({ min: '1s', max: '3s' }),
+        extraSearchCount: DelaySchema.optional().default({ min: 10, max: 50 })
     }).optional().default({
         scrollRandomResults: true,
         clickRandomResults: true,
@@ -107,7 +110,8 @@ export const ConfigSchema = z.object({
         queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
         searchResultVisitTime: '5-10s',
         searchDelay: { min: '2s', max: '5s' },
-        readDelay: { min: '1s', max: '3s' }
+        readDelay: { min: '1s', max: '3s' },
+        extraSearchCount: { min: 10, max: 50 }
     }),
     debugLogs: z.boolean().optional().default(false),
     proxy: z.object({
@@ -147,7 +151,8 @@ export const ConfigSchema = z.object({
         doDesktopSearch: true,
         doMobileSearch: true,
         doDailyCheckIn: true,
-        doReadToEarn: true
+        doReadToEarn: true,
+        doExtraSearch: false
     },
     searchOnBingLocalQueries: false,
     globalTimeout: 120000,
@@ -158,7 +163,8 @@ export const ConfigSchema = z.object({
         queryEngines: ['google', 'wikipedia', 'reddit', 'local'],
         searchResultVisitTime: '5-10s',
         searchDelay: { min: '2s', max: '5s' },
-        readDelay: { min: '1s', max: '3s' }
+        readDelay: { min: '1s', max: '3s' },
+        extraSearchCount: { min: 10, max: 50 }
     },
     debugLogs: false,
     proxy: {

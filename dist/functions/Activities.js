@@ -16,9 +16,9 @@ export default class Activities {
         this.bot = bot;
     }
     // Browser Activities
-    doSearch = async (data, page, isMobile) => {
+    doSearch = async (data, page, isMobile, forceSearchCount) => {
         const search = new Search(this.bot);
-        return await search.doSearch(data, page, isMobile);
+        return await search.doSearch(data, page, isMobile, forceSearchCount);
     };
     doSearchOnBing = async (promotion, page) => {
         const searchOnBing = new SearchOnBing(this.bot);

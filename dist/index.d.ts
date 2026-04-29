@@ -51,6 +51,7 @@ export declare class MicrosoftRewardsBot {
     workers: Workers;
     private login;
     private searchManager;
+    scenario: 'Day' | 'SearchMore';
     axios: AxiosClient;
     constructor();
     get isMobile(): boolean;
@@ -64,6 +65,11 @@ export declare class MicrosoftRewardsBot {
     private acquireProxyLock;
     private releaseProxyLock;
     Main(account: Account): Promise<{
+        initialPoints: number;
+        collectedPoints: number;
+        rank?: string;
+    }>;
+    MainSearchMore(account: Account): Promise<{
         initialPoints: number;
         collectedPoints: number;
         rank?: string;

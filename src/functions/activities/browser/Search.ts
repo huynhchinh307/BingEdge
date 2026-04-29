@@ -9,7 +9,7 @@ export class Search extends Workers {
     private searchPageURL = ''
     private searchCount = 0
 
-    public async doSearch(data: DashboardData, page: Page, isMobile: boolean): Promise<number> {
+    public async doSearch(data: DashboardData, page: Page, isMobile: boolean, forceSearchCount?: number): Promise<number> {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0)
 
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`)
@@ -19,7 +19,8 @@ export class Search extends Workers {
         try {
             let searchCounters: Counters = await this.bot.browser.func.getSearchPoints()
             const missingPoints = this.bot.browser.func.missingSearchPoints(searchCounters, isMobile)
-            let missingPointsTotal = missingPoints.totalPoints
+            let missingPointsTotal = forceSearchCount ? forceSearchCount : missingPoints.totalPoints
+            let searchesDone = 0
 
             this.bot.logger.debug(
                 isMobile,
@@ -100,13 +101,16 @@ export class Search extends Workers {
                     )
                 }
 
-                missingPointsTotal = newMissingPointsTotal
+                missingPointsTotal = forceSearchCount ? (forceSearchCount - searchesDone) : newMissingPointsTotal
+                searchesDone++
 
-                if (missingPointsTotal === 0) {
+                if (missingPointsTotal <= 0) {
                     this.bot.logger.info(
                         isMobile,
                         'SEARCH-BING',
-                        'All required search points earned, stopping main search loop'
+                        forceSearchCount 
+                            ? `Completed forced search count (${forceSearchCount})`
+                            : 'All required search points earned, stopping main search loop'
                     )
                     break
                 }
@@ -213,7 +217,8 @@ export class Search extends Workers {
                             )
                         }
 
-                        missingPointsTotal = newMissingPointsTotal
+                        missingPointsTotal = forceSearchCount ? (forceSearchCount - searchesDone) : newMissingPointsTotal
+                        searchesDone++
 
                         if (missingPointsTotal === 0) {
                             this.bot.logger.info(

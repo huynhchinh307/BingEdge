@@ -96,6 +96,46 @@ function _safeParse(json, fallback) {
     try { return JSON.parse(json); } catch { return fallback; }
 }
 
+export function loadAccounts(projectRoot, isDev = false) {
+    const dbPath = path.join(projectRoot, 'rewards_data.db');
+    
+    // 1. Try SQLite first
+    try {
+        if (fs.existsSync(dbPath)) {
+            const db = new Database(dbPath, { readonly: true });
+            const rows = db.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all();
+            db.close();
+            
+            if (rows.length > 0) {
+                const accounts = rows.map(row => ({
+                    email:          row.email,
+                    password:        row.password,
+                    totpSecret:      row.totp_secret || '',
+                    recoveryEmail:   row.recovery_email || '',
+                    geoLocale:       row.geo_locale || 'auto',
+                    langCode:        row.lang_code || 'en',
+                    proxy:           _safeParse(row.proxy, {}),
+                    saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+                    group:           row.account_group || 'Ungrouped'
+                }));
+                return { data: accounts, path: dbPath };
+            }
+        }
+    } catch (e) {
+        log('WARN', `[DB] Could not read accounts: ${e.message} — trying JSON`);
+    }
+
+    // 2. Fallback: JSON
+    const possiblePaths = isDev
+        ? [path.join(projectRoot, 'src', 'accounts.dev.json')]
+        : [
+            path.join(projectRoot, 'accounts.json'),
+            path.join(projectRoot, 'dist', 'accounts.json')
+          ];
+    
+    return loadJsonFile(possiblePaths, true);
+}
+
 export function loadConfig(projectRoot, isDev = false) {
     // Ưu tiên đọc từ SQLite
     try {
@@ -149,42 +189,76 @@ export function loadConfig(projectRoot, isDev = false) {
     return result;
 }
 
-export function loadAccounts(projectRoot, isDev = false) {
-    // Ưu tiên đọc từ SQLite
+export function saveAccount(projectRoot, account, isDev = false) {
+    const dbPath = path.join(projectRoot, 'rewards_data.db');
+    const now = Date.now();
+
+    // 1. Save to SQLite
     try {
-        const dbPath = path.join(projectRoot, 'rewards_data.db');
-        if (fs.existsSync(dbPath)) {
-            const db = new Database(dbPath, { readonly: true });
-            const rows = db.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all();
-            db.close();
-            if (rows.length > 0) {
-                const accounts = rows.map(row => ({
-                    email:           row.email,
-                    password:        row.password,
-                    totpSecret:      row.totp_secret  || undefined,
-                    recoveryEmail:   row.recovery_email,
-                    geoLocale:       row.geo_locale,
-                    langCode:        row.lang_code,
-                    proxy:           _safeParse(row.proxy,            {}),
-                    saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
-                }));
-                return { data: accounts, path: dbPath };
-            }
-        }
+        const db = new Database(dbPath);
+        db.pragma('journal_mode = WAL');
+        
+        db.prepare(`
+            INSERT INTO accounts
+                (email, password, totp_secret, recovery_email, geo_locale, lang_code,
+                 proxy, save_fingerprint, account_group, created_at, updated_at)
+            VALUES
+                (@email, @password, @totp_secret, @recovery_email, @geo_locale, @lang_code,
+                 @proxy, @save_fingerprint, @account_group, @created_at, @updated_at)
+            ON CONFLICT(email) DO UPDATE SET
+                password         = @password,
+                totp_secret      = @totp_secret,
+                recovery_email   = @recovery_email,
+                geo_locale       = @geo_locale,
+                lang_code        = @lang_code,
+                proxy            = @proxy,
+                save_fingerprint = @save_fingerprint,
+                account_group    = @account_group,
+                updated_at       = @updated_at
+        `).run({
+            email: account.email,
+            password: account.password || '',
+            totp_secret: account.totpSecret || '',
+            recovery_email: account.recoveryEmail || '',
+            geo_locale: account.geoLocale || 'auto',
+            lang_code: account.langCode || 'vi',
+            proxy: JSON.stringify(account.proxy || {}),
+            save_fingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
+            account_group: account.group || 'Ungrouped',
+            created_at: now,
+            updated_at: now
+        });
+        db.close();
+        log('SUCCESS', `Account ${account.email} saved to database`);
     } catch (e) {
-        log('WARN', `[DB] Could not read accounts: ${e.message} — falling back to JSON`);
+        log('ERROR', `Failed to save account to DB: ${e.message}`);
     }
 
-    // Fallback: JSON (fresh install, DB chưa khởi tạo)
-    const possiblePaths = isDev
-        ? [path.join(projectRoot, 'src', 'accounts.dev.json')]
-        : [
-            path.join(projectRoot, 'dist', 'accounts.json'),
-            path.join(projectRoot, 'accounts.json'),
-            path.join(projectRoot, 'accounts.example.json')
-        ];
+    // 2. Save to JSON for fallback/backup
+    const jsonPath = isDev
+        ? path.join(projectRoot, 'src', 'accounts.dev.json')
+        : (fs.existsSync(path.join(projectRoot, 'accounts.json')) 
+            ? path.join(projectRoot, 'accounts.json')
+            : path.join(projectRoot, 'dist', 'accounts.json'));
 
-    return loadJsonFile(possiblePaths, true);
+    try {
+        let accounts = [];
+        if (fs.existsSync(jsonPath)) {
+            accounts = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        }
+        
+        const index = accounts.findIndex(a => a.email.toLowerCase() === account.email.toLowerCase());
+        if (index !== -1) {
+            accounts[index] = { ...accounts[index], ...account };
+        } else {
+            accounts.push(account);
+        }
+        
+        fs.writeFileSync(jsonPath, JSON.stringify(accounts, null, 2));
+        log('SUCCESS', `Account ${account.email} saved to ${path.basename(jsonPath)}`);
+    } catch (e) {
+        log('ERROR', `Failed to save account to JSON: ${e.message}`);
+    }
 }
 
 export function findAccountByEmail(accounts, email) {
@@ -217,6 +291,23 @@ export async function loadCookies(sessionBase, type = 'desktop') {
     }
 }
 
+export async function saveCookies(sessionBase, cookies, type = 'desktop') {
+    const cookiesFile = path.join(sessionBase, `session_${type}.json`)
+    const sessionDir = path.dirname(cookiesFile)
+
+    if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true })
+    }
+
+    try {
+        await fs.promises.writeFile(cookiesFile, JSON.stringify(cookies, null, 2))
+        log('SUCCESS', `Cookies saved to: ${cookiesFile}`)
+    } catch (error) {
+        log('ERROR', `Failed to save cookies to: ${cookiesFile}`)
+        log('ERROR', `Error: ${error.message}`)
+    }
+}
+
 export async function loadFingerprint(sessionBase, type = 'desktop') {
     const fpFile = path.join(sessionBase, `session_fingerprint_${type}.json`)
 
@@ -231,6 +322,23 @@ export async function loadFingerprint(sessionBase, type = 'desktop') {
         log('WARN', `Failed to load fingerprint from: ${fpFile}`)
         log('WARN', `Error: ${error.message}`)
         return null
+    }
+}
+
+export async function saveFingerprint(sessionBase, fingerprint, type = 'desktop') {
+    const fpFile = path.join(sessionBase, `session_fingerprint_${type}.json`)
+    const sessionDir = path.dirname(fpFile)
+
+    if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true })
+    }
+
+    try {
+        await fs.promises.writeFile(fpFile, JSON.stringify(fingerprint, null, 2))
+        log('SUCCESS', `Fingerprint saved to: ${fpFile}`)
+    } catch (error) {
+        log('ERROR', `Failed to save fingerprint to: ${fpFile}`)
+        log('ERROR', `Error: ${error.message}`)
     }
 }
 

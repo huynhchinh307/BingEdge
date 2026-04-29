@@ -4,14 +4,15 @@ export class Search extends Workers {
     bingHome = 'https://bing.com';
     searchPageURL = '';
     searchCount = 0;
-    async doSearch(data, page, isMobile) {
+    async doSearch(data, page, isMobile, forceSearchCount) {
         const startBalance = Number(this.bot.userData.currentPoints ?? 0);
         this.bot.logger.info(isMobile, 'SEARCH-BING', `Starting Bing searches | currentPoints=${startBalance}`);
         let totalGainedPoints = 0;
         try {
             let searchCounters = await this.bot.browser.func.getSearchPoints();
             const missingPoints = this.bot.browser.func.missingSearchPoints(searchCounters, isMobile);
-            let missingPointsTotal = missingPoints.totalPoints;
+            let missingPointsTotal = forceSearchCount ? forceSearchCount : missingPoints.totalPoints;
+            let searchesDone = 0;
             this.bot.logger.debug(isMobile, 'SEARCH-BING', `Initial search counters | mobile=${missingPoints.mobilePoints} | desktop=${missingPoints.desktopPoints} | edge=${missingPoints.edgePoints}`);
             this.bot.logger.info(isMobile, 'SEARCH-BING', `Search points remaining | Edge=${missingPoints.edgePoints} | Desktop=${missingPoints.desktopPoints} | Mobile=${missingPoints.mobilePoints}`);
             const queryCore = new QueryCore(this.bot);
@@ -54,9 +55,12 @@ export class Search extends Workers {
                     totalGainedPoints += gainedPoints;
                     this.bot.logger.info(isMobile, 'SEARCH-BING', `gainedPoints=${gainedPoints} points | query="${query}" | remaining=${newMissingPointsTotal}`, 'green');
                 }
-                missingPointsTotal = newMissingPointsTotal;
-                if (missingPointsTotal === 0) {
-                    this.bot.logger.info(isMobile, 'SEARCH-BING', 'All required search points earned, stopping main search loop');
+                missingPointsTotal = forceSearchCount ? (forceSearchCount - searchesDone) : newMissingPointsTotal;
+                searchesDone++;
+                if (missingPointsTotal <= 0) {
+                    this.bot.logger.info(isMobile, 'SEARCH-BING', forceSearchCount
+                        ? `Completed forced search count (${forceSearchCount})`
+                        : 'All required search points earned, stopping main search loop');
                     break;
                 }
                 if (stagnantLoop > stagnantLoopMax) {
@@ -116,7 +120,8 @@ export class Search extends Workers {
                             totalGainedPoints += gainedPoints;
                             this.bot.logger.info(isMobile, 'SEARCH-BING-EXTRA', `gainedPoints=${gainedPoints} points | query="${query}" | remaining=${newMissingPointsTotal}`, 'green');
                         }
-                        missingPointsTotal = newMissingPointsTotal;
+                        missingPointsTotal = forceSearchCount ? (forceSearchCount - searchesDone) : newMissingPointsTotal;
+                        searchesDone++;
                         if (missingPointsTotal === 0) {
                             this.bot.logger.info(isMobile, 'SEARCH-BING-EXTRA', 'All required search points earned during extra searches');
                             break;

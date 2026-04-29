@@ -5,7 +5,7 @@ export declare class Search extends Workers {
     private bingHome;
     private searchPageURL;
     private searchCount;
-    doSearch(data: DashboardData, page: Page, isMobile: boolean): Promise<number>;
+    doSearch(data: DashboardData, page: Page, isMobile: boolean, forceSearchCount?: number): Promise<number>;
     /**
      * Simulates human-like typing with variable delays, hesitation pauses, and
      * occasional typos (wrong adjacent key → notice → Backspace → retype correctly).

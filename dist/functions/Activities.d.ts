@@ -5,7 +5,7 @@ import type { Promotion } from '../interface/AppDashBoardData';
 export default class Activities {
     private bot;
     constructor(bot: MicrosoftRewardsBot);
-    doSearch: (data: DashboardData, page: Page, isMobile: boolean) => Promise<number>;
+    doSearch: (data: DashboardData, page: Page, isMobile: boolean, forceSearchCount?: number) => Promise<number>;
     doSearchOnBing: (promotion: BasePromotion, page: Page) => Promise<void>;
     doUrlReward: (promotion: BasePromotion, page?: Page) => Promise<void>;
     doQuiz: (promotion: BasePromotion, page?: Page) => Promise<void>;

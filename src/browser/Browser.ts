@@ -40,7 +40,8 @@ class Browser {
         '--disable-external-intent-requests',
         '--disable-blink-features=Attestation',
         '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys,WebAuthenticationProxy,U2F',
-        '--disable-save-password-bubble'
+        '--disable-save-password-bubble',
+        '--window-size=1920,1080'
     ] as const
 
     constructor(bot: MicrosoftRewardsBot) {
@@ -243,9 +244,9 @@ class Browser {
             browsers: [fingerprintBrowser],
             ...(isMobile ? {} : {
                 screen: {
-                    minWidth: 1366,
+                    minWidth: 1920,
                     maxWidth: 1920,
-                    minHeight: 768,
+                    minHeight: 1080,
                     maxHeight: 1080
                 }
             })

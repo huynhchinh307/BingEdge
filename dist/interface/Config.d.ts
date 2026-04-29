@@ -17,6 +17,8 @@ export interface Config {
     geminiApiKey?: string;
     geminiModel?: string;
     geminiEndpoint?: string;
+    apiOtpKey?: string;
+    proxyRotationUrl?: string;
 }
 export type QueryEngine = 'google' | 'wikipedia' | 'reddit' | 'local' | 'gemini';
 export interface ConfigSearchSettings {
@@ -27,6 +29,7 @@ export interface ConfigSearchSettings {
     searchResultVisitTime: number | string;
     searchDelay: ConfigDelay;
     readDelay: ConfigDelay;
+    extraSearchCount: ConfigDelay;
 }
 export interface ConfigDelay {
     min: number | string;
@@ -45,6 +48,7 @@ export interface ConfigWorkers {
     doMobileSearch: boolean;
     doDailyCheckIn: boolean;
     doReadToEarn: boolean;
+    doExtraSearch: boolean;
 }
 export interface ConfigWebhook {
     discord?: WebhookDiscordConfig;

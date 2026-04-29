@@ -50,6 +50,7 @@ export class MicrosoftRewardsBot {
     workers;
     login = new Login(this);
     searchManager;
+    scenario = 'Day';
     axios;
     constructor() {
         this.userData = {
@@ -91,7 +92,14 @@ export class MicrosoftRewardsBot {
         }
         const totalAccounts = accountsToRun.length;
         const runStartTime = Date.now();
-        this.logger.info('main', 'RUN-START', `Starting Microsoft Rewards Script | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`);
+        const scriptIndex = process.argv.indexOf('-script');
+        if (scriptIndex !== -1 && scriptIndex + 1 < process.argv.length) {
+            const scenario = process.argv[scriptIndex + 1];
+            if (scenario === 'SearchMore') {
+                this.scenario = 'SearchMore';
+            }
+        }
+        this.logger.info('main', 'RUN-START', `Starting Microsoft Rewards Script | scenario=${this.scenario} | v${pkg.version} | Accounts: ${totalAccounts} | Clusters: ${this.config.clusters}`);
         if (cluster.isPrimary && this.config.searchSettings.queryEngines.includes('gemini')) {
             const ok = await this.testGeminiConnection();
             if (!ok) {
@@ -280,10 +288,19 @@ export class MicrosoftRewardsBot {
                     this.userData.userName = this.utils.getEmailUsername(accountEmail);
                     this.logger.info('main', 'ACCOUNT-START', `Starting account: ${accountEmail} | geoLocale: ${account.geoLocale}`);
                     this.axios = new AxiosClient(account.proxy);
-                    const result = await this.Main(account).catch(error => {
-                        void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
-                        return undefined;
-                    });
+                    let result;
+                    if (this.scenario === 'SearchMore') {
+                        result = await this.MainSearchMore(account).catch(error => {
+                            void this.logger.error(false, 'FLOW-SEARCH-MORE', `SearchMore flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
+                            return undefined;
+                        });
+                    }
+                    else {
+                        result = await this.Main(account).catch(error => {
+                            void this.logger.error(true, 'FLOW', `Mobile flow failed for ${accountEmail}: ${error instanceof Error ? error.message : String(error)}`);
+                            return undefined;
+                        });
+                    }
                     const durationSeconds = ((Date.now() - accountStartTime) / 1000).toFixed(1);
                     if (result) {
                         const collectedPoints = result.collectedPoints ?? 0;
@@ -562,6 +579,29 @@ export class MicrosoftRewardsBot {
                     }
                 }
             }
+        }
+    }
+    async MainSearchMore(account) {
+        const accountEmail = account.email;
+        this.logger.info('main', 'FLOW-SEARCH-MORE', `Starting SearchMore session for ${accountEmail}`);
+        try {
+            return await executionContext.run({ isMobile: false, account }, async () => {
+                const data = {
+                    userProfile: { attributes: { country: account.geoLocale === 'auto' ? 'US' : account.geoLocale.toUpperCase() } },
+                    userStatus: { availablePoints: 0 }
+                };
+                // Delegate to SearchManager – it will handle browser session creation, login, and extra searches
+                const { desktopPoints, rank } = await this.searchManager.doSearches(data, { mobilePoints: 0, desktopPoints: 0 }, {}, account, accountEmail);
+                this.logger.info('main', 'SEARCH-MORE', `SearchMore complete | Collected: +${desktopPoints} | Rank: ${rank || 'N/A'} | ${accountEmail}`);
+                return {
+                    initialPoints: 0,
+                    collectedPoints: desktopPoints || 0,
+                    rank: rank || ''
+                };
+            });
+        }
+        finally {
+            // SearchManager handles its own browser closing in doSearches/doDesktopSearchSequential
         }
     }
 }

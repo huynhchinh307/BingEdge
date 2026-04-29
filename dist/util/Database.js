@@ -180,7 +180,8 @@ function _migrateFromJson(db) {
                     doDesktopSearch: true,
                     doMobileSearch: true,
                     doDailyCheckIn: true,
-                    doReadToEarn: true
+                    doReadToEarn: true,
+                    doExtraSearch: false
                 },
                 searchOnBingLocalQueries: false,
                 globalTimeout: 120000,
@@ -191,7 +192,8 @@ function _migrateFromJson(db) {
                     parallelSearching: false,
                     searchResultVisitTime: '5-10s',
                     searchDelay: { min: '2s', max: '5s' },
-                    readDelay: { min: '1s', max: '3s' }
+                    readDelay: { min: '1s', max: '3s' },
+                    extraSearchCount: { min: 10, max: 50 }
                 },
                 proxy: {
                     enable: false,
@@ -223,7 +225,9 @@ function _migrateFromJson(db) {
                 },
                 geminiApiKey: '',
                 geminiModel: 'gemini-1.5-flash',
-                geminiEndpoint: 'https://generativelanguage.googleapis.com'
+                geminiEndpoint: 'https://generativelanguage.googleapis.com',
+                apiOtpKey: '',
+                proxyRotationUrl: ''
             };
             db.prepare('INSERT INTO app_config (id, data) VALUES (1, ?)').run(JSON.stringify(defaultConfig, null, 2));
             console.log('[DB] No config found, initialized with default values.');

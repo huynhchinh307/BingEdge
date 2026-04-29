@@ -154,7 +154,15 @@ async function main() {
             const bOptions = {
                 devices: isMobile ? ['mobile'] : ['desktop'],
                 operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'macos', 'linux'],
-                browsers: [fingerprintBrowser]
+                browsers: [fingerprintBrowser],
+                ...(isMobile ? {} : {
+                    screen: {
+                        minWidth: 1920,
+                        maxWidth: 1920,
+                        minHeight: 1080,
+                        maxHeight: 1080
+                    }
+                })
             }
             fingerprint = fingerprintGenerator.getFingerprint(bOptions)
 
@@ -215,7 +223,8 @@ async function main() {
             '--disable-user-media-security=true',
             '--disable-blink-features=Attestation',
             '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys',
-            '--disable-save-password-bubble'
+            '--disable-save-password-bubble',
+            '--window-size=1920,1080'
         ]
     })
 
