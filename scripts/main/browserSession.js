@@ -45,17 +45,25 @@ if (!account) {
 }
 
 async function getIpLocation(proxyConfig) {
+    const isNoProxy = !proxyConfig || !proxyConfig.server
+    const hostPart = isNoProxy ? '' : proxyConfig.server.replace(/^(https?|socks[45]):\/\//i, '').split(':')[0]
+    const isV6 = !isNoProxy && (proxyConfig.isProxyV6 || hostPart.includes('[') || (hostPart.includes(':') && !hostPart.includes('.')))
+
+    if (isV6) {
+        log('INFO', 'IPv6 Proxy detected. Location sync might be slow or fail.')
+    }
+
     const { default: axios } = await import('axios')
     let axiosAgent = null
 
-    if (proxyConfig && proxyConfig.server) {
+    if (!isNoProxy) {
         const { HttpsProxyAgent } = await import('https-proxy-agent')
         const { HttpProxyAgent } = await import('http-proxy-agent')
         const { SocksProxyAgent } = await import('socks-proxy-agent')
-        
+
         const serverUrl = proxyConfig.server.includes('://') ? proxyConfig.server : `http://${proxyConfig.server}`
         const urlObj = new URL(serverUrl)
-        
+
         let proxyUrl = serverUrl
         if (proxyConfig.username && proxyConfig.password) {
             proxyUrl = `${urlObj.protocol}//${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@${urlObj.host}`
@@ -71,10 +79,10 @@ async function getIpLocation(proxyConfig) {
     }
 
     const services = [
-        'http://v6.ipify.org?format=json',
         'http://api64.ipify.org?format=json',
         'http://ip.nf/me.json',
-        'http://ip-api.com/json'
+        'http://ip-api.com/json',
+        'https://ipinfo.io/json'
     ]
 
     for (const url of services) {
@@ -82,10 +90,10 @@ async function getIpLocation(proxyConfig) {
             const response = await axios.get(url, {
                 httpsAgent: axiosAgent,
                 httpAgent: axiosAgent,
-                timeout: 15000, // Tăng lên 15s cho Proxy v6 chậm
+                timeout: isV6 ? 20000 : 10000,
                 headers: { 'User-Agent': 'Mozilla/5.0' }
             })
-            
+
             if (response.data) {
                 const d = response.data
                 const data = {
@@ -98,9 +106,18 @@ async function getIpLocation(proxyConfig) {
                 }
             }
         } catch (e) {
+            log('WARN', `IP API (${new URL(url).hostname}) failed: ${e.message}`)
             continue
         }
     }
+
+    if (isV6 || isNoProxy) {
+        log('WARN', 'Could not sync location. Using default system timezone/location.')
+        return null // Allow proceeding without strict location for V6/NoProxy
+    }
+
+    log('ERROR', 'All IP Location services failed. Stopping flow to prevent IP leak.')
+    process.exit(1)
     return null
 }
 
@@ -248,7 +265,7 @@ async function main() {
 
     let context
     if (fingerprint) {
-        context = await newInjectedContext(browser, { 
+        context = await newInjectedContext(browser, {
             fingerprint,
             newContextOptions: {
                 timezoneId: ipLocation?.timezone,
@@ -287,11 +304,11 @@ async function main() {
                             },
                             timestamp: Date.now(),
                         });
-                        return 1337; 
+                        return 1337;
                     },
-                    clearWatch: () => {},
+                    clearWatch: () => { },
                 };
-                
+
                 // Ghi đè thực sự navigator.geolocation
                 Object.defineProperty(navigator, 'geolocation', {
                     value: mockGeo,
@@ -299,7 +316,7 @@ async function main() {
                     enumerable: true,
                     writable: true
                 });
-                
+
                 // Vô hiệu hóa WebAuthn
                 Object.defineProperty(navigator, 'credentials', {
                     value: {
@@ -337,6 +354,8 @@ async function main() {
         // Mở trang Bing (base page) thay vì trang trắng
         await page.goto('https://www.bing.com')
         log('SUCCESS', 'Browser opened with base page (Bing)')
+        await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel')
+        log('SUCCESS', 'Browser opened with base page (Bing dashboard)')
     } catch (e) {
         log('WARN', `Could not open base page: ${e.message}`)
     }

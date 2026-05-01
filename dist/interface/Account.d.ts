@@ -19,8 +19,8 @@ export interface AccountProxy {
     proxyAxios: boolean;
     url: string;
     port: number;
-    password: string;
-    username: string;
+    password?: string;
+    username?: string;
     isProxyV6?: boolean;
     bypass?: string;
     /**

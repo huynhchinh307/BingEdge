@@ -375,7 +375,8 @@ export function buildProxyConfig(account) {
     }
 
     const proxy = {
-        server: `${protocol}://${host}:${account.proxy.port}`
+        server: `${protocol}://${host}:${account.proxy.port}`,
+        isProxyV6: !!account.proxy.isProxyV6
     }
 
     if (bypassString) {

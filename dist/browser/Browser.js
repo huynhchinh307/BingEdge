@@ -31,6 +31,17 @@ class Browser {
     async createBrowser(account) {
         let browser;
         let chainServer = null;
+        // Determine effective proxy (Account proxy takes precedence, then Global fallback)
+        const globalProxy = this.bot.config.proxy;
+        const effectiveProxy = account.proxy.url
+            ? account.proxy
+            : (globalProxy && globalProxy.enable && globalProxy.url ? {
+                url: globalProxy.url,
+                port: Number(globalProxy.port) || 0,
+                username: globalProxy.username || undefined,
+                password: globalProxy.password || undefined,
+                proxyAxios: true
+            } : null);
         try {
             let bypassString = undefined;
             const bypassFilePath = path.join(process.cwd(), 'bypass.txt');
@@ -75,16 +86,19 @@ class Browser {
                 proxyConfig = { server: `http://127.0.0.1:${localPort}` };
                 this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Proxy router on 127.0.0.1:${localPort} | V6 default + V4 fallback for ${bypassPatterns.length} bypass pattern(s)`);
             }
-            else if (account.proxy.url) {
+            else if (effectiveProxy && effectiveProxy.url) {
                 proxyConfig = {
-                    server: this.formatProxyServer(account.proxy),
+                    server: this.formatProxyServer(effectiveProxy),
                     bypass: bypassString,
-                    ...(account.proxy.username &&
-                        account.proxy.password && {
-                        username: account.proxy.username,
-                        password: account.proxy.password
+                    ...(effectiveProxy.username &&
+                        effectiveProxy.password && {
+                        username: effectiveProxy.username,
+                        password: effectiveProxy.password
                     })
                 };
+                if (!account.proxy.url && globalProxy.enable) {
+                    this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Using global fallback proxy: ${effectiveProxy.url}:${effectiveProxy.port}`);
+                }
             }
             this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Launching stealth browser (Patchright)`);
             browser = await patchright.chromium.launch({
@@ -114,7 +128,7 @@ class Browser {
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile));
             const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`;
             this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Syncing location and timezone with IP...`);
-            const ipLocation = await this.getIpLocation(account.proxy);
+            const ipLocation = await this.getIpLocation(effectiveProxy || {});
             const context = await newInjectedContext(browser, {
                 fingerprint,
                 newContextOptions: {

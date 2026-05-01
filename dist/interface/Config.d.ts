@@ -36,6 +36,11 @@ export interface ConfigDelay {
     max: number | string;
 }
 export interface ConfigProxy {
+    enable: boolean;
+    url: string;
+    port: number | string;
+    username?: string;
+    password?: string;
     queryEngine: boolean;
 }
 export interface ConfigWorkers {

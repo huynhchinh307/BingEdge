@@ -138,8 +138,16 @@ export class MicrosoftRewardsBot {
             return false;
         }
         this.logger.info('main', 'GEMINI-CHECK', 'Testing Gemini API connectivity...');
+        const globalProxy = this.config.proxy;
+        const proxyObj = (globalProxy && globalProxy.enable && globalProxy.url) ? {
+            url: globalProxy.url,
+            port: Number(globalProxy.port) || 0,
+            username: globalProxy.username || undefined,
+            password: globalProxy.password || undefined,
+            proxyAxios: true
+        } : {};
         const isOpenAI = endpoint.includes('/v1') && !endpoint.includes('generativelanguage.googleapis.com');
-        const axios = new AxiosClient({}); // Global test, proxy bypassed if not configured in request
+        const axios = new AxiosClient(proxyObj);
         try {
             let url = '';
             let data = {};
