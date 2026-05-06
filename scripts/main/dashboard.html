@@ -575,6 +575,17 @@
         }
 
         /* Status badge */
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -771,6 +782,24 @@
             background: #f472b6;
             border-color: #f472b6;
             color: #fff;
+        }
+
+        .btn.redem-btn {
+            color: #fbbf24;
+            border-color: rgba(251, 191, 36, 0.25);
+            background: rgba(251, 191, 36, 0.08);
+        }
+
+        .btn.redem-btn:hover {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: #fff;
+        }
+
+        .btn.redem-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .btn.running {
@@ -1204,14 +1233,15 @@
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">System Uptime</div>
-            <div class="stat-value" id="statUptime">—</div>
-            <div class="stat-sub" id="statUptimeSub">—</div>
+            <div class="stat-label">Total Accounts</div>
+            <div class="stat-value" id="statTotalAccounts">—</div>
+            <div class="stat-sub" id="statTotalAccountsSub">Accounts in database</div>
             <div class="stat-bar-track">
-                <div class="stat-bar-fill" id="statUptimeBar" style="width:100%; background: rgba(99,102,241,0.5);">
+                <div class="stat-bar-fill" id="statTotalAccountsBar" style="width:100%; background: var(--accent);">
                 </div>
             </div>
         </div>
+        <div id="tagStatsContainer" style="display: contents;"></div>
     </div>
 
     <div class="dashboard-container">
@@ -1221,6 +1251,16 @@
                     <div class="loading-spinner"></div>
                 </div>
                 <div id="accountsListContainer" style="display: none;">
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem;">
+                        <div class="cfg-field" style="flex: 1; max-width: 400px;">
+                            <input type="text" id="accountSearch" class="form-input" placeholder="Search email, proxy, tag, rank..."
+                                style="padding: 0.5rem 0.75rem; font-size: 0.9rem;"
+                                oninput="debouncedSearch()">
+                        </div>
+                        <span id="filteredCount" style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;"></span>
+                        <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="expandAllGroups()" title="Expand all groups">Expand All</button>
+                        <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="collapseAllGroups()" title="Collapse all groups">Collapse All</button>
+                    </div>
                     <div class="toolbar">
                         <div style="display: flex; align-items: center; gap: 1rem;">
                             <div class="checkbox-wrapper">
@@ -1251,6 +1291,9 @@
                             </button>
                             <button id="bulkGroupBtn" class="btn" style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);" onclick="bulkChangeGroup()" title="Move selected to group">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                            </button>
+                            <button id="bulkRemoveProxyBtn" class="btn" style="padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #f59e0b;" onclick="bulkRemoveProxyByGroup()" title="Remove proxies from group">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                             </button>
                             <button class="btn" onclick="clearAllLocks()" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); font-weight: 600; padding: 0.6rem 1rem;" title="Clear all proxy locks (.locks folder)">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm3.012 3.012L21 10m-3 3l3 3m-3-3l-3-3m3 3l-3 3"></path><path d="M10.5 3.5a2.121 2.121 0 0 0-3 0l-4 4a2.121 2.121 0 0 0 0 3"></path><path d="M14.5 20.5a2.121 2.121 0 0 1 3 0l4-4a2.121 2.121 0 0 1 0-3"></path></svg>
@@ -1286,6 +1329,7 @@
                                     </th>
                                     <th>Account</th>
                                     <th>Points</th>
+                                    <th>Tag</th>
                                     <th>Daily Status</th>
                                     <th>Rank</th>
                                     <th>Worker</th>
@@ -1378,6 +1422,15 @@
                             <input type="text" id="accGroupName" class="form-input" list="groupSuggestions" value="Ungrouped"
                                 style="padding: 0.4rem 0.6rem;">
                             <datalist id="groupSuggestions"></datalist>
+                        </div>
+                        <div class="cfg-field">
+                            <label style="font-size: 0.8rem;">Tag (Goal)</label>
+                            <select id="accTag" class="form-input" style="padding: 0.4rem 0.6rem;">
+                                <option value="">No Tag</option>
+                                <option value="Car">Car (2,950 pts)</option>
+                                <option value="Mart">Mart (5,460 pts)</option>
+                                <option value="Jollibee">Jollibee (5,460 pts)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -1823,7 +1876,7 @@
             } else {
                 collapsedGroups.add(groupName);
             }
-            renderAccounts(lastAccounts);
+            renderAccounts(lastAccounts, true);
         }
 
         async function fetchAccounts() {
@@ -1857,6 +1910,8 @@
             if (checked) selectedEmails.add(email);
             else selectedEmails.delete(email);
             updateSelectedCount();
+            // Re-render to update group header checkbox states
+            renderAccounts(lastAccounts, true);
         }
 
         function toggleSelectAll() {
@@ -1868,6 +1923,8 @@
                 else selectedEmails.delete(cb.value);
             });
             updateSelectedCount();
+            // Force re-render to update any selection-dependent styling
+            renderAccounts(lastAccounts, true);
         }
 
         function updateSelectedCount() {
@@ -2077,251 +2134,286 @@
         }
 
         let lastAccounts = [];
-        let lastTableHTML = '';
+        let filteredAccounts = [];
+        let searchQuery = '';
+        let renderPending = false;
 
         function isCompletedToday(lastUpdateIso) {
             if (!lastUpdateIso || lastUpdateIso === 'Never') return false;
-
             const lastUpdate = new Date(lastUpdateIso);
             const now = new Date();
-
-            // Reset boundary: 07:00 AM UTC+7 = 00:00 UTC every day.
-            // We need to find the most recent 00:00 UTC moment that is <= now.
-            // That is: floor(now) to UTC midnight of the same UTC date.
-            // BUT if now is exactly at midnight, that boundary is "now" itself.
-            //
-            // Build "today midnight UTC" correctly:
             const todayMidnightUTC = new Date(Date.UTC(
-                now.getUTCFullYear(),
-                now.getUTCMonth(),
-                now.getUTCDate(),
-                0, 0, 0, 0
+                now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0
             ));
-
-            // todayMidnightUTC is always <= now (same UTC date, hour set to 0).
-            // This is the last reset boundary.
-            // If the account's lastUpdate is after this boundary → completed today.
             return lastUpdate > todayMidnightUTC;
         }
 
-        function renderAccounts(accounts) {
-            lastAccounts = accounts;
-            document.getElementById('loader').style.display = 'none';
-            const listContainer = document.getElementById('accountsListContainer');
-            const emptyState = document.getElementById('emptyState');
-            const tbody = document.getElementById('accountsTableBody');
+        function filterAccounts(accounts, query) {
+            if (!query) return accounts;
+            const q = query.toLowerCase();
+            return accounts.filter(a =>
+                (a.email || '').toLowerCase().includes(q) ||
+                (a.proxy || '').toLowerCase().includes(q) ||
+                (a.tag || '').toLowerCase().includes(q) ||
+                (a.rank || '').toLowerCase().includes(q) ||
+                (a.group || 'Ungrouped').toLowerCase().includes(q)
+            );
+        }
 
-            if (accounts.length === 0) {
-                listContainer.style.display = 'none';
-                emptyState.style.display = 'block';
-                return;
+        let searchTimeout = null;
+        function debouncedSearch() {
+            const val = document.getElementById('accountSearch').value;
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchQuery = val;
+                renderAccounts(lastAccounts, true);
+            }, 300);
+        }
+
+        function expandAllGroups() {
+            filteredAccounts.forEach(a => collapsedGroups.delete(a.group || 'Ungrouped'));
+            renderAccounts(lastAccounts, true);
+        }
+
+        function collapseAllGroups() {
+            const groups = [...new Set(filteredAccounts.map(a => a.group || 'Ungrouped'))];
+            groups.forEach(g => collapsedGroups.add(g));
+            renderAccounts(lastAccounts, true);
+        }
+
+        // --- Incremental row rendering ---
+        const rowCache = new Map(); // email -> {tr, lastDataHash}
+
+        function hashAccount(acc) {
+            // Fast hash of visual state
+            const s = acc.stats || {};
+            return [
+                acc.isActiveBot, acc.isActiveDesktop, acc.isActiveMobile, acc.isActiveExtraSearch,
+                acc.needsRelogin, acc.points, acc.rank, acc.lastUpdate,
+                s.total, s.newBalance, acc.stats?.isProxyBusy, acc.stats?.status,
+                queuedEmails.has(acc.email), selectedEmails.has(acc.email)
+            ].join('|');
+        }
+
+        function buildRowHTML(acc) {
+            const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile || acc.isActiveExtraSearch;
+            const isQueued = queuedEmails.has(acc.email);
+            const isProxyBusy = acc.stats?.isProxyBusy || acc.stats?.status === 'proxy-busy';
+            const s = acc.stats || (acc.points ? { newBalance: acc.points } : null);
+            const currentPoints = s?.newBalance || 0;
+            const tag = acc.tag || '';
+            let isReady = false;
+            if (tag === 'Car' && currentPoints >= 2950) isReady = true;
+            else if ((tag === 'Mart' || tag === 'Jollibee') && currentPoints >= 5460) isReady = true;
+
+            const rowStyle = isReady ? 'background: rgba(16, 185, 129, 0.08);' : '';
+            const borderStyle = isReady ? 'border-left: 3px solid var(--success);' : '';
+
+            const statusHtml = acc.needsRelogin
+                ? `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer;" onclick="openSession('${acc.email}', 'bot')" title="Click to restart">🔒 Need Login</span>`
+                : isProxyBusy
+                    ? `<span class="status-badge proxy-busy" title="Proxy is currently in use by another process">Proxy Busy</span>`
+                    : isRunning
+                        ? `<span class="status-badge active">Running</span>`
+                        : isQueued
+                            ? `<span class="status-badge queued">Queued</span>`
+                            : `<span class="status-badge">Idle</span>`;
+
+            const getBtnState = (type) => {
+                let isActive = false, label = '', colorClass = '', svg = '';
+                if (type === 'bot') {
+                    isActive = acc.isActiveBot; label = 'Bot'; colorClass = 'bot-btn';
+                    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                } else if (type === 'mobile') {
+                    isActive = acc.isActiveMobile; label = 'Mob'; colorClass = 'mobile-btn';
+                    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
+                } else {
+                    isActive = acc.isActiveDesktop; label = 'PC'; colorClass = 'open-btn';
+                    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
+                }
+                if (isActive) {
+                    return `<button class="btn stop-btn" style="padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>`;
+                }
+                return `<button class="btn ${colorClass}" style="padding: 0.3rem 0.45rem;" onclick="openSession('${acc.email}', '${type}')" title="Start ${label}">${svg}</button>`;
+            };
+
+            const isChecked = selectedEmails.has(acc.email) ? 'checked' : '';
+
+            let pointsHtml = '<span style="color:var(--text-muted);font-size:0.9rem;">—</span>';
+            if (acc.isActiveBot) {
+                pointsHtml = `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.95rem;color:#f59e0b;font-weight:600;">Running...</span></div>`;
+            } else if (acc.stats) {
+                const s = acc.stats;
+                const total = s.total ?? 0;
+                const newBal = s.newBalance ?? null;
+                const earned = total >= 0 ? `+${total}` : `${total}`;
+                const color = total > 0 ? '#10b981' : total < 0 ? '#ef4444' : 'var(--text-muted)';
+                pointsHtml = `<div style="font-size:1.05rem;font-weight:700;color:#fff;">${newBal !== null ? newBal.toLocaleString() : '—'} <span style="font-size:0.85rem;color:${color};font-weight:500;">(${earned})</span></div>`;
+            } else if (acc.points) {
+                pointsHtml = `<div style="font-size:1.05rem;font-weight:700;color:#fff;">${acc.points.toLocaleString()} <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">(saved)</span></div>`;
             }
 
-            listContainer.style.display = 'block';
-            emptyState.style.display = 'none';
-
-            // Update group suggestions for the modal
-            const groups = [...new Set(accounts.map(a => a.group || 'Ungrouped'))];
-            const datalist = document.getElementById('groupSuggestions');
-            if (datalist) {
-                datalist.innerHTML = groups.map(g => `<option value="${g}">`).join('');
+            let dailyStatusHtml = `<span class="status-badge" style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">⏳ Pending</span>`;
+            if (acc.needsRelogin) {
+                dailyStatusHtml = `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer;" onclick="openSession('${acc.email}', 'bot')" title="Click to restart">🔒 Need Login</span>`;
+            } else if (isCompletedToday(acc.lastUpdate)) {
+                dailyStatusHtml = `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`;
             }
 
-            // Group accounts
-            const grouped = accounts.reduce((acc, obj) => {
-                const key = obj.group || 'Ungrouped';
-                if (!acc[key]) acc[key] = [];
-                acc[key].push(obj);
-                return acc;
-            }, {});
+            const r = acc.rank || '';
+            let rankCls = 'rank-na';
+            if (r.includes('Gold')) rankCls = 'rank-gold';
+            else if (r.includes('Silver')) rankCls = 'rank-silver';
+            else if (r.includes('Member')) rankCls = 'rank-member';
 
-            const sortedGroupNames = Object.keys(grouped).sort((a,b) => {
-                if (a === 'Ungrouped') return 1;
-                if (b === 'Ungrouped') return -1;
-                return a.localeCompare(b);
-            });
-
-            let finalHTML = '';
-
-            sortedGroupNames.forEach(groupName => {
-                const groupAccounts = grouped[groupName];
-                
-                const allSelected = groupAccounts.every(ga => selectedEmails.has(ga.email));
-
-                const isCollapsed = collapsedGroups.has(groupName);
-
-                // Group Header Row
-                finalHTML += `
-                    <tr class="group-row" style="background: rgba(99, 102, 241, 0.05); cursor: pointer;" onclick="if(event.target.type !== 'checkbox') toggleGroupCollapse('${groupName}')">
-                        <td colspan="7" style="padding: 0.75rem 1.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.1);">
-                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                                <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--primary); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    <svg class="collapse-icon ${isCollapsed ? 'collapsed' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                    ${groupName} (${groupAccounts.length})
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" onclick="event.stopPropagation()">
-                                    <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500; text-transform: none;">SELECT GROUP</span>
-                                    <input type="checkbox" class="custom-checkbox" onchange="toggleGroupSelect('${groupName}', this.checked)" ${allSelected ? 'checked' : ''}>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-
-                if (!isCollapsed) {
-                    groupAccounts.forEach(acc => {
-                    const isRunning = acc.isActiveBot || acc.isActiveDesktop || acc.isActiveMobile || acc.isActiveExtraSearch;
-                    const isQueued = queuedEmails.has(acc.email);
-                    const isProxyBusy = acc.stats?.isProxyBusy || acc.stats?.status === 'proxy-busy';
-                    const statusHtml = acc.needsRelogin
-                        ? `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;" title="Session expired, click Need Login badge to restart">Need Relogin</span>`
-                        : isProxyBusy
-                            ? `<span class="status-badge proxy-busy" title="Proxy is currently in use by another process">Proxy Busy</span>`
-                            : isRunning
-                                ? `<span class="status-badge active">Running</span>`
-                                : isQueued
-                                    ? `<span class="status-badge queued">Queued</span>`
-                                    : `<span class="status-badge">Idle</span>`;
-
-                    const getBtnState = (type) => {
-                        let isActive = false;
-                        let label = '';
-                        let colorClass = '';
-                        let svg = '';
-
-                        if (type === 'bot') {
-                            isActive = acc.isActiveBot;
-                            label = 'Bot';
-                            colorClass = 'bot-btn';
-                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
-                        } else if (type === 'extra-search') {
-                            isActive = acc.isActiveExtraSearch;
-                            label = 'XTr';
-                            colorClass = 'search-more-btn';
-                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>';
-                        } else if (type === 'mobile') {
-                            isActive = acc.isActiveMobile;
-                            label = 'Mob';
-                            colorClass = 'mobile-btn';
-                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
-                        } else {
-                            isActive = acc.isActiveDesktop;
-                            label = 'PC';
-                            colorClass = 'open-btn';
-                            svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
-                        }
-
-                        if (isActive) {
-                            return `
-                                <button class="btn stop-btn" style="padding: 0.3rem 0.45rem; background: rgba(239, 68, 68, 0.15);" onclick="stopSession('${acc.email}', '${type}')" title="Stop ${label}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                </button>
-                            `;
-                        }
-                        return `
-                            <button class="btn ${colorClass}" style="padding: 0.3rem 0.45rem;" onclick="openSession('${acc.email}', '${type}')" title="Start ${label}">
-                                ${svg}
+            return `
+                <tr data-email="${acc.email}" style="${rowStyle}">
+                    <td style="padding-left: 1.5rem; ${borderStyle}">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" class="custom-checkbox item-checkbox" value="${acc.email}" ${isChecked} onchange="toggleSelect('${acc.email}', this.checked)">
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size: 1rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+                            ${acc.email}
+                            ${acc.isProxyV6 ? '<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; line-height: 1;">V6</span>' : ''}
+                        </div>
+                        <div style="color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin-top: 0.2rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            <span class="proxy-text" title="${acc.proxy}">${acc.proxy}</span>
+                            <button class="btn-icon" onclick="checkProxyForAccount('${acc.email}', this)" style="padding: 2px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); display: flex;" title="Check IP">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                             </button>
-                        `;
-                    };
+                            <span class="proxy-status" id="proxy-status-${acc.email.replace(/[@.]/g, '_')}" style="margin-left: 4px; font-weight: 600;"></span>
+                        </div>
+                    </td>
+                    <td>${pointsHtml}</td>
+                    <td>
+                        <span class="tag-badge" style="background: ${acc.tag ? 'rgba(99, 102, 241, 0.15)' : 'transparent'}; color: ${acc.tag ? '#818cf8' : 'var(--text-muted)'}; padding: 2px 6px; border-radius: 4px; border: 1px solid ${acc.tag ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.05)'}; font-size: 0.75rem; font-weight: 600;">
+                            ${acc.tag || 'None'}
+                        </span>
+                    </td>
+                    <td>${dailyStatusHtml}</td>
+                    <td><span class="rank-badge ${rankCls}">${r || 'N/A'}</span></td>
+                    <td>${statusHtml}</td>
+                    <td style="padding-right: 1.5rem;">
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                            ${getBtnState('desktop')}
+                            ${getBtnState('mobile')}
+                            ${getBtnState('bot')}
+                            <button class="btn redem-btn" style="padding: 0.3rem 0.45rem;" onclick="openRedem('${acc.email}', this)" title="Mở Redem Mobile (Global Proxy)" ${acc.isActiveMobile ? 'disabled' : ''}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            </button>
+                            <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--primary); border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);" onclick="openEditModal('${acc.email}')" title="Edit Account">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                            <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" onclick="confirmDelete('${acc.email}')" title="Delete Account">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+        }
 
-                    const isChecked = selectedEmails.has(acc.email) ? 'checked' : '';
+        function renderAccounts(accounts, force = false) {
+            lastAccounts = accounts;
+            if (renderPending && !force) return;
+            renderPending = true;
+
+            requestAnimationFrame(() => {
+                renderPending = false;
+                document.getElementById('loader').style.display = 'none';
+                const listContainer = document.getElementById('accountsListContainer');
+                const emptyState = document.getElementById('emptyState');
+                const tbody = document.getElementById('accountsTableBody');
+
+                // Update group suggestions
+                const groups = [...new Set(accounts.map(a => a.group || 'Ungrouped'))];
+                const datalist = document.getElementById('groupSuggestions');
+                if (datalist) datalist.innerHTML = groups.map(g => `<option value="${g}">`).join('');
+
+                // Filter
+                filteredAccounts = filterAccounts(accounts, searchQuery);
+                const filteredCount = filteredAccounts.length;
+                document.getElementById('filteredCount').innerText = filteredCount < accounts.length
+                    ? `Showing ${filteredCount} of ${accounts.length}`
+                    : `${accounts.length} accounts`;
+
+                if (filteredCount === 0) {
+                    listContainer.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    emptyState.innerHTML = `<p>${accounts.length > 0 ? 'No accounts match your search.' : 'No accounts found.'}</p>`;
+                    tbody.innerHTML = '';
+                    rowCache.clear();
+                    return;
+                }
+
+                listContainer.style.display = 'block';
+                emptyState.style.display = 'none';
+
+                // Group all filtered accounts (no pagination)
+                const grouped = filteredAccounts.reduce((acc, obj) => {
+                    const key = obj.group || 'Ungrouped';
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(obj);
+                    return acc;
+                }, {});
+
+                const sortedGroupNames = Object.keys(grouped).sort((a, b) => {
+                    if (a === 'Ungrouped') return 1;
+                    if (b === 'Ungrouped') return -1;
+                    return a.localeCompare(b);
+                });
+
+                const newRowKeys = new Set();
+                let finalHTML = '';
+
+                sortedGroupNames.forEach(groupName => {
+                    const groupAccounts = grouped[groupName];
+                    const allSelected = groupAccounts.every(ga => selectedEmails.has(ga.email));
+                    const isCollapsed = collapsedGroups.has(groupName);
 
                     finalHTML += `
-                        <tr data-group="${groupName}">
-                            <td style="padding-left: 1.5rem;">
-                                <div class="checkbox-wrapper">
-                                    <input type="checkbox" class="custom-checkbox item-checkbox" value="${acc.email}" ${isChecked} onchange="toggleSelect('${acc.email}', this.checked)">
+                        <tr class="group-row" style="background: rgba(99, 102, 241, 0.05); cursor: pointer;" onclick="if(event.target.type !== 'checkbox') toggleGroupCollapse('${groupName}')">
+                            <td colspan="7" style="padding: 0.75rem 1.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.1);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--primary); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        <svg class="collapse-icon ${isCollapsed ? 'collapsed' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                        ${groupName} (${groupAccounts.length}${!isCollapsed && groupAccounts.length > 5 ? ' shown' : ''})
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" onclick="event.stopPropagation()">
+                                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500; text-transform: none;">SELECT GROUP</span>
+                                        <input type="checkbox" class="custom-checkbox" onchange="toggleGroupSelect('${groupName}', this.checked)" ${allSelected ? 'checked' : ''}>
+                                    </div>
                                 </div>
                             </td>
-                            <td>
-                                <div style="font-size: 1rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
-                                    ${acc.email}
-                                    ${acc.isProxyV6 ? '<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; line-height: 1;">V6</span>' : ''}
-                                </div>
-                                <div style="color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin-top: 0.2rem;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                                    <span class="proxy-text" title="${acc.proxy}">${acc.proxy}</span>
-                                    <button class="btn-icon" onclick="checkProxyForAccount('${acc.email}', this)" style="padding: 2px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); display: flex;" title="Check IP">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                    </button>
-                                    <span class="proxy-status" id="proxy-status-${acc.email.replace(/[@.]/g, '_')}" style="margin-left: 4px; font-weight: 600;"></span>
-                                </div>
-                            </td>
-                            <td>
-                                ${(() => {
-                            if (acc.isActiveBot) return `<div style="display:flex;align-items:center;gap:0.4rem;"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;animation:pulse 1.2s infinite;"></span><span style="font-size:0.95rem;color:#f59e0b;font-weight:600;">Running...</span></div>`;
-                            if (acc.stats) {
-                                const s = acc.stats;
-                                const total = s.total ?? 0;
-                                const newBal = s.newBalance ?? null;
-                                const earned = total >= 0 ? `+${total}` : `${total}`;
-                                const color = total > 0 ? '#10b981' : total < 0 ? '#ef4444' : 'var(--text-muted)';
-                                return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
-                                            ${newBal !== null ? newBal.toLocaleString() : '—'} 
-                                            <span style="font-size:0.85rem;color:${color};font-weight:500;">(${earned})</span>
-                                        </div>`;
-                            } else if (acc.points) {
-                                return `<div style="font-size:1.05rem;font-weight:700;color:#fff;">
-                                            ${acc.points.toLocaleString()} 
-                                            <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">(saved)</span>
-                                        </div>`;
-                            }
-                            return '<span style="color:var(--text-muted);font-size:0.9rem;">—</span>';
-                        })()}
-                            </td>
-                            <td>
-                                ${(() => {
-                            // Priority: Needs Re-login > Running > Completed > Pending
-                            if (acc.needsRelogin) {
-                                return `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); cursor: pointer;" onclick="openSession('${acc.email}', 'bot')" title="Click to restart">🔒 Need Login</span>`;
-                            }
-                            const done = isCompletedToday(acc.lastUpdate);
-                            return done
-                                ? `<span class="status-badge active" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">✅ Finished</span>`
-                                : `<span class="status-badge" style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">⏳ Pending</span>`;
-                        })()}
-                            </td>
-                            <td>
-                                ${(() => {
-                            const r = acc.rank || '';
-                            let cls = 'rank-na';
-                            if (r.includes('Gold')) cls = 'rank-gold';
-                            else if (r.includes('Silver')) cls = 'rank-silver';
-                            else if (r.includes('Member')) cls = 'rank-member';
+                        </tr>`;
 
-                            return `<span class="rank-badge ${cls}">${r || 'N/A'}</span>`;
-                        })()}
-                            </td>
-                            <td>
-                                ${statusHtml}
-                            </td>
-                            <td style="padding-right: 1.5rem;">
-                                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
-                                    ${getBtnState('desktop')}
-                                    ${getBtnState('mobile')}
-                                    ${getBtnState('bot')}
-                                    ${getBtnState('extra-search')}
-                                    <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--primary); border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);" onclick="openEditModal('${acc.email}')" title="Edit Account">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                    </button>
-                                    <button class="btn" style="padding: 0.4rem 0.6rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" onclick="confirmDelete('${acc.email}')" title="Delete Account">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                    });
+                    if (!isCollapsed) {
+                        groupAccounts.forEach(acc => {
+                            newRowKeys.add(acc.email);
+                            const hash = hashAccount(acc);
+                            const cached = rowCache.get(acc.email);
+                            if (cached && cached.hash === hash && !force) {
+                                finalHTML += cached.html;
+                            } else {
+                                const html = buildRowHTML(acc);
+                                rowCache.set(acc.email, { hash, html });
+                                finalHTML += html;
+                            }
+                        });
+                    }
+                });
+
+                // Remove stale rows from cache
+                for (const key of rowCache.keys()) {
+                    if (!newRowKeys.has(key)) rowCache.delete(key);
                 }
-            });
 
-            if (lastTableHTML !== finalHTML) {
                 tbody.innerHTML = finalHTML;
-                lastTableHTML = finalHTML;
                 updateSelectedCount();
-            }
+            });
         }
 
         function toggleGroupSelect(groupName, checked) {
@@ -2331,6 +2423,31 @@
                 else selectedEmails.delete(a.email);
             });
             renderAccounts(lastAccounts);
+        }
+
+        async function bulkRemoveProxyByGroup() {
+            const groups = [...new Set(lastAccounts.map(a => a.group || 'Ungrouped'))];
+            const groupName = prompt('Enter group name to remove all proxies from:', groups[0] || 'Ungrouped');
+            if (groupName === null) return;
+
+            if (!confirm(`Remove ALL proxies from group "${groupName}"? This affects all accounts in this group.`)) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/accounts/bulk-remove-proxy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group: groupName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Removed proxies from ${data.count} accounts in group "${groupName}"`, 'success');
+                    fetchAccounts();
+                } else {
+                    showToast('Failed: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Error removing proxies: ' + e.message, 'error');
+            }
         }
 
         async function bulkChangeGroup() {
@@ -2356,6 +2473,35 @@
                 }
             } catch (e) {
                 showToast('Error updating group: ' + e.message, 'error');
+            }
+        }
+
+        async function openRedem(email, btn) {
+            if (!email) return;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="animation: spin 1s linear infinite;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+            showToast(`Đang rotation proxy và kiểm tra...`, 'success');
+
+            try {
+                const res = await fetch(`${API_URL}/api/open-redem`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(`Mở Redem thành công! IP: ${data.proxyIp} (${data.proxyCountry})`, 'success');
+                    fetchAccounts();
+                } else {
+                    showToast(data.error || 'Không thể mở Redem', 'error');
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối: ' + err.message, 'error');
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
             }
         }
 
@@ -2503,6 +2649,7 @@
                 document.getElementById('accGeoLocale').value = acc.geoLocale || 'auto';
                 document.getElementById('accLangCode').value = acc.langCode || 'en';
                 document.getElementById('accGroupName').value = acc.group || 'Ungrouped';
+                document.getElementById('accTag').value = acc.tag || '';
 
                 const proxy = acc.proxy || {};
                 let rawUrl = (proxy.url || '').replace(/^(https?|socks[45])?:\/\//i, '');
@@ -2634,6 +2781,7 @@
                 geoLocale: document.getElementById('accGeoLocale').value || "auto",
                 langCode: document.getElementById('accLangCode').value || "en",
                 group: document.getElementById('accGroupName').value || "Ungrouped",
+                tag: document.getElementById('accTag').value || "",
                 proxy: document.getElementById('accUseProxy').checked ? (function() {
                     const p = {
                         proxyAxios: document.getElementById('accProxyAxios').checked,
@@ -2937,15 +3085,6 @@
             return '#ef4444';               // red
         }
 
-        function formatUptime(secs) {
-            const d = Math.floor(secs / 86400);
-            const h = Math.floor((secs % 86400) / 3600);
-            const m = Math.floor((secs % 3600) / 60);
-            if (d > 0) return `${d}d ${h}h ${m}m`;
-            if (h > 0) return `${h}h ${m}m`;
-            return `${m}m`;
-        }
-
         async function fetchStats() {
             try {
                 const res = await fetch(`${API_URL}/api/stats`);
@@ -2968,18 +3107,63 @@
                 const maxSessions = 10;
                 document.getElementById('statSessionsBar').style.width = `${Math.min(d.activeSessions / maxSessions * 100, 100)}%`;
 
-                document.getElementById('statUptime').innerText = formatUptime(d.uptime);
-                document.getElementById('statUptimeSub').innerText = `${d.platform} · online`;
+                document.getElementById('statTotalAccounts').innerText = d.totalAccounts;
+                document.getElementById('statTotalAccountsSub').innerText = `Active: ${d.activeSessions}`;
+
+                const tagContainer = document.getElementById('tagStatsContainer');
+                if (d.tagStats && d.tagStats.length > 0) {
+                    tagContainer.innerHTML = d.tagStats.map(ts => `
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                                    </svg>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">${ts.tag} Ready</span>
+                                    <div class="stat-value">${ts.readyCount}</div>
+                                </div>
+                            </div>
+                            <div class="stat-footer">
+                                <span class="stat-sub">of ${ts.total} total accounts</span>
+                                <div class="stat-progress-bg" style="height: 4px; margin-top: 5px;">
+                                    <div class="stat-progress-fill" style="width: ${Math.round((ts.readyCount/ts.total)*100)}%; background: var(--primary);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    tagContainer.innerHTML = '';
+                }
             } catch (e) { /* silent */ }
         }
 
         async function exportAccounts() {
+            let accountsToExport = [];
+            let exportLabel = '';
+
+            // Always fetch full data from backend (password, proxy object, saveFingerprint, etc.)
             try {
                 const res = await fetch(`${API_URL}/api/accounts/export`);
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                const blob = new Blob([JSON.stringify(data.accounts, null, 2)], { type: 'application/json' });
+                if (selectedEmails.size > 0) {
+                    accountsToExport = data.accounts.filter(a => selectedEmails.has(a.email));
+                    exportLabel = `${accountsToExport.length} selected`;
+                } else {
+                    accountsToExport = data.accounts;
+                    exportLabel = `${accountsToExport.length} total`;
+                }
+            } catch (e) {
+                showToast('Failed to export accounts: ' + e.message, 'error');
+                return;
+            }
+
+            try {
+                const blob = new Blob([JSON.stringify(accountsToExport, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -2989,7 +3173,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                showToast(`Exported ${data.accounts.length} accounts!`, 'success');
+                showToast(`Exported ${exportLabel} accounts!`, 'success');
             } catch (e) {
                 showToast('Failed to export accounts: ' + e.message, 'error');
             }
@@ -3146,17 +3330,21 @@
             if (svg) svg.classList.add('spin');
             btn.disabled = true;
 
-            showToast('Starting bulk proxy check...', 'success');
+            showToast('Starting bulk proxy check (max 5 concurrent)...', 'success');
 
-            // We use P-Queue logic or just parallel for each visible account
-            const promises = lastAccounts.map(acc => {
-                const rowBtn = document.querySelector(`button[onclick*="checkProxyForAccount('${acc.email}'"]`);
-                if (rowBtn) return checkProxyForAccount(acc.email, rowBtn);
-                return Promise.resolve();
-            });
+            const accounts = searchQuery ? filteredAccounts : lastAccounts;
+            const CONCURRENCY = 5;
+            let idx = 0;
+            async function worker() {
+                while (idx < accounts.length) {
+                    const i = idx++;
+                    const acc = accounts[i];
+                    const rowBtn = document.querySelector(`button[onclick*="checkProxyForAccount('${acc.email}'"]`);
+                    if (rowBtn) await checkProxyForAccount(acc.email, rowBtn);
+                }
+            }
+            await Promise.all(Array.from({length: CONCURRENCY}, () => worker()));
 
-            await Promise.allSettled(promises);
-            
             showToast('Bulk proxy check completed!', 'success');
             if (svg) svg.classList.remove('spin');
             btn.disabled = false;

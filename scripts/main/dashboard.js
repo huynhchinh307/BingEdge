@@ -3,9 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
-import { getDirname, getProjectRoot, loadAccounts, log, safeRemoveDirectory } from '../utils.js';
+import { getDirname, getProjectRoot, loadAccounts, log, safeRemoveDirectory, openDb } from '../utils.js';
 import axios from 'axios';
-import Database from 'better-sqlite3';
 
 const __dirname = getDirname(import.meta.url);
 const projectRoot = getProjectRoot(__dirname);
@@ -98,9 +97,7 @@ function getDb() {
     if (_db) return _db;
     try {
         const dbPath = path.join(projectRoot, 'rewards_data.db');
-        _db = new Database(dbPath);
-        _db.pragma('journal_mode = WAL');
-        _db.pragma('synchronous = NORMAL');
+        _db = openDb(dbPath, { timeout: 5000 });
         // Đảm bảo các bảng tồn tại (dashboard có thể khởi động trước bot)
         _db.exec(`
             CREATE TABLE IF NOT EXISTS accounts (
@@ -114,7 +111,8 @@ function getDb() {
                 save_fingerprint TEXT NOT NULL DEFAULT '{"mobile":true,"desktop":true}',
                 created_at       INTEGER NOT NULL DEFAULT 0,
                 updated_at       INTEGER NOT NULL DEFAULT 0,
-                account_group    TEXT NOT NULL DEFAULT 'Ungrouped'
+                account_group    TEXT NOT NULL DEFAULT 'Ungrouped',
+                tag              TEXT NOT NULL DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS app_config (
                 id   INTEGER PRIMARY KEY DEFAULT 1,
@@ -136,6 +134,11 @@ function getDb() {
         try {
             _db.prepare("ALTER TABLE accounts ADD COLUMN account_group TEXT NOT NULL DEFAULT 'Ungrouped'").run();
             log('INFO', '[DB] Added account_group column to accounts table.');
+        } catch(e) { /* Cột đã tồn tại */ }
+
+        try {
+            _db.prepare("ALTER TABLE accounts ADD COLUMN tag TEXT NOT NULL DEFAULT ''").run();
+            log('INFO', '[DB] Added tag column to accounts table.');
         } catch(e) { /* Cột đã tồn tại */ }
 
         // Khởi tạo config mặc định nếu chưa có
@@ -336,6 +339,28 @@ const server = http.createServer((req, res) => {
         const freeRam = os.freemem();
         const usedRam = totalRam - freeRam;
         const toGB = (b) => (b / 1024 / 1024 / 1024).toFixed(1);
+        
+        let totalAccounts = 0;
+        let tagStats = [];
+        try {
+            const db = getDb();
+            totalAccounts = db.prepare('SELECT COUNT(*) as count FROM accounts').get().count;
+            tagStats = db.prepare(`
+                SELECT 
+                    a.tag,
+                    COUNT(*) as total,
+                    COUNT(CASE 
+                        WHEN a.tag = 'Car' AND s.points >= 2950 THEN 1 
+                        WHEN (a.tag = 'Mart' OR a.tag = 'Jollibee') AND s.points >= 5460 THEN 1 
+                        ELSE NULL 
+                    END) as readyCount
+                FROM accounts a
+                LEFT JOIN account_status s ON a.email = s.email
+                WHERE a.tag IN ('Car', 'Mart', 'Jollibee')
+                GROUP BY a.tag
+            `).all();
+        } catch (e) {}
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
@@ -346,8 +371,8 @@ const server = http.createServer((req, res) => {
             ramTotal: toGB(totalRam),
             ramPercent: Math.round((usedRam / totalRam) * 100),
             activeSessions: Object.keys(activeProcesses).length,
-            platform: os.platform(),
-            uptime: Math.floor(os.uptime())
+            totalAccounts: totalAccounts,
+            tagStats: tagStats || []
         }));
         return;
     }
@@ -602,9 +627,9 @@ const server = http.createServer((req, res) => {
                 }
                 db.prepare(`
                     INSERT INTO accounts
-                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, tag, created_at, updated_at)
                     VALUES
-                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @tag, @now, @now)
                     ON CONFLICT(email) DO UPDATE SET
                         password         = @password,
                         totp_secret      = @totpSecret,
@@ -614,6 +639,7 @@ const server = http.createServer((req, res) => {
                         proxy            = @proxy,
                         save_fingerprint = @saveFingerprint,
                         account_group    = @group,
+                        tag              = @tag,
                         updated_at       = @now
                 `).run({
                     email:           account.email,
@@ -625,6 +651,7 @@ const server = http.createServer((req, res) => {
                     proxy:           JSON.stringify(account.proxy           || {}),
                     saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
                     group:           account.group           || 'Ungrouped',
+                    tag:             account.tag             || '',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -648,9 +675,9 @@ const server = http.createServer((req, res) => {
                 const now = Date.now();
                 db.prepare(`
                     INSERT INTO accounts
-                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, tag, created_at, updated_at)
                     VALUES
-                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @tag, @now, @now)
                 `).run({
                     email:           newAcc.email,
                     password:        newAcc.password        || '',
@@ -661,6 +688,7 @@ const server = http.createServer((req, res) => {
                     proxy:           JSON.stringify(newAcc.proxy           || {}),
                     saveFingerprint: JSON.stringify(newAcc.saveFingerprint || { mobile: true, desktop: true }),
                     group:           newAcc.group           || 'Ungrouped',
+                    tag:             newAcc.tag             || '',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -701,6 +729,29 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/accounts/bulk-remove-proxy') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { group } = JSON.parse(body);
+                if (!group && group !== 'Ungrouped') throw new Error('Group name is required');
+
+                const db = getDb();
+                const now = Date.now();
+                const result = db.prepare('UPDATE accounts SET proxy = ?, updated_at = ? WHERE account_group = ?').run('{}', now, group || 'Ungrouped');
+                const count = result.changes;
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, count }));
+            } catch(e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
     if (req.method === 'GET' && req.url === '/api/accounts/export') {
         try {
             const db = getDb();
@@ -716,6 +767,7 @@ const server = http.createServer((req, res) => {
                 proxy:           _safeParse(row.proxy, {}),
                 saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
                 group:           row.account_group || 'Ungrouped',
+                tag:             row.tag || '',
             }));
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -738,9 +790,9 @@ const server = http.createServer((req, res) => {
                 const now = Date.now();
                 const insertStmt = db.prepare(`
                     INSERT INTO accounts
-                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, created_at, updated_at)
+                        (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, tag, created_at, updated_at)
                     VALUES
-                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @now, @now)
+                        (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @tag, @now, @now)
                     ON CONFLICT(email) DO UPDATE SET
                         password         = @password,
                         totp_secret      = @totpSecret,
@@ -750,6 +802,7 @@ const server = http.createServer((req, res) => {
                         proxy            = @proxy,
                         save_fingerprint = @saveFingerprint,
                         account_group    = @group,
+                        tag              = @tag,
                         updated_at       = @now
                 `);
                 
@@ -766,6 +819,7 @@ const server = http.createServer((req, res) => {
                             proxy:           JSON.stringify(account.proxy           || {}),
                             saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
                             group:           account.group           || 'Ungrouped',
+                            tag:             account.tag             || '',
                             now,
                         });
                     }
@@ -835,6 +889,7 @@ const server = http.createServer((req, res) => {
                     proxy: proxyStr,
                     isProxyV6: !!proxy.isProxyV6,
                     group: a.account_group || 'Ungrouped',
+                    tag: a.tag || '',
                     proxyGroup,
                     isActiveDesktop,
                     isActiveMobile,
@@ -910,6 +965,230 @@ const server = http.createServer((req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, logs: processLogs[key] || [] }));
+        return;
+    }
+
+    // === Open Redem: Use Global Proxy with rotation ===
+    if (req.method === 'POST' && req.url === '/api/open-redem') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+                const { email } = data;
+
+                if (!email || typeof email !== 'string') {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Invalid or missing email' }));
+                    return;
+                }
+
+                const key = `${email}-mobile`;
+                if (activeProcesses[key]) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Mobile session is already active for this account' }));
+                    return;
+                }
+
+                // 1. Load account info (to get tag) and global config
+                const db = getDb();
+                const accRow = db?.prepare('SELECT tag FROM accounts WHERE email = ?').get(email);
+                const tag = accRow?.tag || '';
+
+                const cfgRow = db?.prepare('SELECT data FROM app_config WHERE id = 1').get();
+                if (!cfgRow) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Config not found in database' }));
+                    return;
+                }
+                const cfg = JSON.parse(cfgRow.data);
+                const proxyRotationUrl = cfg.proxyRotationUrl;
+                const globalProxy = cfg.proxy || {};
+
+                if (!globalProxy.enable || !globalProxy.url || !globalProxy.port) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Global Proxy chưa được cấu hình hoặc chưa bật. Vào Settings để thiết lập.' }));
+                    return;
+                }
+
+                // 2. Determine Redeem URL based on tag
+                let redeemUrl = 'https://rewards.bing.com/redeem';
+                if (tag === 'Car') {
+                    redeemUrl = 'https://rewards.bing.com/redeem/sku/000899012002';
+                } else if (tag === 'Mart') {
+                    redeemUrl = 'https://rewards.bing.com/redeem/sku/000899012004';
+                } else if (tag === 'Jollibee' || tag === 'Joli') {
+                    redeemUrl = 'https://rewards.bing.com/redeem/sku/000899012014';
+                }
+
+                // 3. Trigger Proxy Rotation if URL is configured
+                if (proxyRotationUrl) {
+                    log('INFO', `[OpenRedem] Triggering proxy rotation: ${proxyRotationUrl}`);
+                    try {
+                        const rotationRes = await axios.get(proxyRotationUrl, { timeout: 15000 });
+                        log('SUCCESS', `[OpenRedem] Proxy rotation response: ${JSON.stringify(rotationRes.data)}`);
+                        // Wait a moment for proxy to settle after rotation
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } catch (e) {
+                        log('ERROR', `[OpenRedem] Proxy rotation failed: ${e.message}`);
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: false, error: `Proxy Rotation thất bại: ${e.message}` }));
+                        return;
+                    }
+                }
+
+                // 4. Test Global Proxy
+                log('INFO', `[OpenRedem] Testing Global Proxy: ${globalProxy.url}:${globalProxy.port}`);
+                let proxyTestOk = false;
+                let proxyIp = '';
+                let proxyCountry = '';
+                try {
+                    let host = (globalProxy.url || '').replace(/^(https?|socks[45]):\/\//i, '').trim();
+                    const protocolMatch = (globalProxy.url || '').match(/^(https?|socks[45])/i);
+                    let proto = protocolMatch ? protocolMatch[1].toLowerCase() : 'http';
+
+                    if (host.includes(':') && !host.startsWith('[') && !host.includes('.')) {
+                        host = `[${host}]`;
+                    }
+
+                    let proxyUrlStr = `${proto}://`;
+                    if (globalProxy.username && globalProxy.password) {
+                        proxyUrlStr += `${encodeURIComponent(globalProxy.username)}:${encodeURIComponent(globalProxy.password)}@`;
+                    }
+                    proxyUrlStr += `${host}:${globalProxy.port}`;
+
+                    let agent;
+                    if (proto.startsWith('socks')) {
+                        const { SocksProxyAgent } = await import('socks-proxy-agent');
+                        agent = new SocksProxyAgent(proxyUrlStr);
+                    } else {
+                        const { HttpsProxyAgent } = await import('https-proxy-agent');
+                        agent = new HttpsProxyAgent(proxyUrlStr);
+                    }
+
+                    const checkServices = [
+                        'http://api64.ipify.org?format=json',
+                        'http://ip-api.com/json',
+                        'http://ip.nf/me.json'
+                    ];
+
+                    for (const url of checkServices) {
+                        try {
+                            const response = await axios.get(url, {
+                                httpsAgent: agent,
+                                httpAgent: agent,
+                                timeout: 10000,
+                                headers: { 'User-Agent': 'Mozilla/5.0' }
+                            });
+                            if (response.data) {
+                                const d = response.data;
+                                proxyIp = d.ip?.address || d.ip || d.query || '';
+                                proxyCountry = d.ip?.country || d.country || d.country_name || '';
+                                proxyTestOk = true;
+                                break;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                } catch (e) {
+                    log('ERROR', `[OpenRedem] Proxy test error: ${e.message}`);
+                }
+
+                if (!proxyTestOk) {
+                    log('ERROR', `[OpenRedem] Global Proxy không hoạt động!`);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Global Proxy không hoạt động! Kiểm tra lại cấu hình proxy trong Settings.' }));
+                    return;
+                }
+
+                log('SUCCESS', `[OpenRedem] Global Proxy OK! IP: ${proxyIp} (${proxyCountry})`);
+
+                // 5. Build proxy override JSON for browserSession.js
+                const proxyOverride = {
+                    url: globalProxy.url,
+                    port: parseInt(globalProxy.port) || 0,
+                    username: globalProxy.username || '',
+                    password: globalProxy.password || ''
+                };
+
+                // 6. Spawn browserSession with proxy override and mobile flag
+                const proxyOverrideJson = JSON.stringify(proxyOverride);
+                const spawnArgs = [
+                    './scripts/main/browserSession.js',
+                    '-email', email,
+                    '-force',
+                    '-mobile',
+                    '-proxy-override', proxyOverrideJson,
+                    '-goto', redeemUrl
+                ];
+
+                log('INFO', `[OpenRedem] Starting Redem MOBILE session for ${email} via Global Proxy (Tag: ${tag || 'None'}, URL: ${redeemUrl})`);
+
+                const cp = spawn('node', spawnArgs, { cwd: projectRoot });
+                const proxyKey = `GLOBAL_PROXY@${globalProxy.url}:${globalProxy.port}`;
+
+                activeProcesses[key] = cp.pid;
+                activeProxies[email] = { proxyKey, type: 'mobile', pid: cp.pid };
+                processLogs[key] = [];
+                let lineBuffer = '';
+
+                const stripAnsi = (str) => str.replace(/\x1b\[[0-9;]*m/g, '');
+
+                const processLine = (line) => {
+                    const clean = stripAnsi(line).trim();
+                    if (!clean) return;
+                    processLogs[key].push(clean);
+                };
+
+                const addLog = (data) => {
+                    const str = data.toString();
+                    process.stdout.write(str);
+                    lineBuffer += str;
+                    const parts = lineBuffer.split('\n');
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        processLine(parts[i]);
+                    }
+                    lineBuffer = parts[parts.length - 1];
+                    if (processLogs[key].length > 300) {
+                        processLogs[key] = processLogs[key].slice(-300);
+                    }
+                };
+
+                cp.stdout.on('data', addLog);
+                cp.stderr.on('data', addLog);
+
+                const cleanup = (code) => {
+                    if (lineBuffer.trim()) processLine(lineBuffer);
+                    lineBuffer = '';
+                    if (activeProcesses[key]) {
+                        log('INFO', `[OpenRedem] Session closed for ${email} (code: ${code})`);
+                        delete activeProcesses[key];
+                        delete activeProxies[email];
+                    }
+                };
+
+                cp.on('exit', cleanup);
+                cp.on('close', cleanup);
+                cp.on('error', (err) => {
+                    log('ERROR', `[OpenRedem] Error for ${email}: ${err.message}`);
+                    delete activeProcesses[key];
+                    delete activeProxies[email];
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ 
+                    success: true, 
+                    message: `Redem session started via Global Proxy`,
+                    proxyIp,
+                    proxyCountry,
+                    pid: cp.pid
+                }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
         return;
     }
 

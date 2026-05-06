@@ -3,6 +3,21 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import Database from 'better-sqlite3'
 
+/**
+ * Open SQLite connection with consistent WAL + busy_timeout settings.
+ * Mọi chỗ trong project gọi hàm này thay vì new Database() trực tiếp.
+ */
+export function openDb(dbPath, options = {}) {
+    const { readonly = false, timeout = 5000 } = options;
+    const db = new Database(dbPath, { readonly, timeout });
+    // WAL mode cho phép concurrent readers + single writer không block nhau
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    // busy_timeout đã set qua constructor option, nhưng pragma double-check
+    db.pragma(`busy_timeout = ${timeout}`);
+    return db;
+}
+
 export function getDirname(importMetaUrl) {
     const __filename = fileURLToPath(importMetaUrl)
     return path.dirname(__filename)
@@ -98,11 +113,11 @@ function _safeParse(json, fallback) {
 
 export function loadAccounts(projectRoot, isDev = false) {
     const dbPath = path.join(projectRoot, 'rewards_data.db');
-    
+
     // 1. Try SQLite first
     try {
         if (fs.existsSync(dbPath)) {
-            const db = new Database(dbPath, { readonly: true });
+            const db = openDb(dbPath, { readonly: true, timeout: 5000 });
             const rows = db.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all();
             db.close();
             
@@ -116,7 +131,8 @@ export function loadAccounts(projectRoot, isDev = false) {
                     langCode:        row.lang_code || 'en',
                     proxy:           _safeParse(row.proxy, {}),
                     saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
-                    group:           row.account_group || 'Ungrouped'
+                    group:           row.account_group || 'Ungrouped',
+                    tag:             row.tag || ''
                 }));
                 return { data: accounts, path: dbPath };
             }
@@ -141,7 +157,7 @@ export function loadConfig(projectRoot, isDev = false) {
     try {
         const dbPath = path.join(projectRoot, 'rewards_data.db');
         if (fs.existsSync(dbPath)) {
-            const db = new Database(dbPath, { readonly: true });
+            const db = openDb(dbPath, { readonly: true, timeout: 5000 });
             const row = db.prepare('SELECT data FROM app_config WHERE id = 1').get();
             db.close();
             if (row) {
@@ -195,16 +211,15 @@ export function saveAccount(projectRoot, account, isDev = false) {
 
     // 1. Save to SQLite
     try {
-        const db = new Database(dbPath);
-        db.pragma('journal_mode = WAL');
+        const db = openDb(dbPath, { timeout: 5000 });
         
         db.prepare(`
             INSERT INTO accounts
                 (email, password, totp_secret, recovery_email, geo_locale, lang_code,
-                 proxy, save_fingerprint, account_group, created_at, updated_at)
+                 proxy, save_fingerprint, account_group, tag, created_at, updated_at)
             VALUES
                 (@email, @password, @totp_secret, @recovery_email, @geo_locale, @lang_code,
-                 @proxy, @save_fingerprint, @account_group, @created_at, @updated_at)
+                 @proxy, @save_fingerprint, @account_group, @tag, @created_at, @updated_at)
             ON CONFLICT(email) DO UPDATE SET
                 password         = @password,
                 totp_secret      = @totp_secret,
@@ -214,6 +229,7 @@ export function saveAccount(projectRoot, account, isDev = false) {
                 proxy            = @proxy,
                 save_fingerprint = @save_fingerprint,
                 account_group    = @account_group,
+                tag              = @tag,
                 updated_at       = @updated_at
         `).run({
             email: account.email,
@@ -225,6 +241,7 @@ export function saveAccount(projectRoot, account, isDev = false) {
             proxy: JSON.stringify(account.proxy || {}),
             save_fingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
             account_group: account.group || 'Ungrouped',
+            tag: account.tag || '',
             created_at: now,
             updated_at: now
         });
@@ -258,6 +275,44 @@ export function saveAccount(projectRoot, account, isDev = false) {
         log('SUCCESS', `Account ${account.email} saved to ${path.basename(jsonPath)}`);
     } catch (e) {
         log('ERROR', `Failed to save account to JSON: ${e.message}`);
+    }
+}
+
+export function deleteAccount(projectRoot, email, isDev = false) {
+    const dbPath = path.join(projectRoot, 'rewards_data.db');
+    
+    // 1. Delete from SQLite
+    try {
+        if (fs.existsSync(dbPath)) {
+            const db = openDb(dbPath, { timeout: 5000 });
+            db.prepare('DELETE FROM accounts WHERE email = ?').run(email);
+            db.close();
+            log('SUCCESS', `Account ${email} deleted from database`);
+        }
+    } catch (e) {
+        log('ERROR', `Failed to delete account from DB: ${e.message}`);
+    }
+
+    // 2. Delete from JSON
+    const jsonPath = isDev
+        ? path.join(projectRoot, 'src', 'accounts.dev.json')
+        : (fs.existsSync(path.join(projectRoot, 'accounts.json')) 
+            ? path.join(projectRoot, 'accounts.json')
+            : path.join(projectRoot, 'dist', 'accounts.json'));
+
+    try {
+        if (fs.existsSync(jsonPath)) {
+            let accounts = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+            const initialCount = accounts.length;
+            accounts = accounts.filter(a => a.email.toLowerCase() !== email.toLowerCase());
+            
+            if (accounts.length < initialCount) {
+                fs.writeFileSync(jsonPath, JSON.stringify(accounts, null, 2));
+                log('SUCCESS', `Account ${email} deleted from ${path.basename(jsonPath)}`);
+            }
+        }
+    } catch (e) {
+        log('ERROR', `Failed to delete account from JSON: ${e.message}`);
     }
 }
 

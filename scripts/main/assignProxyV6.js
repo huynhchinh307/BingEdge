@@ -1,33 +1,24 @@
-import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
-import { getDirname, getProjectRoot, log } from '../utils.js';
+import { getDirname, getProjectRoot, log, openDb } from '../utils.js';
 
 const __dirname = getDirname(import.meta.url);
 const projectRoot = getProjectRoot(__dirname);
 const dbPath = path.join(projectRoot, 'rewards_data.db');
 
-const proxyList = [
-    '160.250.54.8:49460:proxyhot49460:sMaqveol',
-    '160.250.54.8:49071:proxyhot49071:mzvTDRZW',
-    '160.250.54.8:50012:proxyhot50012:CgeyDGHs',
-    '160.250.54.8:49566:proxyhot49566:dbPvtppX',
-    '160.250.54.8:49571:proxyhot49571:AJILcHBT',
-    '160.250.54.8:49803:proxyhot49803:EGpnnwcO',
-    '160.250.54.8:49299:proxyhot49299:xqpwxjMf',
-    '160.250.54.8:49451:proxyhot49451:rSeQLkwI',
-    '160.250.54.8:49311:proxyhot49311:uGAkfVrh',
-    '160.250.54.8:49134:proxyhot49134:dwgEfkDM',
-    '160.250.54.8:49309:proxyhot49309:ykQOZAgf',
-    '160.250.54.8:49064:proxyhot49064:rnOhabVp',
-    '160.250.54.8:49837:proxyhot49837:sFjsGDEL',
-    '160.250.54.8:49879:proxyhot49879:lgGFDzwA',
-    '160.250.54.8:49977:proxyhot49977:VHpMMOKZ',
-    '160.250.54.8:49168:proxyhot49168:iGuYGCoB',
-    '160.250.54.8:49809:proxyhot49809:tNGkifVJ',
-    '160.250.54.8:49315:proxyhot49315:OQfUhDUE',
-    '160.250.54.8:49423:proxyhot49423:HbNHfjYI',
-    '160.250.54.8:49265:proxyhot49265:CFCYtCRc'
-];
+const proxyFilePath = path.join(projectRoot, 'proxies.txt');
+let proxyList = [];
+
+if (fs.existsSync(proxyFilePath)) {
+    proxyList = fs.readFileSync(proxyFilePath, 'utf8')
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+    log('SUCCESS', `Loaded ${proxyList.length} proxies from proxies.txt`);
+} else {
+    log('WARN', 'proxies.txt not found in project root. Please create it with one proxy (ip:port:user:pass) per line.');
+}
+
 
 function parseProxy(proxyStr) {
     const parts = proxyStr.split(':');
@@ -41,13 +32,13 @@ function parseProxy(proxyStr) {
 }
 
 async function main() {
-    log('INFO', 'Starting proxy assignment for "AutoRegister" group...');
-    
-    const db = new Database(dbPath);
-    const accounts = db.prepare('SELECT * FROM accounts WHERE account_group = ?').all('AutoRegister');
-    
-    log('INFO', `Found ${accounts.length} accounts in "AutoRegister" group.`);
-    
+    log('INFO', 'Starting proxy assignment for "AutoV2" group...');
+
+    const db = openDb(dbPath, { timeout: 5000 });
+    const accounts = db.prepare('SELECT * FROM accounts WHERE account_group = ?').all('AutoV2');
+
+    log('INFO', `Found ${accounts.length} accounts in "AutoV2" group.`);
+
     // Find accounts without ProxyV6
     const pendingAccounts = accounts.filter(acc => {
         try {
@@ -57,24 +48,25 @@ async function main() {
             return true;
         }
     });
-    
+
     log('INFO', `${pendingAccounts.length} accounts need proxy assignment.`);
-    
+
     if (pendingAccounts.length === 0) {
         log('SUCCESS', 'All accounts already have ProxyV6. Nothing to do.');
         return;
     }
 
-    // Get list of proxies currently in use to avoid duplicates
+    // Get list of proxies currently in use across ALL groups to avoid duplicates
     const usedProxies = new Set();
-    accounts.forEach(acc => {
+    const allAccounts = db.prepare('SELECT proxy FROM accounts').all();
+    allAccounts.forEach(acc => {
         try {
             const proxy = JSON.parse(acc.proxy);
             if (proxy.url && proxy.port) {
                 const proxyKey = `${proxy.url}:${proxy.port}`;
                 usedProxies.add(proxyKey);
             }
-        } catch (e) {}
+        } catch (e) { }
     });
 
     const availableProxies = proxyList.filter(p => {
@@ -93,7 +85,7 @@ async function main() {
             const account = pendingAccounts[i];
             const proxyStr = availableProxies[i];
             const proxyObj = parseProxy(proxyStr);
-            
+
             stmt.run(JSON.stringify(proxyObj), Date.now(), account.email);
             log('SUCCESS', `Assigned proxy ${proxyObj.url}:${proxyObj.port} to ${account.email}`);
             assignedCount++;

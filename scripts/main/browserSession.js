@@ -31,6 +31,18 @@ args.dev = args.dev || false
 
 validateEmail(args.email)
 
+// Parse proxy override from CLI args (JSON string)
+let proxyOverride = null
+if (args['proxy-override']) {
+    try {
+        proxyOverride = JSON.parse(args['proxy-override'])
+        log('INFO', `Proxy override provided: ${proxyOverride.url}:${proxyOverride.port}`)
+    } catch (e) {
+        log('ERROR', `Invalid proxy override JSON: ${e.message}`)
+        process.exit(1)
+    }
+}
+
 const { data: config } = loadConfig(projectRoot, args.dev)
 const { data: accounts } = loadAccounts(projectRoot, args.dev)
 
@@ -217,9 +229,17 @@ async function main() {
         }
     }
 
-    const proxy = buildProxyConfig(account)
+    let proxy
+    if (proxyOverride) {
+        // Use the proxy override (Global Proxy) instead of account proxy
+        const overrideAccount = { proxy: proxyOverride }
+        proxy = buildProxyConfig(overrideAccount)
+        log('INFO', `Using PROXY OVERRIDE (Global Proxy): ${proxy?.server || 'None'}`)
+    } else {
+        proxy = buildProxyConfig(account)
+    }
 
-    if (account.proxy && account.proxy.url && (!proxy || !proxy.server)) {
+    if (!proxyOverride && account.proxy && account.proxy.url && (!proxy || !proxy.server)) {
         log('ERROR', 'Proxy is configured in account but proxy data is invalid or incomplete')
         log('ERROR', 'Account proxy config:', JSON.stringify(account.proxy, null, 2))
         log('ERROR', 'Required fields: proxy.url, proxy.port')
@@ -345,17 +365,53 @@ async function main() {
 
     if (cookies.length) {
         await context.addCookies(cookies)
-        log('INFO', `Added ${cookies.length} cookies to context`)
+            log('INFO', `Added ${cookies.length} cookies to context`)
     }
 
     const page = await context.newPage()
 
+    // Helper to scrape and save points
+    const scrapeAndSavePoints = async () => {
+        try {
+            // Selector for profile button/points element
+            const selector = 'button[aria-label="View profile"] p, #id_l, #id_rc';
+            const element = await page.$(selector);
+            if (element) {
+                const text = await element.innerText();
+                const points = parseInt(text.replace(/[,. ]/g, ''));
+                if (!isNaN(points) && points > 0) {
+                    account.points = points;
+                    saveAccount(projectRoot, account, args.dev);
+                    log('SUCCESS', `Updated points for ${account.email}: ${points.toLocaleString()}`);
+                }
+            }
+        } catch (e) {
+            // Silent error for scraping
+        }
+    };
+
     try {
-        // Mở trang Bing (base page) thay vì trang trắng
-        await page.goto('https://www.bing.com')
-        log('SUCCESS', 'Browser opened with base page (Bing)')
-        await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel')
-        log('SUCCESS', 'Browser opened with base page (Bing dashboard)')
+        const gotoUrl = args.goto || null
+        if (gotoUrl) {
+            // Navigate to custom URL (e.g., Rewards redemption page)
+            await page.goto('https://www.bing.com')
+            log('SUCCESS', 'Browser opened with base page (Bing)')
+            await page.goto(gotoUrl)
+            log('SUCCESS', `Browser navigated to: ${gotoUrl}`)
+
+            // Wait a bit for profile to load and scrape points
+            await page.waitForTimeout(5000);
+            await scrapeAndSavePoints();
+        } else {
+            // Mở trang Bing (base page) thay vì trang trắng
+            await page.goto('https://www.bing.com')
+            log('SUCCESS', 'Browser opened with base page (Bing)')
+            await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel')
+            log('SUCCESS', 'Browser opened with base page (Bing dashboard)')
+
+            await page.waitForTimeout(3000);
+            await scrapeAndSavePoints();
+        }
     } catch (e) {
         log('WARN', `Could not open base page: ${e.message}`)
     }
@@ -380,6 +436,7 @@ async function main() {
 
     page.on('close', async () => {
         log('INFO', 'Browser page closed. Cleaning up...')
+        try { await scrapeAndSavePoints(); } catch(e) {}
         await saveCookies(sessionBase, await context.cookies(), sessionType)
         releaseProxyLock(proxyKey, projectRoot)
         log('INFO', 'Exiting process...')
@@ -388,6 +445,7 @@ async function main() {
 
     browser.on('disconnected', async () => {
         log('INFO', 'Browser disconnected. Cleaning up...')
+        try { await scrapeAndSavePoints(); } catch(e) {}
         await saveCookies(sessionBase, await context.cookies(), sessionType)
         releaseProxyLock(proxyKey, projectRoot)
         log('INFO', 'Exiting process...')

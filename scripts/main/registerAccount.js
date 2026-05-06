@@ -19,7 +19,9 @@ import {
     getSessionPath,
     getProxyKey,
     acquireProxyLock,
-    releaseProxyLock
+    releaseProxyLock,
+    deleteAccount,
+    openDb
 } from '../utils.js'
 
 const __dirname = getDirname(import.meta.url)
@@ -28,12 +30,13 @@ const projectRoot = getProjectRoot(__dirname)
 const args = parseArgs()
 const { data: config, path: configPath } = loadConfig(projectRoot, args.dev || false)
 
+let lastRotatedProxy = null // Cache last successful proxy for multi-slot reuse
+
 // --- Persistence logic for new config fields ---
 if ((args.rotationUrl && !config.proxyRotationUrl) || (args.otpKey && !config.apiOtpKey)) {
     try {
-        const Database = (await import('better-sqlite3')).default
         const dbPath = path.join(projectRoot, 'rewards_data.db')
-        const db = new Database(dbPath)
+        const db = openDb(dbPath, { timeout: 5000 })
 
         const newConfig = { ...config }
         if (args.rotationUrl) newConfig.proxyRotationUrl = args.rotationUrl
@@ -50,37 +53,58 @@ if ((args.rotationUrl && !config.proxyRotationUrl) || (args.otpKey && !config.ap
 
 // --- Helper Functions ---
 
-async function rotateProxy(url) {
+async function rotateProxy(url, maxWaitMs = 360000) {
     if (!url) return null
-    try {
-        log('INFO', 'Rotating proxy...')
-        const response = await axios.get(url)
-        // Handle both "status: success" and "success: true" formats
-        if (response.data.status === 'success' || response.data.success === true) {
-            const proxyStr = response.data.proxy // format: "ip:port:user:pass"
 
-            if (proxyStr) {
-                const parts = proxyStr.split(':')
-                log('SUCCESS', `Proxy Rotated: ${parts[0]}:${parts[1]} | IP: ${response.data.ip || 'Unknown'}`)
-                return {
-                    server: `http://${parts[0]}:${parts[1]}`,
-                    host: parts[0],
-                    port: parts[1],
-                    username: parts[2],
-                    password: parts[3],
-                    isProxyV6: (response.data.ip && response.data.ip.includes(':')) || parts[0].includes(':')
+    const attempt = async () => {
+        try {
+            log('INFO', 'Rotating proxy...')
+            const response = await axios.get(url)
+            if (response.data.status === 'success' || response.data.success === true) {
+                const proxyStr = response.data.proxy
+                if (proxyStr) {
+                    const parts = proxyStr.split(':')
+                    log('SUCCESS', `Proxy Rotated: ${parts[0]}:${parts[1]} | IP: ${response.data.ip || 'Unknown'}`)
+                    return {
+                        server: `http://${parts[0]}:${parts[1]}`,
+                        host: parts[0],
+                        port: parts[1],
+                        username: parts[2],
+                        password: parts[3],
+                        isProxyV6: (response.data.ip && response.data.ip.includes(':')) || parts[0].includes(':')
+                    }
+                } else {
+                    log('SUCCESS', 'Proxy rotation triggered successfully (Static Proxy)')
+                    return { triggerOnly: true }
                 }
             } else {
-                log('SUCCESS', 'Proxy rotation triggered successfully (Static Proxy)')
-                return { triggerOnly: true }
+                const msg = response.data.message || response.data.msg || ''
+                // Parse cooldown: e.g. "Chưa tới thời gian xoay: 36s" or "wait 120 seconds"
+                const match = msg.match(/(\d+)\s*s(econds?)?/i)
+                const cooldownSec = match ? parseInt(match[1]) : null
+                return { cooldownSec, errorMsg: msg }
             }
-        } else {
-            log('ERROR', `Proxy rotation failed: ${response.data.message || response.data.msg || 'Unknown error'}`)
+        } catch (e) {
+            log('ERROR', `Proxy rotation request failed: ${e.message}`)
+            return null
         }
-    } catch (e) {
-        log('ERROR', `Proxy rotation failed: ${e.message}`)
     }
-    return null
+
+    const started = Date.now()
+    while (true) {
+        const result = await attempt()
+        if (!result) return null                         // network error
+        if (!result.cooldownSec && !result.errorMsg) return result // success
+        if (result.triggerOnly) return result
+
+        const waitMs = result.cooldownSec ? (result.cooldownSec + 5) * 1000 : 0
+        if (!waitMs || Date.now() - started + waitMs > maxWaitMs) {
+            log('ERROR', `Proxy rotation failed: ${result.errorMsg || 'Unknown error'}`)
+            return null
+        }
+        log('INFO', `Proxy cooldown active (${result.cooldownSec}s). Waiting before retry...`)
+        await new Promise(r => setTimeout(r, waitMs))
+    }
 }
 
 async function createOtpOrder(apiKey, retries = 5) {
@@ -254,8 +278,7 @@ async function getIpLocation(proxy) {
         return null
     }
 
-    log('ERROR', 'All IP Location services failed or returned 502. Stopping flow to prevent IP leak.')
-    process.exit(1)
+    log('ERROR', 'All IP Location services failed or returned 502.')
     return null
 }
 
@@ -286,10 +309,15 @@ async function main() {
             }
         } else {
             effectiveProxy = rotatedProxy
+            lastRotatedProxy = rotatedProxy // Cache for next slots
         }
     } else {
         if (config.proxyRotationUrl || args.rotationUrl) {
             log('ERROR', 'Could not rotate proxy or rotation failed. Checking Global Fallback...')
+            if (lastRotatedProxy) {
+                log('INFO', `Reusing last rotated proxy: ${lastRotatedProxy.host}:${lastRotatedProxy.port}`)
+                effectiveProxy = lastRotatedProxy
+            }
         }
 
         if (globalProxy && globalProxy.enable && globalProxy.url) {
@@ -316,7 +344,7 @@ async function main() {
     if (!lock.success) {
         log('ERROR', `Proxy ${proxyKey === 'NO_PROXY' ? 'No-Proxy' : proxyKey} is currently in use (PID: ${lock.pid || 'Unknown'}).`)
         log('ERROR', 'Please close the other session or use the "Clear Locks" button on the Dashboard.')
-        process.exit(88)
+        throw new Error(`Proxy in use: ${proxyKey}`)
     }
 
     // 2. Order OTP
@@ -324,12 +352,24 @@ async function main() {
     const order = await createOtpOrder(otpKey)
     if (!order) {
         log('ERROR', 'Could not rent email. Check config.apiOtpKey')
-        process.exit(1)
+        throw new Error('Could not rent email')
     }
 
     const email = order.email
     const orderId = order.orderid
     const password = args.password || generateRandomPassword(14)
+
+    // Extract birth year from last 4 digits of email local-part if valid
+    const localPart = email.split('@')[0] || ''
+    const yearMatch = localPart.match(/(\d{4})$/)
+    let birthYear = null
+    if (yearMatch) {
+        const parsedYear = parseInt(yearMatch[1], 10)
+        if (parsedYear >= 1920 && parsedYear <= 2010) {
+            birthYear = parsedYear
+            log('INFO', `Detected birth year ${birthYear} from email suffix`)
+        }
+    }
 
     log('SUCCESS', `Rented Email: ${email} | Order ID: ${orderId} | Password: ${password}`)
 
@@ -345,12 +385,13 @@ async function main() {
             url: `http://${effectiveProxy.host}`,
             port: effectiveProxy.port,
             username: effectiveProxy.username,
-            password: effectiveProxy.password
+            password: effectiveProxy.password,
+            isProxyV6: effectiveProxy.isProxyV6 || false
         } : {},
         geoLocale: 'auto',
         langCode: 'vi',
-        group: 'Hanoi',
-        saveFingerprint: { mobile: true, desktop: true }
+        group: 'AutoChinh',
+        saveFingerprint: { mobile: args.mobile || false, desktop: !(args.mobile || false) }
     }
     saveAccount(projectRoot, initialAccount, args.dev || false)
 
@@ -378,24 +419,28 @@ async function main() {
         args: [...BROWSER_ARGS]
     })
 
-    // --- New logic: Save and exit immediately when browser is closed ---
+    // Save session when browser is closed unexpectedly (user closes manually)
     browser.on('disconnected', async () => {
         await persistSessionData()
-        log('INFO', 'Browser closed. Process ended.')
-        process.exit(0)
+        log('INFO', 'Browser disconnected.')
     })
-    // ------------------------------------------------------------------
 
     let fingerprint = null
     const browserType = config.browserType ?? 'chromium'
     const fingerprintBrowser = browserType === 'edge' ? 'edge' : 'chrome'
 
+    const isMobile = args.mobile || false
     const fingerprintGenerator = new FingerprintGenerator()
     fingerprint = fingerprintGenerator.getFingerprint({
-        devices: ['desktop'],
-        operatingSystems: ['windows', 'macos', 'linux'],
+        devices: isMobile ? ['mobile'] : ['desktop'],
+        operatingSystems: isMobile ? ['android', 'ios'] : ['windows', 'macos', 'linux'],
         browsers: [fingerprintBrowser],
-        screen: {
+        screen: isMobile ? {
+            minWidth: 360,
+            maxWidth: 480,
+            minHeight: 640,
+            maxHeight: 926
+        } : {
             minWidth: 1366,
             maxWidth: 1920,
             minHeight: 768,
@@ -410,7 +455,7 @@ async function main() {
             logger: { error: () => { }, warn: () => { }, info: () => { }, debug: () => { } }
         }
         const um = new UserAgentManager(mockBot)
-        fingerprint = await um.updateFingerprintUserAgent(fingerprint, false) // false = desktop
+        fingerprint = await um.updateFingerprintUserAgent(fingerprint, isMobile) // isMobile: true/false
         log('SUCCESS', 'Applied exact Edge/Chrome UA string matching')
     } catch (err) {
         log('WARN', 'Could not apply exact UA string matching: ' + err.message)
@@ -433,9 +478,10 @@ async function main() {
 
         try {
             if (!silent) log('INFO', 'Capturing cookies and fingerprint for persistence...')
+            const sessionType = args.mobile ? 'mobile' : 'desktop'
             const cookies = await currentContext.cookies()
-            await saveCookies(sessionBase, cookies, 'desktop')
-            await saveFingerprint(sessionBase, currentFingerprint, 'desktop')
+            await saveCookies(sessionBase, cookies, sessionType)
+            await saveFingerprint(sessionBase, currentFingerprint, sessionType)
 
             // Note: Don't set isSaved = true if we are doing periodic saves
             if (silent) {
@@ -450,18 +496,25 @@ async function main() {
     }
 
     const ipLocation = await getIpLocation(effectiveProxy)
+    if (!ipLocation && !((args.geo || 'US').toLowerCase() === 'vi')) {
+        log('ERROR', 'Stopping flow to prevent IP leak. Deleting account info...')
+        deleteAccount(projectRoot, email, args.dev || false)
+        releaseProxyLock(proxyKey, projectRoot)
+        throw new Error('IP location failed — flow aborted to prevent IP leak')
+    }
     const locale = (args.geo || 'US').toLowerCase() === 'vi' ? 'vi-VN' : 'en-US'
 
     const context = await newInjectedContext(browser, {
         fingerprint,
         newContextOptions: {
-            viewport: { width: getRandomInt(1366, 1920), height: getRandomInt(768, 1080) },
+            viewport: isMobile ? { width: getRandomInt(360, 414), height: getRandomInt(700, 896) } : { width: getRandomInt(1366, 1920), height: getRandomInt(768, 1080) },
             locale: locale,
             timezoneId: ipLocation?.timezone,
             geolocation: ipLocation ? { latitude: ipLocation.lat, longitude: ipLocation.lon } : undefined,
             permissions: ['geolocation'],
             ignoreHTTPSErrors: true,
-            bypassCSP: true
+            bypassCSP: true,
+            hasTouch: isMobile
         }
     })
 
@@ -535,7 +588,11 @@ async function main() {
 
     try {
         log('INFO', 'Navigating to signup...')
-        await page.goto('https://signup.live.com/signup', { waitUntil: 'networkidle', timeout: 60000 })
+        await page.goto('https://signup.live.com/signup', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(async (e) => {
+            log('ERROR', `Failed to navigate to signup page: ${e.message}`)
+            await deleteAccount(projectRoot, email, args.dev || false)
+            throw new Error(`Signup navigation failed: ${e.message}`)
+        })
 
         // 4. Fill Information
         log('INFO', `Entering Email: ${email}`)
@@ -560,8 +617,9 @@ async function main() {
         }
 
         if (!otp) {
-            log('ERROR', 'OTP Timeout. Closing...')
-            process.exit(1)
+            log('ERROR', 'OTP Timeout. Deleting account and aborting...')
+            deleteAccount(projectRoot, email, args.dev || false)
+            throw new Error('OTP Timeout')
         }
 
         // Check for standard input or multi-digit inputs (codeEntry-0...5)
@@ -588,11 +646,12 @@ async function main() {
         await page.waitForTimeout(getRandomInt(3000, 5000))
         // 6. Birth Date (Custom Dropdowns)
         log('INFO', 'Filling Birth Date...')
-        await page.waitForSelector('[data-testid="birthdateControls"], #BirthMonthDropdown', { state: 'visible' })
+        await page.waitForSelector('[data-testid="birthdateControls"], #BirthMonthDropdown', { state: 'visible', timeout: 30000 })
+        log('INFO', 'Birthdate controls visible')
 
         const day = String(getRandomInt(1, 25)) // Avoid 29-31 for safety
         const monthIndex = getRandomInt(1, 12)
-        const year = String(getRandomInt(1995, 2005)) // Sinh năm > 1994
+        const year = birthYear ? String(birthYear) : String(getRandomInt(1995, 2005))
 
         const months = [
             'January', 'February', 'March', 'April', 'May', 'June',
@@ -600,25 +659,68 @@ async function main() {
         ]
         const monthName = months[monthIndex - 1]
 
-        // 1. Month
-        await fluentUIClick(page, '#BirthMonthDropdown')
-        await page.waitForSelector('div[role="listbox"], .fui-Listbox', { state: 'visible' })
-        await page.locator('role=option').filter({ hasText: monthName }).first().click()
-        await page.waitForTimeout(getRandomInt(1000, 2000))
+        // Detect layout order: which dropdown is on the left (smaller X)?
+        const monthBtn = page.locator('#BirthMonthDropdown').first()
+        const dayBtn = page.locator('#BirthDayDropdown').first()
+        const monthBox = await monthBtn.boundingBox().catch(() => null)
+        const dayBox = await dayBtn.boundingBox().catch(() => null)
+        const monthFirst = !monthBox || !dayBox || monthBox.x <= dayBox.x
+        log('INFO', `Birthdate layout: ${monthFirst ? 'Month → Day' : 'Day → Month'}`)
 
-        // 2. Day
-        await fluentUIClick(page, '#BirthDayDropdown')
-        await page.waitForSelector('div[role="listbox"], .fui-Listbox', { state: 'visible' })
-        await page.locator('role=option').filter({ hasText: day }).first().click()
-        await page.waitForTimeout(getRandomInt(1000, 2000))
+        // Helper: open a dropdown, select option by exact text, wait for close
+        async function selectDropdownOption(btnSelector, optionText, label) {
+            const btn = page.locator(btnSelector).first()
+            let opened = false
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                await fluentUIClick(page, btn)
+                const listbox = page.locator('div[role="listbox"], ul[role="listbox"], .fui-Listbox').first()
+                opened = await listbox.isVisible({ timeout: 5000 }).catch(() => false)
+                const ariaExpanded = await btn.getAttribute('aria-expanded').catch(() => null)
+                if (opened || ariaExpanded === 'true') break
+                log('WARN', `${label} dropdown did not open (attempt ${attempt}/3), retrying...`)
+                await page.waitForTimeout(getRandomInt(800, 1500))
+            }
+            if (!opened) { log('WARN', `${label} dropdown failed to open, proceeding anyway`) }
 
-        // 3. Year
-        await humanType(page, 'input[name="BirthYear"]', year)
-        await page.waitForTimeout(getRandomInt(1000, 2000))
+            // Exact text match to avoid "5" matching "15", "25"
+            const exactOption = page.locator(`[role="option"]`).filter({ hasText: new RegExp(`^\\s*${optionText}\\s*$`) }).first()
+            const fallbackOption = page.locator(`[role="option"]`).filter({ hasText: optionText }).first()
+            const option = await exactOption.isVisible({ timeout: 3000 }).catch(() => false) ? exactOption : fallbackOption
+            await option.click()
+            log('INFO', `${label} selected: ${optionText}`)
 
+            // Wait for dropdown to close (aria-expanded → false)
+            await page.waitForFunction(
+                (sel) => {
+                    const el = document.querySelector(sel)
+                    return !el || el.getAttribute('aria-expanded') !== 'true'
+                },
+                btnSelector,
+                { timeout: 5000 }
+            ).catch(() => {})
+            await page.waitForTimeout(getRandomInt(700, 1200))
+        }
+
+        // 1. Fill in detected order
+        if (monthFirst) {
+            await selectDropdownOption('#BirthMonthDropdown', monthName, 'Month')
+            await selectDropdownOption('#BirthDayDropdown', day, 'Day')
+        } else {
+            await selectDropdownOption('#BirthDayDropdown', day, 'Day')
+            await selectDropdownOption('#BirthMonthDropdown', monthName, 'Month')
+        }
+
+        // 2. Year (text input)
+        log('INFO', `Filling Year: ${year}`)
+        const yearInput = page.locator('input[name="BirthYear"], input#BirthYearInput').first()
+        await yearInput.fill('')
+        await humanType(page, yearInput, year)
+        await page.waitForTimeout(getRandomInt(800, 1500))
+
+        log('INFO', 'Birthdate filled. Clicking Next...')
         await fluentUIClick(page, submitSelector)
         await waitForPageStable(page)
-        await page.waitForTimeout(getRandomInt(3000, 5000))
+        await page.waitForTimeout(getRandomInt(2000, 4000))
         // 8. Name - Vietnamese + English Random (Expanded List)
         const lastNames = [
             // Phổ biến nhất (VN)
@@ -745,6 +847,22 @@ async function main() {
         await waitForPageStable(page)
         await page.waitForTimeout(getRandomInt(5000, 10000))
 
+        // 10a. Check for account creation block screen
+        const blockSelectors = [
+            'h1:has-text("Account creation has been blocked")',
+            'h1:has-text("We can\'t create your account")',
+            '[data-testid="title"]:has-text("blocked")',
+            '[data-testid="title"]:has-text("unusual activity")',
+            'div:has-text("unusual activity and have blocked")',
+        ]
+        for (const sel of blockSelectors) {
+            if (await page.locator(sel).first().isVisible({ timeout: 1500 }).catch(() => false)) {
+                log('ERROR', '🚫 Account creation blocked by Microsoft (unusual activity detected)')
+                deleteAccount(projectRoot, email, args.dev || false)
+                throw new Error('Account creation blocked by Microsoft')
+            }
+        }
+
         // 10. Check for CAPTCHA (Human verification challenge)
         const captchaIframeSelector = 'iframe[title="Human verification challenge"], iframe[src*="arkoselabs"], iframe[data-testid="humanCaptchaIframe"]'
         const captchaFrame = await page.$(captchaIframeSelector)
@@ -754,11 +872,38 @@ async function main() {
                 log('SUCCESS', '✅ CAPTCHA solved automatically!')
             } else {
                 log('INFO', 'Automatic solve failed. Please solve manually...')
-
                 await page.waitForSelector(captchaIframeSelector, { state: 'hidden', timeout: 0 })
                 log('SUCCESS', '✅ CAPTCHA solved manually! Continuing...')
             }
             await waitForPageStable(page)
+
+            // Verify CAPTCHA was truly solved: page must leave signup form within 20s
+            const postCaptchaUrls = [
+                'privacynotice.account.microsoft.com',
+                'account.live.com',
+                'account.microsoft.com',
+                'login.live.com',
+                'rewards.bing.com',
+                'rewards.microsoft.com'
+            ]
+            log('INFO', 'Verifying CAPTCHA result — waiting for page to advance...')
+            let captchaPassed = false
+            for (let i = 0; i < 20; i++) {
+                const currentUrl = page.url()
+                if (postCaptchaUrls.some(u => currentUrl.includes(u))) {
+                    log('INFO', `✅ Page advanced to: ${currentUrl}`)
+                    captchaPassed = true
+                    break
+                }
+                await page.waitForTimeout(1000)
+            }
+
+            if (!captchaPassed) {
+                log('ERROR', `CAPTCHA not passed — page still at: ${page.url()}`)
+                log('ERROR', 'Deleting account and aborting...')
+                await deleteAccount(projectRoot, email, args.dev || false)
+                throw new Error('CAPTCHA verification failed: page did not advance after solve attempt')
+            }
         }
 
         // 11. Finalize Sequence (Poll until Dashboard or Security page reached)
@@ -773,7 +918,7 @@ async function main() {
             if (url.includes('privacynotice.account.microsoft.com')) {
                 log('INFO', 'Privacy Notice detected. Waiting for "OK" button...')
                 const okButton = page.locator('button.ms-Button--primary:has-text("OK"), button:has-text("OK")').first()
-                if (await okButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+                if (await okButton.isVisible({ timeout: 5000 }).catch(() => false)) {
                     log('INFO', 'Clicking OK on Privacy Notice...')
                     await okButton.click()
                     await page.waitForTimeout(3000)
@@ -783,22 +928,63 @@ async function main() {
 
 
 
-            // --- b2. Handle Passkey / KeyPass / Security Prompts ---
-            const passkeySkip = page.locator('button#close-button, button[data-testid="secondaryButton"], button:has-text("Cancel"), button:has-text("Skip"), button:has-text("Bỏ qua"), button:has-text("Not now")').first()
-            if (await passkeySkip.isVisible({ timeout: 2000 }).catch(() => false)) {
-                log('INFO', 'Passkey/Security prompt detected. Skipping...')
-                await passkeySkip.click()
-                await page.waitForTimeout(3000)
-                continue
+            // --- b2. Handle Passkey / Security Prompts ---
+            const passkeyRefused = await handlePasskeyPrompt(page)
+            if (passkeyRefused) {
+                await page.waitForTimeout(2000)
+                continue // Re-check URL after click
             }
 
-            // --- b. Handle Stay Signed In ---
-            const stayBtn = page.locator('input#idSIButton9, button:has-text("Yes"), button:has-text("Có"), input[value="Yes"]').first()
-            if (await stayBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                log('INFO', 'Stay Signed In prompt detected. Clicking Yes...')
-                await stayBtn.click()
-                await page.waitForTimeout(3000)
-                continue // Re-check URL after click
+
+            // --- b. Handle Stay Signed In (KMSI) ---
+            // Detect via element (not URL) — new signup flow may show this on non-login URLs
+            const kmsiDetectors = [
+                '[data-testid="kmsiVideo"]',
+                'div:has-text("Stay signed in?")',
+                'div:has-text("Rester connecté")',
+                'input#idSIButton9',
+                'input[value="Yes"]'
+            ]
+            let kmsiDetected = false
+            for (const sel of kmsiDetectors) {
+                try {
+                    if (await page.locator(sel).first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                        kmsiDetected = true
+                        break
+                    }
+                } catch { /* try next */ }
+            }
+            if (kmsiDetected) {
+                log('INFO', `Stay Signed In prompt detected at ${url}. Clicking Yes...`)
+                // New Fluent UI uses data-testid="primaryButton"; old login uses input#idSIButton9
+                const kmsiYesSelectors = [
+                    'button[data-testid="primaryButton"]',
+                    'input#idSIButton9',
+                    'input[value="Yes"]',
+                    'button#idSIButton9'
+                ]
+                let kmsiClicked = false
+                for (const sel of kmsiYesSelectors) {
+                    try {
+                        const btn = page.locator(sel).first()
+                        if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                            await btn.scrollIntoViewIfNeeded().catch(() => {})
+                            await page.waitForTimeout(getRandomInt(300, 600))
+                            try {
+                                await btn.click({ timeout: 5000 })
+                            } catch {
+                                await btn.focus().catch(() => {})
+                                await page.keyboard.press('Enter')
+                            }
+                            await page.waitForTimeout(3000)
+                            log('INFO', `After KMSI click, URL: ${page.url()}`)
+                            kmsiClicked = true
+                            break
+                        }
+                    } catch { /* try next */ }
+                }
+                if (!kmsiClicked) log('WARN', 'KMSI detected but could not click Yes button')
+                continue
             }
 
             // --- c. Check for Final Destination ---
@@ -822,14 +1008,28 @@ async function main() {
         }
 
         log('INFO', 'Navigating to security/change password page...')
-        await page.goto('https://account.live.com/password/Change?mkt=en-US&refd=account.microsoft.com&refp=security', { waitUntil: 'networkidle', timeout: 30000 }).catch(() => { })
+        const pwGotoErr = await page.goto('https://account.live.com/password/Change?mkt=en-US&refd=account.microsoft.com&refp=security', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e => e)
+        if (pwGotoErr instanceof Error) {
+            log('WARN', `Password page navigation error: ${pwGotoErr.message} — retrying once...`)
+            await page.waitForTimeout(3000)
+            await page.goto('https://account.live.com/password/Change?mkt=en-US&refd=account.microsoft.com&refp=security', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
+        }
+        log('INFO', `Password page URL: ${page.url()}`)
 
-        // Check if "Add/Change password" form is present
+        // Wait for "Add/Change password" form — retry up to 15s
         const passwordInput = page.locator('#iPassword')
         const retypeInput = page.locator('#iRetypePassword')
         const saveBtn = page.locator('#UpdatePasswordAction')
 
-        if (await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+        let pwFormFound = false
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            pwFormFound = await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)
+            if (pwFormFound) break
+            log('WARN', `Password form not visible (attempt ${attempt}/3), waiting...`)
+            await page.waitForTimeout(3000)
+        }
+
+        if (pwFormFound) {
             log('INFO', 'Form "Add a password" detected. Securing account...')
             await humanType(page, passwordInput, initialAccount.password)
             await page.waitForTimeout(getRandomInt(1000, 2000))
@@ -840,56 +1040,305 @@ async function main() {
             await fluentUIClick(page, saveBtn)
             await waitForPageStable(page)
             await page.waitForTimeout(getRandomInt(3000, 5000))
+        } else {
+            log('WARN', `⚠️ Password form NOT found at ${page.url()} — password step SKIPPED`)
         }
 
         // 11. Activate Microsoft Rewards via Referral
         log('INFO', 'Activating Microsoft Rewards via referral link...')
-        await page.goto('https://rewards.bing.com/welcome?rh=960784F9&ref=rafsrchae', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => { })
+        await page.goto('https://rewards.bing.com/welcome?rh=FBF6AB43&ref=rafsrchae', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => { })
         await waitForPageStable(page)
+        await page.waitForTimeout(getRandomInt(2000, 3000))
+        log('INFO', `Rewards page URL: ${page.url()}`)
 
         // Click "Start earning rewards" link
         const startEarningSelector = 'a#start-earning-rewards-link'
-        if (await page.isVisible(startEarningSelector).catch(() => false)) {
+        const startEarningVisible = await page.locator(startEarningSelector).isVisible({ timeout: 5000 }).catch(() => false)
+        if (startEarningVisible) {
             log('INFO', 'Clicking "Start earning rewards" link...')
             await fluentUIClick(page, startEarningSelector)
+            await waitForPageStable(page)
             await page.waitForTimeout(getRandomInt(3000, 5000))
+            log('INFO', `After start earning URL: ${page.url()}`)
+        } else {
+            log('WARN', '"Start earning rewards" link not found — may already be enrolled or page layout changed')
         }
-
-        await page.waitForTimeout(getRandomInt(3000, 5000))
 
         // Click "Get Rewards now" button/span
-        const getRewardsSelector = 'button:has-text("Get Rewards now"), button:has-text("Nhận phần thưởng ngay"), span:has-text("Get Rewards now")'
-        if (await page.isVisible(getRewardsSelector).catch(() => false)) {
-            log('INFO', 'Clicking "Get Rewards now" button...')
-            await fluentUIClick(page, getRewardsSelector)
-            await page.waitForTimeout(getRandomInt(3000, 5000))
+        const getRewardsSelectors = [
+            'button:has-text("Get Rewards now")',
+            'button:has-text("Nhận phần thưởng ngay")',
+            'span:has-text("Get Rewards now")',
+            'a:has-text("Get Rewards now")',
+            '[data-testid*="rewards"] button',
+            'button.c-call-to-action'
+        ]
+        let rewardsClicked = false
+        for (const sel of getRewardsSelectors) {
+            const visible = await page.locator(sel).first().isVisible({ timeout: 3000 }).catch(() => false)
+            if (visible) {
+                log('INFO', `Clicking "Get Rewards now" button (${sel})...`)
+                await fluentUIClick(page, sel)
+                await page.waitForTimeout(getRandomInt(3000, 5000))
+                rewardsClicked = true
+                break
+            }
         }
+        if (!rewardsClicked) {
+            log('WARN', '"Get Rewards now" button not found — checking if already activated...')
+            // Navigate directly to rewards dashboard to confirm enrollment
+            await page.goto('https://rewards.bing.com/', { waitUntil: 'networkidle', timeout: 30000 }).catch(() => { })
+            await waitForPageStable(page)
+            log('INFO', `Rewards dashboard URL: ${page.url()}`)
+        }
+
+        // Click reward cards to activate them, then close the popup
+        async function clickRewardCard(sectionId) {
+            try {
+                const section = page.locator(`#${sectionId}, section[id="${sectionId}"]`).first()
+                const sectionVisible = await section.isVisible({ timeout: 3000 }).catch(() => false)
+                if (!sectionVisible) {
+                    log('WARN', `Section #${sectionId} not found, skipping`)
+                    return
+                }
+
+                // Find the clickable card button inside the section
+                // Correct button: bg-bgCtrlNeutralRest + w-sizeCtrlDefault (NOT bg-bgCtrlSubtleRest which is the small icon button)
+                const cardBtn = section.locator('button[class*="bg-bgCtrlNeutralRest"]').first()
+                const cardVisible = await cardBtn.isVisible({ timeout: 2000 }).catch(() => false)
+                if (!cardVisible) {
+                    log('WARN', `Card button in #${sectionId} not found, skipping`)
+                    return
+                }
+
+                log('INFO', `Clicking card in #${sectionId}...`)
+                await cardBtn.scrollIntoViewIfNeeded()
+                await page.waitForTimeout(getRandomInt(300, 600))
+
+                const box = await cardBtn.boundingBox()
+                if (box) {
+                    const cx = box.x + box.width / 2
+                    const cy = box.y + box.height / 2
+                    // Move mouse to element first
+                    await page.mouse.move(cx, cy, { steps: getRandomInt(8, 15) })
+                    await page.waitForTimeout(getRandomInt(150, 300))
+                }
+
+                // Use touch events (most reliable for Angular PWA/mobile-style components)
+                await cardBtn.evaluate((el) => {
+                    const rect = el.getBoundingClientRect()
+                    const cx = rect.left + rect.width / 2
+                    const cy = rect.top + rect.height / 2
+                    const touch = new Touch({ identifier: Date.now(), target: el, clientX: cx, clientY: cy, pageX: cx, pageY: cy, screenX: cx, screenY: cy, radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1 })
+                    const touchInit = { bubbles: true, cancelable: true, view: window, touches: [touch], targetTouches: [touch], changedTouches: [touch] }
+                    el.dispatchEvent(new TouchEvent('touchstart', touchInit))
+                    el.dispatchEvent(new TouchEvent('touchend',   { ...touchInit, touches: [], targetTouches: [] }))
+                    // Also fire click for fallback
+                    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }))
+                })
+                await page.waitForTimeout(getRandomInt(4500, 5500))
+
+                // Close the popup — also use real mouse click
+                const closeSelectors = [
+                    'button[slot="close"]',
+                    '[slot="close"]',
+                    'button[aria-label="Close"]',
+                    'button[aria-label="Đóng"]',
+                    'button[aria-label="close"]',
+                    '.close-icon button',
+                    'button.ms-Button--icon[title="Close"]'
+                ]
+                let popupClosed = false
+                for (const sel of closeSelectors) {
+                    const closeBtn = page.locator(sel).first()
+                    if (await closeBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+                        const cbox = await closeBtn.boundingBox()
+                        if (cbox) {
+                            await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2, { steps: 5 })
+                            await page.waitForTimeout(200)
+                            await page.mouse.click(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2)
+                        } else {
+                            await closeBtn.evaluate(el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })))
+                        }
+                        log('INFO', `Closing popup from #${sectionId} (${sel})`)
+                        await page.waitForTimeout(getRandomInt(1000, 1800))
+                        popupClosed = true
+                        break
+                    }
+                }
+                if (!popupClosed) {
+                    log('WARN', `Close button not found for #${sectionId} popup, pressing Escape`)
+                    await page.keyboard.press('Escape')
+                    await page.waitForTimeout(1000)
+                }
+            } catch (e) {
+                log('WARN', `Error handling section #${sectionId}: ${e.message}`)
+            }
+        }
+
+        for (const sectionId of ['snapshot', 'dailyset', 'streaks', 'achievements']) {
+            await clickRewardCard(sectionId)
+        }
+
+        // Redeem SKU page
+        log('INFO', 'Navigating to rewards redeem SKU page...')
+        await page.goto('https://rewards.bing.com/redeem/sku/000899012002', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
+        await page.waitForTimeout(getRandomInt(3000, 5000))
+        log('INFO', `SKU page URL: ${page.url()}`)
+
+        const dispatchTouchClick = async (el) => {
+            await el.scrollIntoViewIfNeeded().catch(() => {})
+            await page.waitForTimeout(getRandomInt(200, 400))
+            await el.evaluate((node) => {
+                const rect = node.getBoundingClientRect()
+                const cx = rect.left + rect.width / 2
+                const cy = rect.top + rect.height / 2
+                const touch = new Touch({ identifier: Date.now(), target: node, clientX: cx, clientY: cy, pageX: cx, pageY: cy, screenX: cx, screenY: cy, radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1 })
+                const init = { bubbles: true, cancelable: true, view: window, touches: [touch], targetTouches: [touch], changedTouches: [touch] }
+                node.dispatchEvent(new TouchEvent('touchstart', init))
+                node.dispatchEvent(new TouchEvent('touchend', { ...init, touches: [], targetTouches: [] }))
+                node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }))
+            })
+            await page.waitForTimeout(getRandomInt(500, 900))
+        }
+
+        // Step 1: Click toggle switch (ctrlChoiceSwitch) — optional pre-redeem toggle
+        const toggleSwitch = page.locator('div[class*="ctrlChoiceSwitchBgDefault"]').first()
+        if (await toggleSwitch.isVisible({ timeout: 5000 }).catch(() => false)) {
+            log('INFO', 'Clicking toggle switch...')
+            await dispatchTouchClick(toggleSwitch)
+        } else {
+            log('WARN', 'Toggle switch not found on SKU page')
+        }
+
+        // Step 2: Select "Track and manually redeem your reward" (value="Goal")
+        // The radio is inside a React-Aria popup; we target the label or input with value="Goal"
+        const goalRadioInput = page.locator('input[type="radio"][value="Goal"]').first()
+        const goalRadioLabel = page.locator('label:has-text("Track and manually redeem your reward")').first()
+
+        if (await goalRadioInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+            log('INFO', 'Selecting "Track and manually redeem your reward" (Goal)...')
+            // Click the associated label for better React-Aria handling
+            if (await goalRadioLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await dispatchTouchClick(goalRadioLabel)
+            } else {
+                await dispatchTouchClick(goalRadioInput)
+            }
+            await page.waitForTimeout(getRandomInt(800, 1200))
+        } else {
+            log('WARN', '"Goal" radio option not found, falling back to first radio indicator')
+            const fallbackRadio = page.locator('div[data-indicator="true"][class*="ctrlChoiceRadio"]').first()
+            if (await fallbackRadio.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await dispatchTouchClick(fallbackRadio)
+                await page.waitForTimeout(getRandomInt(800, 1200))
+            }
+        }
+
+        // Step 3: Click Next button (wait for it to become enabled)
+        const nextBtn = page.locator('button[class*="bg-bgCtrlBrandRest"]:has-text("Next"), button:has-text("Next")').first()
+        if (await nextBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
+            // Wait for disabled attribute to be removed
+            try {
+                await page.waitForFunction(() => {
+                    const btn = document.querySelector('button[class*="bg-bgCtrlBrandRest"], button:has-text("Next")')
+                    return btn && !btn.disabled
+                }, { timeout: 5000 })
+            } catch {
+                log('WARN', 'Next button may still be disabled, proceeding anyway')
+            }
+            log('INFO', 'Clicking Next button on SKU page...')
+            await dispatchTouchClick(nextBtn)
+            await page.waitForTimeout(getRandomInt(3000, 5000))
+            log('INFO', `After Next, URL: ${page.url()}`)
+        } else {
+            log('WARN', 'Next button not found on SKU page')
+        }
+
+        // Step 4: Dismiss "Your Rewards goal is set" popup
+        const okayBtn = page.locator('button:has-text("Okay"), button:has-text("OK")').first()
+        if (await okayBtn.isVisible({ timeout: 6000 }).catch(() => false)) {
+            log('INFO', '"Your Rewards goal is set" popup detected. Clicking Okay...')
+            await dispatchTouchClick(okayBtn)
+            await page.waitForTimeout(getRandomInt(1500, 2500))
+            log('INFO', '✅ Rewards goal popup dismissed')
+        } else {
+            log('WARN', '"Rewards goal" popup Okay button not found — may not have appeared')
+        }
+
+        // Step 5: Dashboard referral clicks for extra points
+        log('INFO', 'Navigating to Rewards dashboard for referral clicks...')
+        await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
+        await waitForPageStable(page)
+        await page.waitForTimeout(getRandomInt(2000, 3500))
+
+        // First round: click "Earn 1320 points" then /earn
+        const earnPointsSpan1 = page.locator('span:has-text("Earn 1320 points")').first()
+        if (await earnPointsSpan1.isVisible({ timeout: 5000 }).catch(() => false)) {
+            log('INFO', 'Clicking "Earn 1320 points" span (round 1)...')
+            await dispatchTouchClick(earnPointsSpan1)
+            await page.waitForTimeout(getRandomInt(1500, 2500))
+
+            const earnLink1 = page.locator('a[href="/earn"]').first()
+            if (await earnLink1.isVisible({ timeout: 5000 }).catch(() => false)) {
+                log('INFO', 'Clicking /earn link (round 1)...')
+                await dispatchTouchClick(earnLink1)
+                await page.waitForTimeout(5000)
+            } else {
+                log('WARN', '/earn link not found (round 1)')
+            }
+        } else {
+            log('WARN', '"Earn 1320 points" span not found (round 1)')
+        }
+
+        // Return to dashboard
+        log('INFO', 'Returning to dashboard for second round...')
+        await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
+        await waitForPageStable(page)
+        await page.waitForTimeout(getRandomInt(2000, 3500))
+
+        // Second round: click "Earn 1320 points" then /about?section=benefits
+        const earnPointsSpan2 = page.locator('span:has-text("Earn 1320 points")').first()
+        if (await earnPointsSpan2.isVisible({ timeout: 5000 }).catch(() => false)) {
+            log('INFO', 'Clicking "Earn 1320 points" span (round 2)...')
+            await dispatchTouchClick(earnPointsSpan2)
+            await page.waitForTimeout(getRandomInt(1500, 2500))
+
+            const benefitsLink = page.locator('a[href="/about?section=benefits"]').first()
+            if (await benefitsLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+                log('INFO', 'Clicking /about?section=benefits link (round 2)...')
+                await dispatchTouchClick(benefitsLink)
+                await page.waitForTimeout(5000)
+            } else {
+                log('WARN', '/about?section=benefits link not found (round 2)')
+            }
+        } else {
+            log('WARN', '"Earn 1320 points" span not found (round 2)')
+        }
+
+        // Return to dashboard final time
+        log('INFO', 'Returning to dashboard (final)...')
+        await page.goto('https://rewards.bing.com/dashboard?ref=rewardspanel', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
+        await waitForPageStable(page)
+        await page.waitForTimeout(getRandomInt(1500, 2500))
 
         log('SUCCESS', '✅ Registration and Rewards activation completed!')
 
-
-        log('INFO', 'The browser will remain open so you can review the account.')
-        log('INFO', 'Dữ liệu sẽ được tự động lưu mỗi 10 giây.')
-        log('INFO', 'Đóng trình duyệt hoặc nhấn Ctrl+C để kết thúc.')
-
-        // Periodic save every 10 seconds while waiting
-        const saveInterval = setInterval(async () => {
-            if (browser.isConnected()) {
-                await persistSessionData(true) // silent save
-            } else {
-                clearInterval(saveInterval)
-            }
-        }, 10000)
-
-        // Hang until disconnected or manually stopped
-        while (browser.isConnected()) {
-            await new Promise(r => setTimeout(r, 1000))
+        log('INFO', 'Saving session and closing browser...')
+        await persistSessionData()
+        releaseProxyLock(proxyKey, projectRoot)
+        if (browser?.isConnected?.()) {
+            await browser.close()
         }
-
-        clearInterval(saveInterval)
+        log('SUCCESS', 'Session saved. Process complete.')
+        return { success: true }
 
     } catch (e) {
         log('ERROR', `Flow failed: ${e.message}`)
+        releaseProxyLock(proxyKey, projectRoot)
+        if (browser?.isConnected?.()) {
+            await browser.close()
+        }
+        return { success: false, error: e.message }
     }
 
     setupCleanupHandlers(async () => {
@@ -904,95 +1353,314 @@ async function main() {
 }
 
 /**
- * Automates the "Press and Hold" Arkose CAPTCHA
+ * Detects and refuses passkey/WebAuthn setup prompts.
+ * Separates detection selectors from refuse selectors to avoid false positives.
+ * Returns true if a passkey prompt was found and handled, false otherwise.
+ */
+async function handlePasskeyPrompt(page) {
+    // Detection selectors: only content that specifically indicates a passkey page
+    const passkeyDetectionSelectors = [
+        '[data-testid*="passkey"]',
+        '[data-testid="biometricVideo"]',
+        '[data-testid="registrationImg"]',
+        'div:has-text("Set up a passkey")',
+        'div:has-text("Tạo khóa truy cập")',
+        'div:has-text("passkey")',
+        'div:has-text("clé d\'accès")',
+        'div:has-text("Configurer une clé")',
+        'div:has-text("Giữ thông tin của bạn an toàn")',
+        'div:has-text("Keep your info safe")'
+    ]
+
+    let passkeyPromptFound = false
+    for (const selector of passkeyDetectionSelectors) {
+        const element = page.locator(selector).first()
+        if (await element.isVisible({ timeout: 500 }).catch(() => false)) {
+            passkeyPromptFound = true
+            log('WARN', `⚠️ Passkey prompt detected (selector: ${selector}) - REFUSING...`)
+            break
+        }
+    }
+
+    if (!passkeyPromptFound) return false
+
+    // Refuse selectors: buttons to click to dismiss the passkey prompt
+    const refuseButtonSelectors = [
+        'button:has-text("Skip")',
+        'button:has-text("Not now")',
+        'button:has-text("Bỏ qua")',
+        'button:has-text("Để sau")',
+        'button:has-text("No")',
+        'button:has-text("Cancel")',
+        'button:has-text("Ignorer")',
+        'button:has-text("Plus tard")',
+        'button:has-text("Non")',
+        'button:has-text("Annuler")',
+        'button[data-testid="secondaryButton"]',
+        'button[id*="cancel"]',
+        'button[id*="skip"]'
+    ]
+
+    for (const selector of refuseButtonSelectors) {
+        const btn = page.locator(selector).first()
+        if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
+            log('INFO', `Clicking passkey refuse button: ${selector}`)
+            await fluentUIClick(page, btn)
+            log('INFO', '✅ Passkey setup REFUSED')
+            return true
+        }
+    }
+
+    log('WARN', '⚠️ Passkey prompt found but no refuse button detected')
+    return true // Still return true to re-check URL
+}
+
+/**
+ * Automates the "Press and Hold" CAPTCHA (PerimeterX / HUMAN Security via hsprotect.net)
+ *
+ * HTML structure:
+ *   - Outer page has: <iframe title="Verification challenge" data-testid="humanCaptchaIframe" src="https://iframe.hsprotect.net/...">
+ *   - Inside that iframe is the hold button
+ *   - Playwright CAN interact via page.frames() even cross-origin (CDP bypass)
  */
 async function solveArkosePressAndHold(page) {
-    log('INFO', 'Attempting to solve "Press and Hold" CAPTCHA...')
+    log('INFO', 'Attempting to solve "Press and Hold" CAPTCHA (PerimeterX/HUMAN Security)...')
 
     try {
-        // Wait for the outer captcha frame
-        const outerFrameSelector = 'iframe[title="Human verification challenge"], iframe[src*="arkoselabs"]'
+        // Correct selector based on actual HTML (title="Verification challenge", NOT "Human verification challenge")
+        const outerFrameSelector = 'iframe[data-testid="humanCaptchaIframe"], iframe[title="Verification challenge"], iframe[title="Human verification challenge"]'
         await page.waitForSelector(outerFrameSelector, { state: 'visible', timeout: 15000 })
+        log('INFO', 'CAPTCHA iframe detected')
 
-        // Find the interactive button inside nested frames
-        // We look for aria-label, text content, or specific IDs commonly used by Arkose
-        const selectors = [
+        await page.waitForTimeout(getRandomInt(1500, 2500)) // Let iframe load
+
+        // --- Strategy 1: Interact inside the iframe via Playwright frame API ---
+        // Playwright can access cross-origin iframes directly via page.frames()
+        // The hold button selectors for PerimeterX/HUMAN Security
+        const holdSelectors = [
+            '#home_children_button',   // PerimeterX common
+            '#Tay_nhan_giu',           // Vietnamese variant
+            'button[id*="hold"]',
+            'button[id*="press"]',
+            '[aria-label*="hold"]',
+            '[aria-label*="press"]',
             'button:has-text("Press and hold")',
-            'div:has-text("Press and hold")',
-            '[aria-label="Press and hold"]',
-            '#home_children_button',
-            '#Tay_nhan_giu'
+            'div[role="button"]',
+            'button'                   // Last resort: first button in iframe
         ]
 
-        let targetElement = null
-        let targetFrame = null
+        // Find the challenge frame (hsprotect.net with ch_ctx=1)
+        let challengeFrame = null
+        for (const frame of page.frames()) {
+            const url = frame.url()
+            if (url.includes('hsprotect.net') && url.includes('ch_ctx')) {
+                challengeFrame = frame
+                log('INFO', `Found challenge frame: ${url.substring(0, 80)}...`)
+                break
+            }
+        }
 
-        // Recursive search for the button in all frames
-        const frames = page.frames()
-        for (const frame of frames) {
-            for (const selector of selectors) {
+        // Fallback: any hsprotect frame
+        if (!challengeFrame) {
+            for (const frame of page.frames()) {
+                if (frame.url().includes('hsprotect.net')) {
+                    challengeFrame = frame
+                    log('INFO', `Found hsprotect frame (fallback): ${frame.url().substring(0, 80)}...`)
+                    break
+                }
+            }
+        }
+
+        if (challengeFrame) {
+            // Wait for frame to be fully loaded
+            await challengeFrame.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+            await page.waitForTimeout(getRandomInt(1000, 2000))
+
+            // --- Strategy 1: Accessibility bypass ---
+            // "Accessible challenge" button is on the OUTER PAGE, not inside the iframe
+            const accessibilitySelectors = [
+                'button:has-text("Accessible challenge")',
+                '[aria-label="Accessible challenge"]',
+                '[data-testid="accessibleImg"]',       // img inside the button
+                'button:has([data-testid="accessibleImg"])',
+                'img[data-testid="accessibleImg"]',
+                // Fallback: check inside iframe too
+                'button[aria-label="Accessibility"]',
+                'button[aria-label*="ccessib"]',
+                '#accessibility_button',
+                'button[id*="accessibility"]'
+            ]
+
+            let accessibilityClicked = false
+            // Search on OUTER page first
+            for (const sel of accessibilitySelectors.slice(0, 5)) {
                 try {
-                    const el = await frame.$(selector)
-                    if (el && await el.isVisible()) {
-                        targetElement = el
-                        targetFrame = frame
+                    const el = page.locator(sel).first()
+                    if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        log('INFO', `Accessibility button found on outer page (${sel}), clicking...`)
+                        await el.click()
+                        await page.waitForTimeout(getRandomInt(1500, 2500))
+                        accessibilityClicked = true
                         break
                     }
-                } catch (e) { }
+                } catch (e) { /* try next */ }
             }
-            if (targetElement) break
+
+            // Fallback: search inside iframe
+            if (!accessibilityClicked) {
+                for (const sel of accessibilitySelectors.slice(5)) {
+                    try {
+                        const el = await challengeFrame.$(sel)
+                        if (el && await el.isVisible()) {
+                            log('INFO', `Accessibility button found inside iframe (${sel}), clicking...`)
+                            await el.click()
+                            await page.waitForTimeout(getRandomInt(1500, 2500))
+                            accessibilityClicked = true
+                            break
+                        }
+                    } catch (e) { /* try next */ }
+                }
+            }
+
+            if (accessibilityClicked) {
+                // After accessibility click, look for "Press Again" / confirm button
+                // This button can be on outer page OR inside iframe
+                const pressAgainSelectors = [
+                    'button:has-text("Press Again")',
+                    'button:has-text("Press again")',
+                    'button:has-text("Nhấn lại")',
+                    'button:has-text("Confirm")',
+                    'button:has-text("Verify")',
+                    'button:has-text("Xác nhận")',
+                    '#verify_button',
+                    'button[id*="verify"]'
+                ]
+
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    // Check outer page first
+                    for (const sel of pressAgainSelectors) {
+                        try {
+                            const btn = page.locator(sel).first()
+                            if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
+                                log('INFO', `"Press Again" found on outer page (${sel}), clicking...`)
+                                await btn.click()
+                                await page.waitForTimeout(getRandomInt(2000, 3000))
+                                log('INFO', '✅ Accessibility captcha bypass done')
+                                return true
+                            }
+                        } catch (e) { /* try next */ }
+                    }
+                    // Check inside iframe
+                    for (const sel of pressAgainSelectors) {
+                        try {
+                            const btn = await challengeFrame.$(sel)
+                            if (btn && await btn.isVisible()) {
+                                log('INFO', `"Press Again" found inside iframe (${sel}), clicking...`)
+                                await btn.click()
+                                await page.waitForTimeout(getRandomInt(2000, 3000))
+                                log('INFO', '✅ Accessibility captcha bypass done')
+                                return true
+                            }
+                        } catch (e) { /* try next */ }
+                    }
+                    log('WARN', `"Press Again" not found (attempt ${attempt}/4), waiting...`)
+                    await page.waitForTimeout(1500)
+                }
+
+                log('WARN', '"Press Again" not found after accessibility click — falling back to hold')
+            } else {
+                log('WARN', 'Accessibility button not found — trying press and hold')
+            }
+
+            // --- Strategy 2: Press and Hold inside iframe ---
+            for (const selector of holdSelectors) {
+                try {
+                    const el = await challengeFrame.$(selector)
+                    if (el && await el.isVisible()) {
+                        log('INFO', `Hold button found inside iframe: ${selector}`)
+
+                        const box = await el.boundingBox()
+                        if (!box) continue
+
+                        const iframeEl = await page.$(outerFrameSelector)
+                        const iframeBox = await iframeEl?.boundingBox()
+
+                        const pageX = (iframeBox?.x ?? 0) + box.x + box.width / 2 + getRandomInt(-3, 3)
+                        const pageY = (iframeBox?.y ?? 0) + box.y + box.height / 2 + getRandomInt(-3, 3)
+
+                        log('INFO', `Moving to hold position: (${pageX.toFixed(0)}, ${pageY.toFixed(0)})`)
+                        await page.mouse.move(pageX, pageY, { steps: getRandomInt(10, 20) })
+                        await page.waitForTimeout(getRandomInt(300, 700))
+                        await page.mouse.down()
+
+                        const holdDuration = getRandomInt(8500, 12000)
+                        log('INFO', `Holding for ${(holdDuration / 1000).toFixed(1)} seconds...`)
+                        await page.waitForTimeout(holdDuration)
+                        await page.mouse.up()
+
+                        await page.waitForTimeout(getRandomInt(2000, 3500))
+                        return true
+                    }
+                } catch (e) { /* try next selector */ }
+            }
+
+            log('WARN', 'Hold button not found inside iframe. Falling back to center hold...')
+        } else {
+            log('WARN', 'Could not get challengeFrame via page.frames(). Falling back to bounding box hold...')
         }
 
-        if (!targetElement) {
-            log('WARN', 'Could not find "Press and hold" button via standard selectors. Trying center click fallback...')
-            // Fallback: Click and hold the center of the captcha iframe
-            const frameElement = await page.$(outerFrameSelector)
-            const box = await frameElement.boundingBox()
-            if (box) {
-                const centerX = box.x + box.width / 2
-                const centerY = box.y + box.height / 2
+        // --- Strategy 3: Fallback - Hold center of iframe bounding box ---
+        const iframeEl = await page.$(outerFrameSelector)
+        const iframeBox = await iframeEl?.boundingBox()
+        if (iframeBox) {
+            const centerX = iframeBox.x + iframeBox.width / 2 + getRandomInt(-5, 5)
+            const centerY = iframeBox.y + iframeBox.height / 2 + getRandomInt(-5, 5)
 
-                await page.mouse.move(centerX, centerY, { steps: 10 })
-                await page.mouse.down()
-                log('INFO', 'Holding center of iframe...')
-                await page.waitForTimeout(getRandomInt(8000, 12000))
-                await page.mouse.up()
-                return true
-            }
-            return false
+            log('INFO', `Fallback: Holding iframe center (${centerX.toFixed(0)}, ${centerY.toFixed(0)})`)
+            await page.mouse.move(centerX, centerY, { steps: getRandomInt(10, 15) })
+            await page.waitForTimeout(getRandomInt(300, 600))
+            await page.mouse.down()
+
+            const holdDuration = getRandomInt(9000, 12000)
+            log('INFO', `Holding for ${(holdDuration / 1000).toFixed(1)} seconds...`)
+            await page.waitForTimeout(holdDuration)
+            await page.mouse.up()
+
+            await page.waitForTimeout(getRandomInt(2000, 3000))
+            return true
         }
 
-        log('INFO', 'Target button found. Starting hold sequence...')
-        const box = await targetElement.boundingBox()
-        if (!box) return false
-
-        // Move to button with slight randomization
-        await page.mouse.move(
-            box.x + box.width / 2 + getRandomInt(-5, 5),
-            box.y + box.height / 2 + getRandomInt(-5, 5),
-            { steps: 15 }
-        )
-
-        // Press down
-        await page.mouse.down()
-
-        // Duration: 8-12 seconds is typical for Arkose
-        const holdDuration = getRandomInt(8500, 11500)
-        log('INFO', `Holding for ${(holdDuration / 1000).toFixed(1)} seconds...`)
-        await page.waitForTimeout(holdDuration)
-
-        // Release
-        await page.mouse.up()
-        await page.waitForTimeout(2000)
-
-        return true
+        log('ERROR', 'Could not determine iframe position for captcha hold')
+        return false
     } catch (e) {
         log('ERROR', `Error in solveArkosePressAndHold: ${e.message}`)
         return false
     }
 }
 
-main().catch(err => {
-    log('ERROR', `Fatal error: ${err.message}`)
-    process.exit(1)
-})
+// Entry point — supports -slot N to create multiple accounts sequentially
+;(async () => {
+    const slots = parseInt(args.slot) || 1
+    let succeeded = 0
+    let failed = 0
+
+    for (let i = 1; i <= slots; i++) {
+        if (slots > 1) log('INFO', `--- Slot ${i}/${slots} ---`)
+        try {
+            const result = await main()
+            if (result?.success) {
+                succeeded++
+            } else {
+                failed++
+                log('WARN', `Slot ${i} failed: ${result?.error || 'unknown error'}`)
+            }
+        } catch (err) {
+            failed++
+            log('ERROR', `Slot ${i} fatal error: ${err.message}`)
+        }
+        if (i < slots) await new Promise(r => setTimeout(r, 3000))
+    }
+
+    if (slots > 1) log('INFO', `Done: ${succeeded} succeeded, ${failed} failed out of ${slots} slots`)
+    process.exit(failed > 0 && succeeded === 0 ? 1 : 0)
+})()
