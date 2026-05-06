@@ -50,3 +50,4 @@ note
 dashboard_data.json
 scripts/assignProxyV6.js
 scripts/registerAccount.js
+.locks
