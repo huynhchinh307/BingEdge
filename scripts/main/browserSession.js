@@ -56,6 +56,77 @@ if (!account) {
     process.exit(1)
 }
 
+async function checkAndRotateLocalProxy(proxyConfig) {
+    if (!proxyConfig || !proxyConfig.server) return;
+    const isLocal = proxyConfig.server.includes('127.0.0.1') || proxyConfig.server.includes('localhost');
+    const isV6 = proxyConfig.isProxyV6;
+
+    if (isLocal && isV6) {
+        log('INFO', `Detected local IPv6 proxy: ${proxyConfig.server}. Ensuring it is alive...`);
+        const { default: axios } = await import('axios');
+        let axiosAgent = null;
+
+        const { HttpsProxyAgent } = await import('https-proxy-agent');
+        const { SocksProxyAgent } = await import('socks-proxy-agent');
+
+        const serverUrl = proxyConfig.server.includes('://') ? proxyConfig.server : `http://${proxyConfig.server}`;
+        const urlObj = new URL(serverUrl);
+        const port = urlObj.port;
+
+        let proxyUrl = serverUrl;
+        if (proxyConfig.username && proxyConfig.password) {
+            proxyUrl = `${urlObj.protocol}//${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@${urlObj.host}`;
+        }
+
+        let agent = null;
+        if (urlObj.protocol === 'socks4:' || urlObj.protocol === 'socks5:') {
+            agent = new SocksProxyAgent(proxyUrl);
+        } else {
+            agent = new HttpsProxyAgent(proxyUrl);
+        }
+
+        const checkAlive = async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            try {
+                const resp = await axios.get('https://www.google.com/generate_204', {
+                    httpsAgent: agent,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                return resp.status < 400;
+            } catch (e) {
+                clearTimeout(timeoutId);
+                return false;
+            }
+        };
+
+        const maxRotations = 10;
+        for (let i = 0; i < maxRotations; i++) {
+            if (i > 0) log('INFO', `Checking proxy alive status (Attempt ${i + 1})...`);
+            else log('INFO', `Checking if proxy is alive...`);
+
+            const isAlive = await checkAlive();
+            if (isAlive) {
+                log('SUCCESS', `Proxy is alive and responding!`);
+                return;
+            }
+
+            log('WARN', `Proxy is dead or timed out. Rotating via local API...`);
+            try {
+                const rotateRes = await axios.post(`http://localhost:9002/proxy/rotate/${port}`);
+                log('INFO', `Rotate API response: ${JSON.stringify(rotateRes.data)}`);
+                await new Promise(r => setTimeout(r, 3000));
+            } catch (err) {
+                log('ERROR', `Failed to call rotate API: ${err.message}`);
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        log('ERROR', `Failed to get a working proxy after ${maxRotations} rotations.`);
+        process.exit(88); // Proxy Busy or Dead code
+    }
+}
+
 async function getIpLocation(proxyConfig) {
     const isNoProxy = !proxyConfig || !proxyConfig.server
     const hostPart = isNoProxy ? '' : proxyConfig.server.replace(/^(https?|socks[45]):\/\//i, '').split(':')[0]
@@ -278,6 +349,7 @@ async function main() {
     })
 
     log('INFO', 'Syncing location and timezone with IP...')
+    await checkAndRotateLocalProxy(proxy)
     const ipLocation = await getIpLocation(proxy)
     if (ipLocation) {
         log('INFO', `  Detected: ${ipLocation.lat}, ${ipLocation.lon} | Timezone: ${ipLocation.timezone}`)
@@ -365,7 +437,7 @@ async function main() {
 
     if (cookies.length) {
         await context.addCookies(cookies)
-            log('INFO', `Added ${cookies.length} cookies to context`)
+        log('INFO', `Added ${cookies.length} cookies to context`)
     }
 
     const page = await context.newPage()
@@ -436,7 +508,7 @@ async function main() {
 
     page.on('close', async () => {
         log('INFO', 'Browser page closed. Cleaning up...')
-        try { await scrapeAndSavePoints(); } catch(e) {}
+        try { await scrapeAndSavePoints(); } catch (e) { }
         await saveCookies(sessionBase, await context.cookies(), sessionType)
         releaseProxyLock(proxyKey, projectRoot)
         log('INFO', 'Exiting process...')
@@ -445,7 +517,7 @@ async function main() {
 
     browser.on('disconnected', async () => {
         log('INFO', 'Browser disconnected. Cleaning up...')
-        try { await scrapeAndSavePoints(); } catch(e) {}
+        try { await scrapeAndSavePoints(); } catch (e) { }
         await saveCookies(sessionBase, await context.cookies(), sessionType)
         releaseProxyLock(proxyKey, projectRoot)
         log('INFO', 'Exiting process...')

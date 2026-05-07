@@ -128,6 +128,7 @@ class Browser {
             const fingerprint = sessionData.fingerprint ?? (await this.generateFingerprint(this.bot.isMobile));
             const locale = account.geoLocale === 'auto' ? 'en-US' : `${account.geoLocale.toLowerCase()}-${account.geoLocale.toUpperCase()}`;
             this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Syncing location and timezone with IP...`);
+            await this.checkAndRotateLocalProxy(effectiveProxy);
             const ipLocation = await this.getIpLocation(effectiveProxy || {});
             const context = await newInjectedContext(browser, {
                 fingerprint,
@@ -350,6 +351,77 @@ class Browser {
         const userAgentManager = new UserAgentManager(this.bot);
         const updatedFingerPrintData = await userAgentManager.updateFingerprintUserAgent(fingerPrintData, isMobile);
         return updatedFingerPrintData;
+    }
+    async checkAndRotateLocalProxy(proxy) {
+        if (!proxy || !proxy.url)
+            return;
+        const isLocal = proxy.url.includes('127.0.0.1') || proxy.url.includes('localhost');
+        const isV6 = proxy.isProxyV6;
+        if (isLocal && isV6) {
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Detected local IPv6 proxy: ${proxy.url}:${proxy.port}. Ensuring it is alive...`);
+            let axios = null;
+            try {
+                const axiosMod = await import('axios');
+                axios = axiosMod.default;
+            }
+            catch {
+                return; // fallback
+            }
+            const { HttpsProxyAgent } = await import('https-proxy-agent');
+            const { SocksProxyAgent } = await import('socks-proxy-agent');
+            const serverUrl = proxy.url.includes('://') ? proxy.url : `http://${proxy.url}`;
+            const urlObj = new URL(serverUrl);
+            const port = proxy.port;
+            let proxyUrl = `${urlObj.protocol}//`;
+            if (proxy.username && proxy.password) {
+                proxyUrl += `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password)}@`;
+            }
+            proxyUrl += `${urlObj.hostname}:${port}`;
+            let agent = null;
+            if (urlObj.protocol === 'socks4:' || urlObj.protocol === 'socks5:') {
+                agent = new SocksProxyAgent(proxyUrl);
+            }
+            else {
+                agent = new HttpsProxyAgent(proxyUrl);
+            }
+            const checkAlive = async () => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                try {
+                    const resp = await axios.get('https://www.google.com/generate_204', {
+                        httpsAgent: agent,
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    return resp.status < 400;
+                }
+                catch {
+                    clearTimeout(timeoutId);
+                    return false;
+                }
+            };
+            this.bot.logger.info(this.bot.isMobile, 'BROWSER', 'Checking if proxy is alive...');
+            let isAlive = await checkAlive();
+            let attempts = 0;
+            while (!isAlive && attempts < 10) {
+                attempts++;
+                this.bot.logger.warn(this.bot.isMobile, 'BROWSER', `Proxy is dead or timed out. Rotating via local API... (Attempt ${attempts}/10)`);
+                try {
+                    const response = await axios.post(`http://localhost:9002/proxy/rotate/${port}`, {}, { timeout: 15000 });
+                    this.bot.logger.info(this.bot.isMobile, 'BROWSER', `Rotate API response: ${JSON.stringify(response.data)}`);
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+                catch (err) {
+                    this.bot.logger.warn(this.bot.isMobile, 'BROWSER', `Failed to call rotate API: ${err.message}`);
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+                isAlive = await checkAlive();
+            }
+            if (!isAlive) {
+                this.bot.logger.error(this.bot.isMobile, 'BROWSER', `Failed to rotate local proxy after 10 attempts. Exiting...`);
+                process.exit(88); // 88 = proxy busy/dead
+            }
+        }
     }
 }
 export default Browser;

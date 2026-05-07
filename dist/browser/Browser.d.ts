@@ -26,6 +26,7 @@ declare class Browser {
     private detectIpVersion;
     private getIpLocation;
     generateFingerprint(isMobile: boolean): Promise<BrowserFingerprintWithHeaders>;
+    private checkAndRotateLocalProxy;
 }
 export default Browser;
 //# sourceMappingURL=Browser.d.ts.map

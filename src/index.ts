@@ -333,8 +333,6 @@ export class MicrosoftRewardsBot {
                                 acc.lastUpdate = new Date().toISOString()
                             }
                         })
-                        // Periodically save
-                        saveAccounts(this.accounts)
                     }
 
                     const log = msg.__ipcLog
@@ -671,7 +669,7 @@ export class MicrosoftRewardsBot {
                     // Lock was stale and removed, retry immediately on next iteration
                     if (attempt < maxRetries - 1) {
                         const delay = Math.min(baseDelayMs * Math.pow(1.5, attempt), 30000) // Exponential backoff, max 30s
-                        this.logger.debug(false, 'PROXY-LOCK', `Waiting ${Math.round(delay/1000)}s before retry ${attempt + 2}/${maxRetries} for ${proxyKey}`)
+                        this.logger.debug(false, 'PROXY-LOCK', `Waiting ${Math.round(delay / 1000)}s before retry ${attempt + 2}/${maxRetries} for ${proxyKey}`)
                         await this.utils.wait(delay)
                     }
                 } else {
@@ -751,7 +749,7 @@ export class MicrosoftRewardsBot {
                         return true
                     }
                     fs.unlinkSync(lockPath)
-                    this.logger.info(false, 'PROXY-LOCK', `Removed stale lock for ${proxyKey} (PID ${pid}, ${Math.round((Date.now() - timestamp!)/1000/60)}min old)`)
+                    this.logger.info(false, 'PROXY-LOCK', `Removed stale lock for ${proxyKey} (PID ${pid}, ${Math.round((Date.now() - timestamp!) / 1000 / 60)}min old)`)
                     return true // Retry immediately
                 } catch (e: any) {
                     if (e.code === 'ENOENT') {
