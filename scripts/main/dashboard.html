@@ -3435,6 +3435,13 @@
             return result;
         };
 
+        const originalOpenRedem = openRedem;
+        openRedem = async function(email, btn) {
+            const result = await originalOpenRedem(email, btn);
+            setTimeout(updateRefreshIntervals, 500);
+            return result;
+        };
+
         const originalStopSession = stopSession;
         stopSession = async function(email, type) {
             const result = await originalStopSession(email, type);

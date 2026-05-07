@@ -275,6 +275,20 @@ function parseAccountEndLog(line, email) {
         };
         saveAccountStats();
     }
+    
+    // Also parse "Updated points for email: 1,234"
+    if (line.includes('Updated points for')) {
+        const parts = line.split(':');
+        if (parts.length >= 2) {
+            const points = parseInt(parts[parts.length - 1].replace(/[,. ]/g, ''));
+            if (!isNaN(points)) {
+                if (!accountStats[email]) accountStats[email] = {};
+                accountStats[email].newBalance = points;
+                accountStats[email].total = points;
+                accountStats[email].completedAt = new Date().toISOString();
+            }
+        }
+    }
 }
 
 // CPU usage sampler
@@ -842,15 +856,16 @@ const server = http.createServer((req, res) => {
             const diskStatus = loadAccountStatus();
             
             const cleanAccounts = accounts.map(a => {
+                const email = a.email.toLowerCase();
                 const proxy = _safeParse(a.proxy, {});
                 
                 // Helper to check if process is TRULY active
                 const checkActive = (type) => {
-                    const pid = activeProcesses[`${a.email}-${type}`];
+                    const pid = activeProcesses[`${email}-${type}`];
                     if (!pid) return false;
                     if (isPidAlive(pid)) return true;
                     // Auto-cleanup if dead
-                    delete activeProcesses[`${a.email}-${type}`];
+                    delete activeProcesses[`${email}-${type}`];
                     return false;
                 };
 
@@ -872,7 +887,7 @@ const server = http.createServer((req, res) => {
                     : 'NO_PROXY';
 
                 const ds = diskStatus[a.email] || null;
-                let stats = accountStats[a.email] || null;
+                let stats = accountStats[email] || null;
                 if (!stats && ds) {
                     stats = {
                         total:       ds.collectedPoints ?? 0,
@@ -897,10 +912,10 @@ const server = http.createServer((req, res) => {
                     isActiveExtraSearch,
                     stats,
                     points:     ds?.points ?? 0,
-                    rank:       accountStats[a.email]?.rank || ds?.rank || 'N/A',
+                    rank:       accountStats[email]?.rank || ds?.rank || 'N/A',
                     lastUpdate: ds?.lastUpdate || 'Never',
-                    needsRelogin: accountStats[a.email]?.needsRelogin || false,
-                    reloginAt: accountStats[a.email]?.reloginAt || null
+                    needsRelogin: accountStats[email]?.needsRelogin || false,
+                    reloginAt: accountStats[email]?.reloginAt || null
                 };
             });
 
@@ -959,7 +974,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'GET' && req.url.startsWith('/api/logs')) {
         const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-        const email = urlParams.get('email');
+        const email = (urlParams.get('email') || '').toLowerCase();
         const type = urlParams.get('type');
         const key = `${email}-${type}`;
 
@@ -975,7 +990,7 @@ const server = http.createServer((req, res) => {
         req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
-                const { email } = data;
+                const email = (data.email || '').toLowerCase();
 
                 if (!email || typeof email !== 'string') {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1139,6 +1154,7 @@ const server = http.createServer((req, res) => {
                     const clean = stripAnsi(line).trim();
                     if (!clean) return;
                     processLogs[key].push(clean);
+                    parseAccountEndLog(clean, email);
                 };
 
                 const addLog = (data) => {
@@ -1161,8 +1177,46 @@ const server = http.createServer((req, res) => {
                 const cleanup = (code) => {
                     if (lineBuffer.trim()) processLine(lineBuffer);
                     lineBuffer = '';
+                    
                     if (activeProcesses[key]) {
                         log('INFO', `[OpenRedem] Session closed for ${email} (code: ${code})`);
+                        
+                        // Clear memory status
+                        if (code === 0) {
+                            if (accountStats[email]) {
+                                delete accountStats[email].isProxyBusy;
+                                accountStats[email].status = 'idle';
+                            }
+                        } else if (code === 88) {
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].isProxyBusy = true;
+                            accountStats[email].status = 'proxy-busy';
+                        } else if (code !== null) {
+                            if (!accountStats[email]) accountStats[email] = {};
+                            accountStats[email].status = 'error';
+                        }
+
+                        // Update SQLite account_status so the dashboard reflects the change immediately
+                        try {
+                            const db = getDb();
+                            if (db) {
+                                const now = Math.floor(Date.now() / 1000);
+                                const isoNow = new Date().toISOString();
+                                
+                                // We update last_update and points (if we have a new balance in memory)
+                                // This ensures the 'Rank' and 'Points' columns in the dashboard update
+                                const points = accountStats[email]?.newBalance || accountStats[email]?.total || 0;
+                                
+                                db.prepare(`
+                                    UPDATE account_status 
+                                    SET last_update = ?, updated_at = ?
+                                    WHERE email = ?
+                                `).run(isoNow, now, email);
+                            }
+                        } catch (e) {
+                            log('ERROR', `[OpenRedem] Failed to update DB on cleanup: ${e.message}`);
+                        }
+
                         delete activeProcesses[key];
                         delete activeProxies[email];
                     }
@@ -1198,7 +1252,8 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
-                const { email, type } = data; // type: 'desktop' | 'mobile' | 'bot'
+                const email = (data.email || '').toLowerCase(); // type: 'desktop' | 'mobile' | 'bot'
+                const type = data.type;
 
                 // Validate email and type
                 if (!email || typeof email !== 'string') {
@@ -1223,7 +1278,7 @@ const server = http.createServer((req, res) => {
                 // Check for proxy conflicts with other active processes
                 const accountsResult = loadAccounts(projectRoot);
                 const accounts = accountsResult.data || [];
-                const account = accounts.find(a => a.email === email);
+                const account = accounts.find(a => a.email.toLowerCase() === email);
                 const proxyKey = account ? getProxyKey(account) : 'NO_PROXY';
                 
                 const proxyConflict = isProxyInUse(proxyKey, email);
@@ -1340,6 +1395,10 @@ const server = http.createServer((req, res) => {
                             accountStats[email].exitCode = code;
                         } else {
                             log('INFO', `Dashboard: Session closed for ${key}`);
+                            if (accountStats[email]) {
+                                delete accountStats[email].isProxyBusy;
+                                accountStats[email].status = 'idle';
+                            }
                         }
                         delete activeProcesses[key];
                         delete activeProxies[email];
@@ -1372,7 +1431,8 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
-                const { email, type } = data;
+                const email = (data.email || '').toLowerCase();
+                const type = data.type;
                 const key = `${email}-${type}`;
 
                 const pid = activeProcesses[key];
