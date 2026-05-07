@@ -9,7 +9,7 @@ import { SessionInvalidError } from './browser/BrowserFunc.js';
 import BrowserUtils from './browser/BrowserUtils.js';
 import { Logger } from './logging/Logger.js';
 import Utils from './util/Utils.js';
-import { loadAccounts, loadConfig, saveAccounts, updateAccountStatus } from './util/Load.js';
+import { loadAccounts, loadConfig, updateAccountStatus } from './util/Load.js';
 import { checkNodeVersion } from './util/Validator.js';
 import { Login } from './browser/auth/Login.js';
 import { Workers } from './functions/Workers.js';
@@ -249,8 +249,6 @@ export class MicrosoftRewardsBot {
                                 acc.lastUpdate = new Date().toISOString();
                             }
                         });
-                        // Periodically save
-                        saveAccounts(this.accounts);
                     }
                     const log = msg.__ipcLog;
                     if (log && typeof log.content === 'string') {

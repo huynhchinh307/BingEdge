@@ -14,7 +14,7 @@ import BrowserUtils from './browser/BrowserUtils'
 
 import { IpcLog, Logger } from './logging/Logger'
 import Utils from './util/Utils'
-import { loadAccounts, loadConfig, saveAccounts, updateAccountStatus } from './util/Load'
+import { loadAccounts, loadConfig, updateAccountStatus } from './util/Load'
 import { checkNodeVersion } from './util/Validator'
 
 import { Login } from './browser/auth/Login'
