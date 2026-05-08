@@ -24,7 +24,7 @@ function getProxyKey(account) {
     // Normalize URL by stripping scheme prefix
     let host = account.proxy.url.replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
     let port = account.proxy.port;
-    
+
     // If host already contains a port, extract it
     if (host.includes(':')) {
         const parts = host.split(':');
@@ -33,7 +33,7 @@ function getProxyKey(account) {
             port = parseInt(parts[1]);
         }
     }
-    
+
     return `${account.proxy.username || ''}@${host}:${port || 0}`;
 }
 
@@ -42,7 +42,7 @@ function getProxyKey(account) {
  */
 function isProxyInUse(proxyKey, excludeEmail) {
     if (proxyKey === 'NO_PROXY') return false; // Allow multiple no-proxy accounts
-    
+
     for (const [activeEmail, info] of Object.entries(activeProxies)) {
         if (activeEmail !== excludeEmail && info.proxyKey === proxyKey) {
             return { email: activeEmail, type: info.type, pid: info.pid };
@@ -134,12 +134,12 @@ function getDb() {
         try {
             _db.prepare("ALTER TABLE accounts ADD COLUMN account_group TEXT NOT NULL DEFAULT 'Ungrouped'").run();
             log('INFO', '[DB] Added account_group column to accounts table.');
-        } catch(e) { /* Cột đã tồn tại */ }
+        } catch (e) { /* Cột đã tồn tại */ }
 
         try {
             _db.prepare("ALTER TABLE accounts ADD COLUMN tag TEXT NOT NULL DEFAULT ''").run();
             log('INFO', '[DB] Added tag column to accounts table.');
-        } catch(e) { /* Cột đã tồn tại */ }
+        } catch (e) { /* Cột đã tồn tại */ }
 
         // Khởi tạo config mặc định nếu chưa có
         const cfgCount = (_db.prepare('SELECT COUNT(*) as c FROM app_config').get()).c;
@@ -232,12 +232,12 @@ function loadAccountStatus() {
         const result = {};
         for (const row of rows) {
             result[row.email] = {
-                points:          row.points,
-                initialPoints:   row.initial_points,
+                points: row.points,
+                initialPoints: row.initial_points,
                 collectedPoints: row.collected_points,
-                duration:        row.duration,
-                rank:            row.rank,
-                lastUpdate:      row.last_update
+                duration: row.duration,
+                rank: row.rank,
+                lastUpdate: row.last_update
             };
         }
         _statusCache = result;
@@ -275,7 +275,7 @@ function parseAccountEndLog(line, email) {
         };
         saveAccountStats();
     }
-    
+
     // Also parse "Updated points for email: 1,234"
     if (line.includes('Updated points for')) {
         const parts = line.split(':');
@@ -303,7 +303,7 @@ function sampleCpu() {
         const prev = lastCpuSample[i].times;
         const idle = curr.idle - prev.idle;
         const total = Object.values(curr).reduce((a, b) => a + b, 0)
-                    - Object.values(prev).reduce((a, b) => a + b, 0);
+            - Object.values(prev).reduce((a, b) => a + b, 0);
         totalIdle += idle;
         totalTick += total;
     }
@@ -353,7 +353,7 @@ const server = http.createServer((req, res) => {
         const freeRam = os.freemem();
         const usedRam = totalRam - freeRam;
         const toGB = (b) => (b / 1024 / 1024 / 1024).toFixed(1);
-        
+
         let totalAccounts = 0;
         let tagStats = [];
         try {
@@ -373,7 +373,7 @@ const server = http.createServer((req, res) => {
                 WHERE a.tag IN ('Car', 'Mart', 'Jollibee')
                 GROUP BY a.tag
             `).all();
-        } catch (e) {}
+        } catch (e) { }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -419,7 +419,7 @@ const server = http.createServer((req, res) => {
                 `).run({ data: configStr });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: 'Invalid JSON or DB error: ' + e.message }));
             }
@@ -435,7 +435,7 @@ const server = http.createServer((req, res) => {
                 const { apiKey, model, endpoint } = JSON.parse(body);
                 let baseUrl = (endpoint || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
                 let modelName = model || 'gemini-1.5-flash';
-                
+
                 let response;
                 // Check if it's an OpenAI-compatible endpoint (usually ends with /v1 or contains v1/chat)
                 const isOpenAI = baseUrl.includes('/v1') && !baseUrl.includes('generativelanguage.googleapis.com');
@@ -447,7 +447,7 @@ const server = http.createServer((req, res) => {
                         model: modelName,
                         messages: [{ role: "user", content: "Hello, what is 1+1? Response only the number." }]
                     }, {
-                        headers: { 
+                        headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${apiKey}`
                         },
@@ -477,7 +477,7 @@ const server = http.createServer((req, res) => {
                 } else {
                     reply = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
                 }
-                
+
                 reply = reply || "Connected successfully, but got empty response.";
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, message: `Connected! Answer: ${reply}` }));
@@ -504,7 +504,7 @@ const server = http.createServer((req, res) => {
                 let host = (proxyInfo.url || '').replace(/^(https?|socks[45]):\/\//i, '').trim();
                 const protocolMatch = (proxyInfo.url || '').match(/^(https?|socks[45])/i);
                 let proto = protocolMatch ? protocolMatch[1].toLowerCase() : 'http';
-                
+
                 // Xử lý IPv6 host
                 if (host.includes(':') && !host.startsWith('[') && !host.includes('.')) {
                     host = `[${host}]`;
@@ -554,8 +554,8 @@ const server = http.createServer((req, res) => {
                     const ip = d.ip?.address || d.ip || d.query;
                     const country = d.ip?.country || d.country || d.country_name || 'Unknown';
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ 
-                        success: true, 
+                    res.end(JSON.stringify({
+                        success: true,
                         ip: ip,
                         country: country,
                         city: d.ip?.city || d.city || '',
@@ -590,7 +590,7 @@ const server = http.createServer((req, res) => {
                 safeRemoveDirectory(targetSessionDir, projectRoot);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }
@@ -606,19 +606,19 @@ const server = http.createServer((req, res) => {
             const row = db?.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
             if (!row) throw new Error('Account not found');
             const acc = {
-                email:           row.email,
-                password:        row.password,
-                totpSecret:      row.totp_secret || undefined,
-                recoveryEmail:   row.recovery_email,
-                geoLocale:       row.geo_locale,
-                langCode:        row.lang_code,
-                proxy:           _safeParse(row.proxy, {}),
+                email: row.email,
+                password: row.password,
+                totpSecret: row.totp_secret || undefined,
+                recoveryEmail: row.recovery_email,
+                geoLocale: row.geo_locale,
+                langCode: row.lang_code,
+                proxy: _safeParse(row.proxy, {}),
                 saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
-                group:           row.account_group || 'Ungrouped',
+                group: row.account_group || 'Ungrouped',
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, account: acc }));
-        } catch(e) {
+        } catch (e) {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: e.message }));
         }
@@ -656,21 +656,21 @@ const server = http.createServer((req, res) => {
                         tag              = @tag,
                         updated_at       = @now
                 `).run({
-                    email:           account.email,
-                    password:        account.password        || '',
-                    totpSecret:      account.totpSecret      || '',
-                    recoveryEmail:   account.recoveryEmail   || '',
-                    geoLocale:       account.geoLocale       || 'auto',
-                    langCode:        account.langCode        || 'en',
-                    proxy:           JSON.stringify(account.proxy           || {}),
+                    email: account.email,
+                    password: account.password || '',
+                    totpSecret: account.totpSecret || '',
+                    recoveryEmail: account.recoveryEmail || '',
+                    geoLocale: account.geoLocale || 'auto',
+                    langCode: account.langCode || 'en',
+                    proxy: JSON.stringify(account.proxy || {}),
                     saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
-                    group:           account.group           || 'Ungrouped',
-                    tag:             account.tag             || '',
+                    group: account.group || 'Ungrouped',
+                    tag: account.tag || '',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }
@@ -693,21 +693,21 @@ const server = http.createServer((req, res) => {
                     VALUES
                         (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @tag, @now, @now)
                 `).run({
-                    email:           newAcc.email,
-                    password:        newAcc.password        || '',
-                    totpSecret:      newAcc.totpSecret      || '',
-                    recoveryEmail:   newAcc.recoveryEmail   || '',
-                    geoLocale:       newAcc.geoLocale       || 'auto',
-                    langCode:        newAcc.langCode        || 'en',
-                    proxy:           JSON.stringify(newAcc.proxy           || {}),
+                    email: newAcc.email,
+                    password: newAcc.password || '',
+                    totpSecret: newAcc.totpSecret || '',
+                    recoveryEmail: newAcc.recoveryEmail || '',
+                    geoLocale: newAcc.geoLocale || 'auto',
+                    langCode: newAcc.langCode || 'en',
+                    proxy: JSON.stringify(newAcc.proxy || {}),
                     saveFingerprint: JSON.stringify(newAcc.saveFingerprint || { mobile: true, desktop: true }),
-                    group:           newAcc.group           || 'Ungrouped',
-                    tag:             newAcc.tag             || '',
+                    group: newAcc.group || 'Ungrouped',
+                    tag: newAcc.tag || '',
                     now,
                 });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }
@@ -722,20 +722,20 @@ const server = http.createServer((req, res) => {
             try {
                 const { emails, group } = JSON.parse(body);
                 if (!Array.isArray(emails) || emails.length === 0) throw new Error('No emails provided');
-                
+
                 const db = getDb();
                 const now = Date.now();
                 const stmt = db.prepare('UPDATE accounts SET account_group = ?, updated_at = ? WHERE email = ?');
-                
+
                 db.transaction(() => {
                     for (const email of emails) {
                         stmt.run(group || 'Ungrouped', now, email);
                     }
                 })();
-                
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, count: emails.length }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }
@@ -758,7 +758,7 @@ const server = http.createServer((req, res) => {
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, count }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }
@@ -770,18 +770,18 @@ const server = http.createServer((req, res) => {
         try {
             const db = getDb();
             const accounts = db?.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all() || [];
-            
+
             const exportAccounts = accounts.map(row => ({
-                email:           row.email,
-                password:        row.password,
-                totpSecret:      row.totp_secret || undefined,
-                recoveryEmail:   row.recovery_email,
-                geoLocale:       row.geo_locale,
-                langCode:        row.lang_code,
-                proxy:           _safeParse(row.proxy, {}),
+                email: row.email,
+                password: row.password,
+                totpSecret: row.totp_secret || undefined,
+                recoveryEmail: row.recovery_email,
+                geoLocale: row.geo_locale,
+                langCode: row.lang_code,
+                proxy: _safeParse(row.proxy, {}),
                 saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
-                group:           row.account_group || 'Ungrouped',
-                tag:             row.tag || '',
+                group: row.account_group || 'Ungrouped',
+                tag: row.tag || '',
             }));
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -819,21 +819,21 @@ const server = http.createServer((req, res) => {
                         tag              = @tag,
                         updated_at       = @now
                 `);
-                
+
                 db.transaction(() => {
                     for (const account of accounts) {
                         if (!account.email) continue;
                         insertStmt.run({
-                            email:           account.email,
-                            password:        account.password        || '',
-                            totpSecret:      account.totpSecret      || '',
-                            recoveryEmail:   account.recoveryEmail   || '',
-                            geoLocale:       account.geoLocale       || 'auto',
-                            langCode:        account.langCode        || 'en',
-                            proxy:           JSON.stringify(account.proxy           || {}),
+                            email: account.email,
+                            password: account.password || '',
+                            totpSecret: account.totpSecret || '',
+                            recoveryEmail: account.recoveryEmail || '',
+                            geoLocale: account.geoLocale || 'auto',
+                            langCode: account.langCode || 'en',
+                            proxy: JSON.stringify(account.proxy || {}),
                             saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
-                            group:           account.group           || 'Ungrouped',
-                            tag:             account.tag             || '',
+                            group: account.group || 'Ungrouped',
+                            tag: account.tag || '',
                             now,
                         });
                     }
@@ -841,9 +841,247 @@ const server = http.createServer((req, res) => {
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, count: accounts.length }));
-            } catch(e) {
+            } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    if (req.url === '/api/accounts/export-full') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            let tempDir = '';
+            let zipPath = '';
+            try {
+                let emails = [];
+                if (req.method === 'POST' && body) {
+                    const parsed = JSON.parse(body);
+                    emails = parsed.emails || [];
+                }
+
+                const db = getDb();
+                let accounts;
+                if (emails.length > 0) {
+                    const placeholders = emails.map(() => '?').join(',');
+                    accounts = db.prepare(`SELECT * FROM accounts WHERE email IN (${placeholders}) ORDER BY created_at ASC`).all(...emails);
+                } else {
+                    accounts = db?.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all() || [];
+                }
+
+                const exportAccountsData = accounts.map(row => ({
+                    email: row.email,
+                    password: row.password,
+                    totpSecret: row.totp_secret || undefined,
+                    recoveryEmail: row.recovery_email,
+                    geoLocale: row.geo_locale,
+                    langCode: row.lang_code,
+                    proxy: _safeParse(row.proxy, {}),
+                    saveFingerprint: _safeParse(row.save_fingerprint, { mobile: true, desktop: true }),
+                    group: row.account_group || "Ungrouped",
+                    tag: row.tag || "",
+                }));
+
+                // 1. Create temp directory
+                tempDir = path.join(os.tmpdir(), `bing_export_${Date.now()}`);
+                fs.mkdirSync(tempDir, { recursive: true });
+
+                // 2. Write accounts.json
+                fs.writeFileSync(path.join(tempDir, 'accounts.json'), JSON.stringify({ success: true, accounts: exportAccountsData }, null, 2));
+
+                // 3. Copy sessions
+                const sessionsDest = path.join(tempDir, 'sessions');
+                fs.mkdirSync(sessionsDest, { recursive: true });
+
+                for (const acc of accounts) {
+                    const email = acc.email;
+                    const srcPath = path.join(sessionPath, email);
+                    if (fs.existsSync(srcPath)) {
+                        try {
+                            fs.cpSync(srcPath, path.join(sessionsDest, email), { recursive: true });
+                        } catch (cpErr) {
+                            log('WARN', `Failed to copy session for ${email}: ${cpErr.message}`);
+                        }
+                    }
+                }
+
+                // 4. Create ZIP using tar (tar -ac on Windows creates ZIP by extension)
+                zipPath = path.join(os.tmpdir(), `bing_export_${Date.now()}.zip`);
+
+                // Using promisified exec might be tricky with paths, so we use spawn or a simpler approach
+                const { execSync } = await import('child_process');
+                try {
+                    // Windows tar requires -C to be followed by the directory
+                    execSync(`tar -ac -f "${zipPath}" -C "${tempDir}" .`);
+                } catch (tarErr) {
+                    throw new Error(`Failed to create ZIP: ${tarErr.message}`);
+                }
+
+                // 5. Send ZIP
+                if (!fs.existsSync(zipPath)) {
+                    throw new Error('ZIP file was not created');
+                }
+
+                const zipBuffer = fs.readFileSync(zipPath);
+                res.writeHead(200, {
+                    'Content-Type': 'application/zip',
+                    'Content-Disposition': `attachment; filename=bing_full_export_${new Date().toISOString().slice(0, 10)}.zip`
+                });
+                res.end(zipBuffer);
+
+            } catch (e) {
+                log('ERROR', `Full Export failed: ${e.message}`);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            } finally {
+                // Cleanup
+                try {
+                    if (zipPath && fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                    if (tempDir && fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch (cleanupErr) {
+                    log('WARN', `Cleanup failed: ${cleanupErr.message}`);
+                }
+            }
+        });
+        return;
+    }
+
+
+
+    /**
+     * Helper to insert or update multiple accounts in the database
+     */
+    function performAccountImport(accounts, res) {
+        try {
+            if (!Array.isArray(accounts)) throw new Error("Accounts must be an array");
+            const db = getDb();
+            const now = Date.now();
+            const insertStmt = db.prepare(`
+                INSERT INTO accounts
+                    (email, password, totp_secret, recovery_email, geo_locale, lang_code, proxy, save_fingerprint, account_group, tag, created_at, updated_at)
+                VALUES
+                    (@email, @password, @totpSecret, @recoveryEmail, @geoLocale, @langCode, @proxy, @saveFingerprint, @group, @tag, @now, @now)
+                ON CONFLICT(email) DO UPDATE SET
+                    password         = @password,
+                    totp_secret      = @totpSecret,
+                    recovery_email   = @recoveryEmail,
+                    geo_locale       = @geoLocale,
+                    lang_code        = @langCode,
+                    proxy            = @proxy,
+                    save_fingerprint = @saveFingerprint,
+                    account_group    = @group,
+                    tag              = @tag,
+                    updated_at       = @now
+            `);
+
+            db.transaction(() => {
+                for (const account of accounts) {
+                    if (!account.email) continue;
+                    insertStmt.run({
+                        email: account.email,
+                        password: account.password || "",
+                        totpSecret: account.totpSecret || "",
+                        recoveryEmail: account.recoveryEmail || "",
+                        geoLocale: account.geoLocale || "auto",
+                        langCode: account.langCode || "en",
+                        proxy: JSON.stringify(account.proxy || {}),
+                        saveFingerprint: JSON.stringify(account.saveFingerprint || { mobile: true, desktop: true }),
+                        group: account.group || "Ungrouped",
+                        tag: account.tag || "",
+                        now,
+                    });
+                }
+            })();
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true, count: accounts.length }));
+        } catch (e) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+    }
+
+    if (req.method === "POST" && req.url === "/api/accounts/import") {
+        let body = "";
+        req.on("data", chunk => body += chunk.toString());
+        req.on("end", () => {
+            try {
+                const { accounts } = JSON.parse(body);
+                performAccountImport(accounts, res);
+            } catch (e) {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ success: false, error: "Invalid JSON" }));
+            }
+        });
+        return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/accounts/import-full") {
+        const chunks = [];
+        req.on("data", chunk => chunks.push(chunk));
+        req.on("end", async () => {
+            let tempDir = "";
+            let zipPath = "";
+            try {
+                const buffer = Buffer.concat(chunks);
+
+                // 1. Save ZIP to temp file
+                zipPath = path.join(os.tmpdir(), `bing_import_${Date.now()}.zip`);
+                fs.writeFileSync(zipPath, buffer);
+
+                // 2. Create temp directory for extraction
+                tempDir = path.join(os.tmpdir(), `bing_extract_${Date.now()}`);
+                fs.mkdirSync(tempDir, { recursive: true });
+
+                // 3. Extract ZIP using tar
+                const { execSync } = await import("child_process");
+                try {
+                    execSync(`tar -xf "${zipPath}" -C "${tempDir}"`);
+                } catch (err) {
+                    throw new Error(`Failed to extract ZIP: ${err.message}`);
+                }
+
+                // 4. Read accounts.json
+                const accountsJsonPath = path.join(tempDir, "accounts.json");
+                if (!fs.existsSync(accountsJsonPath)) {
+                    throw new Error("ZIP file does not contain accounts.json");
+                }
+                const { accounts } = JSON.parse(fs.readFileSync(accountsJsonPath, "utf-8"));
+
+                // 5. Copy session folders
+                const sessionsSrc = path.join(tempDir, "sessions");
+                if (fs.existsSync(sessionsSrc)) {
+                    const sessionFolders = fs.readdirSync(sessionsSrc);
+                    for (const email of sessionFolders) {
+                        const srcPath = path.join(sessionsSrc, email);
+                        const destPath = path.join(sessionPath, email);
+                        if (fs.statSync(srcPath).isDirectory()) {
+                            if (!fs.existsSync(destPath)) {
+                                fs.mkdirSync(destPath, { recursive: true });
+                            }
+                            // Using recursive cpSync will merge/overwrite existing files
+                            fs.cpSync(srcPath, destPath, { recursive: true });
+                        }
+                    }
+                }
+
+                // 6. Import database records
+                performAccountImport(accounts, res);
+
+            } catch (e) {
+                log("ERROR", `Full Import failed: ${e.message}`);
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            } finally {
+                // Cleanup
+                try {
+                    if (zipPath && fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                    if (tempDir && fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch (cleanupErr) {
+                    log("WARN", `Import cleanup failed: ${cleanupErr.message}`);
+                }
             }
         });
         return;
@@ -854,11 +1092,11 @@ const server = http.createServer((req, res) => {
             const db = getDb();
             const accounts = db?.prepare('SELECT * FROM accounts ORDER BY created_at ASC').all() || [];
             const diskStatus = loadAccountStatus();
-            
+
             const cleanAccounts = accounts.map(a => {
                 const email = a.email.toLowerCase();
                 const proxy = _safeParse(a.proxy, {});
-                
+
                 // Helper to check if process is TRULY active
                 const checkActive = (type) => {
                     const pid = activeProcesses[`${email}-${type}`];
@@ -869,9 +1107,9 @@ const server = http.createServer((req, res) => {
                     return false;
                 };
 
-                const isActiveDesktop     = checkActive('desktop');
-                const isActiveMobile      = checkActive('mobile');
-                const isActiveBot         = checkActive('bot');
+                const isActiveDesktop = checkActive('desktop');
+                const isActiveMobile = checkActive('mobile');
+                const isActiveBot = checkActive('bot');
                 const isActiveExtraSearch = checkActive('extra-search');
 
                 let host = (proxy?.url || '').replace(/^(https?|socks[45]):\/\//i, '').toLowerCase().trim();
@@ -890,12 +1128,12 @@ const server = http.createServer((req, res) => {
                 let stats = accountStats[email] || null;
                 if (!stats && ds) {
                     stats = {
-                        total:       ds.collectedPoints ?? 0,
-                        oldBalance:  ds.initialPoints   ?? 0,
-                        newBalance:  ds.points          ?? 0,
-                        duration:    ds.duration        ?? null,
-                        rank:        ds.rank            || null,
-                        completedAt: ds.lastUpdate      || null
+                        total: ds.collectedPoints ?? 0,
+                        oldBalance: ds.initialPoints ?? 0,
+                        newBalance: ds.points ?? 0,
+                        duration: ds.duration ?? null,
+                        rank: ds.rank || null,
+                        completedAt: ds.lastUpdate || null
                     };
                 }
 
@@ -911,8 +1149,8 @@ const server = http.createServer((req, res) => {
                     isActiveBot,
                     isActiveExtraSearch,
                     stats,
-                    points:     ds?.points ?? 0,
-                    rank:       accountStats[email]?.rank || ds?.rank || 'N/A',
+                    points: ds?.points ?? 0,
+                    rank: accountStats[email]?.rank || ds?.rank || 'N/A',
                     lastUpdate: ds?.lastUpdate || 'Never',
                     needsRelogin: accountStats[email]?.needsRelogin || false,
                     reloginAt: accountStats[email]?.reloginAt || null
@@ -955,7 +1193,7 @@ const server = http.createServer((req, res) => {
                         try {
                             fs.unlinkSync(path.join(lockDir, file));
                             count++;
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
                 log('SUCCESS', `Dashboard: Cleared ${count} proxy locks`);
@@ -1177,10 +1415,10 @@ const server = http.createServer((req, res) => {
                 const cleanup = (code) => {
                     if (lineBuffer.trim()) processLine(lineBuffer);
                     lineBuffer = '';
-                    
+
                     if (activeProcesses[key]) {
                         log('INFO', `[OpenRedem] Session closed for ${email} (code: ${code})`);
-                        
+
                         // Clear memory status
                         if (code === 0) {
                             if (accountStats[email]) {
@@ -1202,11 +1440,11 @@ const server = http.createServer((req, res) => {
                             if (db) {
                                 const now = Math.floor(Date.now() / 1000);
                                 const isoNow = new Date().toISOString();
-                                
+
                                 // We update last_update and points (if we have a new balance in memory)
                                 // This ensures the 'Rank' and 'Points' columns in the dashboard update
                                 const points = accountStats[email]?.newBalance || accountStats[email]?.total || 0;
-                                
+
                                 db.prepare(`
                                     UPDATE account_status 
                                     SET last_update = ?, updated_at = ?
@@ -1231,8 +1469,8 @@ const server = http.createServer((req, res) => {
                 });
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ 
-                    success: true, 
+                res.end(JSON.stringify({
+                    success: true,
                     message: `Redem session started via Global Proxy`,
                     proxyIp,
                     proxyCountry,
@@ -1280,14 +1518,14 @@ const server = http.createServer((req, res) => {
                 const accounts = accountsResult.data || [];
                 const account = accounts.find(a => a.email.toLowerCase() === email);
                 const proxyKey = account ? getProxyKey(account) : 'NO_PROXY';
-                
+
                 const proxyConflict = isProxyInUse(proxyKey, email);
                 if (proxyConflict) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ 
-                        success: false, 
+                    res.end(JSON.stringify({
+                        success: false,
                         error: `Proxy ${proxyKey} is already in use by ${proxyConflict.email} (${proxyConflict.type})`,
-                        proxyBusy: true 
+                        proxyBusy: true
                     }));
                     return;
                 }
@@ -1297,7 +1535,7 @@ const server = http.createServer((req, res) => {
                     delete accountStats[email].isProxyBusy;
                     delete accountStats[email].needsRelogin;
                     delete accountStats[email].status;
-                } 
+                }
 
                 let args;
                 if (type === 'bot') {
@@ -1311,7 +1549,7 @@ const server = http.createServer((req, res) => {
 
                 // Using spawn but attached tracking to update status on close
                 const cp = spawn('node', args, { cwd: projectRoot });
-                
+
                 activeProcesses[key] = cp.pid;
                 activeProxies[email] = { proxyKey, type, pid: cp.pid };
                 processLogs[key] = [];

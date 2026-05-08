@@ -283,24 +283,54 @@
         }
 
         @keyframes fadeInLeft {
-            from { opacity: 0; transform: translateX(-15px); }
-            to { opacity: 1; transform: translateX(0); }
+            from {
+                opacity: 0;
+                transform: translateX(-15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         @media (max-width: 960px) {
-            .sidebar { width: 64px; padding: 0.75rem 0.5rem; }
-            .sidebar-brand > div:last-child,
+            .sidebar {
+                width: 64px;
+                padding: 0.75rem 0.5rem;
+            }
+
+            .sidebar-brand>div:last-child,
             .nav-item span:not(.nav-badge),
             .theme-toggle span,
-            .nav-section-label { display: none; }
-            .nav-item { justify-content: center; padding: 0.65rem; }
-            .theme-toggle { justify-content: center; padding: 0.65rem; }
-            .main-content { padding: 1rem; }
+            .nav-section-label {
+                display: none;
+            }
+
+            .nav-item {
+                justify-content: center;
+                padding: 0.65rem;
+            }
+
+            .theme-toggle {
+                justify-content: center;
+                padding: 0.65rem;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
         }
 
         @media (max-width: 720px) {
-            .topbar { flex-direction: column; align-items: flex-start; }
-            .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
         }
 
         /* Legacy header (kept for fallback if used elsewhere) */
@@ -398,8 +428,13 @@
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .spin {
@@ -721,7 +756,7 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.7);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
         }
 
         .actions {
@@ -1039,6 +1074,7 @@
         .close-btn:hover {
             color: var(--danger);
         }
+
         .collapse-icon {
             transition: transform 0.2s ease;
         }
@@ -1058,14 +1094,18 @@
             transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
             box-shadow: var(--shadow-sm);
         }
+
         .stat-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0;
-            width: 3px; height: 100%;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
             background: linear-gradient(to bottom, var(--primary), var(--accent));
             opacity: 0.7;
         }
+
         .stat-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-md);
@@ -1082,54 +1122,72 @@
         :root[data-theme="light"] .toolbar {
             background: rgba(255, 255, 255, 0.85);
         }
+
         :root[data-theme="light"] .modal {
             background: #ffffff;
         }
+
         :root[data-theme="light"] .form-input,
         :root[data-theme="light"] .browser-type-btn {
             background: rgba(255, 255, 255, 0.92);
             color: var(--text-main);
         }
-        :root[data-theme="light"] .form-input::placeholder { color: rgba(15,23,42,0.4); }
+
+        :root[data-theme="light"] .form-input::placeholder {
+            color: rgba(15, 23, 42, 0.4);
+        }
+
         :root[data-theme="light"] .accounts-table tbody tr:hover {
             background: rgba(99, 102, 241, 0.05);
         }
+
         :root[data-theme="light"] .slider {
             background: rgba(15, 23, 42, 0.18);
         }
+
         :root[data-theme="light"] .btn {
             background: rgba(15, 23, 42, 0.04);
             color: var(--text-main);
         }
+
         :root[data-theme="light"] .btn:hover {
             background: rgba(15, 23, 42, 0.08);
         }
+
         :root[data-theme="light"] .stat-bar-track {
             background: rgba(15, 23, 42, 0.08);
         }
+
         :root[data-theme="light"] .toast {
             background: rgba(255, 255, 255, 0.95);
             color: var(--text-main);
         }
+
         :root[data-theme="light"] .sidebar {
             background: rgba(255, 255, 255, 0.92);
         }
+
         :root[data-theme="light"] .nav-item:hover {
             background: rgba(99, 102, 241, 0.08);
         }
+
         :root[data-theme="light"] .theme-toggle {
             background: rgba(15, 23, 42, 0.04);
         }
+
         :root[data-theme="light"] .modal-overlay {
             background: rgba(15, 23, 42, 0.45);
         }
+
         :root[data-theme="light"] .accounts-table th {
             color: var(--text-muted);
         }
+
         :root[data-theme="light"] input[type="number"]#threadCount {
             background: rgba(15, 23, 42, 0.05) !important;
             color: var(--text-main) !important;
         }
+
         :root[data-theme="light"] .toolbar {
             background: rgba(255, 255, 255, 0.92) !important;
         }
@@ -1150,31 +1208,81 @@
             <nav class="sidebar-nav">
                 <div class="nav-section-label">Workspace</div>
                 <button class="nav-item active" type="button" onclick="window.scrollTo({top:0,behavior:'smooth'})">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
                     <span>Dashboard</span>
                 </button>
                 <button class="nav-item" type="button" onclick="openAddAccountModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
                     <span>Add Account</span>
                 </button>
                 <div class="nav-section-label">Data</div>
-                <button class="nav-item" type="button" onclick="exportAccounts()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    <span>Export</span>
+                <button class="nav-item" type="button" onclick="exportAccounts()" title="Export account data only">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Export JSON</span>
                 </button>
-                <button class="nav-item" type="button" onclick="document.getElementById('importFileInput').click()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <button class="nav-item" type="button" onclick="exportFullAccounts()"
+                    title="Export account data + session folders">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Export ZIP</span>
+                </button>
+                <button class="nav-item" type="button" onclick="document.getElementById('importFileInput').click()"
+                    title="Import JSON or ZIP (with sessions)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
                     <span>Import</span>
                 </button>
                 <div class="nav-section-label">System</div>
                 <button class="nav-item" type="button" onclick="openConfigModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                        </path>
+                    </svg>
                     <span>Settings</span>
                 </button>
             </nav>
             <div class="sidebar-footer">
                 <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" type="button">
-                    <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
                     <span id="themeLabel">Light Mode</span>
                 </button>
             </div>
@@ -1182,168 +1290,266 @@
 
         <main class="main-content">
             <div class="topbar">
-                    <div>
-                        <h1>Profile Dashboard</h1>
-                        <p>A beautiful manager to control all your browser sessions</p>
+                <div>
+                    <h1>Profile Dashboard</h1>
+                    <p>A beautiful manager to control all your browser sessions</p>
+                </div>
+                <div class="topbar-actions">
+                    <input type="file" id="importFileInput" style="display: none;" accept=".json,.zip"
+                        onchange="importAccounts(event)">
+                    <div style="display: flex; gap: 0.35rem;">
+                        <button class="btn" style="padding: 0.55rem 0.8rem; font-size: 0.85rem;"
+                            onclick="exportAccounts()" title="Export JSON">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            JSON
+                        </button>
+                        <button class="btn"
+                            style="padding: 0.55rem 0.8rem; font-size: 0.85rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);"
+                            onclick="exportFullAccounts()" title="Export Full (ZIP + Sessions)">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            ZIP
+                        </button>
                     </div>
-                    <div class="topbar-actions">
-                    <input type="file" id="importFileInput" style="display: none;" accept=".json" onchange="importAccounts(event)">
-                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="exportAccounts()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Export
-                    </button>
-                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="document.getElementById('importFileInput').click()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;"
+                        onclick="document.getElementById('importFileInput').click()"
+                        title="Import JSON or ZIP (with sessions)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
                         Import
                     </button>
-                    <button class="btn btn-primary" style="padding: 0.55rem 1.1rem; font-size: 0.85rem;" onclick="openAddAccountModal()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <button class="btn btn-primary" style="padding: 0.55rem 1.1rem; font-size: 0.85rem;"
+                        onclick="openAddAccountModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                         Add Account
                     </button>
                     <button class="btn" style="padding: 0.55rem 1rem; font-size: 0.85rem;" onclick="openConfigModal()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
                         Settings
                     </button>
                 </div>
             </div>
 
-    <div class="stats-bar" id="statsBar">
-        <div class="stat-card">
-            <div class="stat-label">CPU Usage</div>
-            <div class="stat-value" id="statCpu">—</div>
-            <div class="stat-sub" id="statCpuSub">—</div>
-            <div class="stat-bar-track">
-                <div class="stat-bar-fill" id="statCpuBar" style="width:0%"></div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">RAM Usage</div>
-            <div class="stat-value" id="statRam">—</div>
-            <div class="stat-sub" id="statRamSub">—</div>
-            <div class="stat-bar-track">
-                <div class="stat-bar-fill" id="statRamBar" style="width:0%"></div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Active Sessions</div>
-            <div class="stat-value" id="statSessions">—</div>
-            <div class="stat-sub" id="statSessionsSub">Bot processes running</div>
-            <div class="stat-bar-track">
-                <div class="stat-bar-fill" id="statSessionsBar" style="width:0%; background: var(--primary);"></div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Total Accounts</div>
-            <div class="stat-value" id="statTotalAccounts">—</div>
-            <div class="stat-sub" id="statTotalAccountsSub">Accounts in database</div>
-            <div class="stat-bar-track">
-                <div class="stat-bar-fill" id="statTotalAccountsBar" style="width:100%; background: var(--accent);">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-card">
+                    <div class="stat-label">CPU Usage</div>
+                    <div class="stat-value" id="statCpu">—</div>
+                    <div class="stat-sub" id="statCpuSub">—</div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="statCpuBar" style="width:0%"></div>
+                    </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-label">RAM Usage</div>
+                    <div class="stat-value" id="statRam">—</div>
+                    <div class="stat-sub" id="statRamSub">—</div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="statRamBar" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Sessions</div>
+                    <div class="stat-value" id="statSessions">—</div>
+                    <div class="stat-sub" id="statSessionsSub">Bot processes running</div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="statSessionsBar" style="width:0%; background: var(--primary);">
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Accounts</div>
+                    <div class="stat-value" id="statTotalAccounts">—</div>
+                    <div class="stat-sub" id="statTotalAccountsSub">Accounts in database</div>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" id="statTotalAccountsBar"
+                            style="width:100%; background: var(--accent);">
+                        </div>
+                    </div>
+                </div>
+                <div id="tagStatsContainer" style="display: contents;"></div>
             </div>
-        </div>
-        <div id="tagStatsContainer" style="display: contents;"></div>
-    </div>
 
-    <div class="dashboard-container">
-        <div class="main-layout">
-            <div class="glass-panel accounts-section">
-                <div id="loader" style="text-align: center;">
-                    <div class="loading-spinner"></div>
-                </div>
-                <div id="accountsListContainer" style="display: none;">
-                    <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem;">
-                        <div class="cfg-field" style="flex: 1; max-width: 400px;">
-                            <input type="text" id="accountSearch" class="form-input" placeholder="Search email, proxy, tag, rank..."
-                                style="padding: 0.5rem 0.75rem; font-size: 0.9rem;"
-                                oninput="debouncedSearch()">
+            <div class="dashboard-container">
+                <div class="main-layout">
+                    <div class="glass-panel accounts-section">
+                        <div id="loader" style="text-align: center;">
+                            <div class="loading-spinner"></div>
                         </div>
-                        <span id="filteredCount" style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;"></span>
-                        <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="expandAllGroups()" title="Expand all groups">Expand All</button>
-                        <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" onclick="collapseAllGroups()" title="Collapse all groups">Collapse All</button>
-                    </div>
-                    <div class="toolbar">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div class="checkbox-wrapper">
-                                <input type="checkbox" id="selectAll" class="custom-checkbox"
-                                    onchange="toggleSelectAll()">
+                        <div id="accountsListContainer" style="display: none;">
+                            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem;">
+                                <div class="cfg-field" style="flex: 1; max-width: 400px;">
+                                    <input type="text" id="accountSearch" class="form-input"
+                                        placeholder="Search email, proxy, tag, rank..."
+                                        style="padding: 0.5rem 0.75rem; font-size: 0.9rem;" oninput="debouncedSearch()">
+                                </div>
+                                <span id="filteredCount"
+                                    style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;"></span>
+                                <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;"
+                                    onclick="expandAllGroups()" title="Expand all groups">Expand All</button>
+                                <button class="btn" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;"
+                                    onclick="collapseAllGroups()" title="Collapse all groups">Collapse All</button>
                             </div>
-                            <span style="font-weight: 500; cursor: pointer;"
-                                onclick="document.getElementById('selectAll').click()">Select All</span>
-                            <span id="selectedCount" style="color: var(--text-muted); font-size: 0.9rem;">(0
-                                selected)</span>
+                            <div class="toolbar">
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <div class="checkbox-wrapper">
+                                        <input type="checkbox" id="selectAll" class="custom-checkbox"
+                                            onchange="toggleSelectAll()">
+                                    </div>
+                                    <span style="font-weight: 500; cursor: pointer;"
+                                        onclick="document.getElementById('selectAll').click()">Select All</span>
+                                    <span id="selectedCount" style="color: var(--text-muted); font-size: 0.9rem;">(0
+                                        selected)</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <label
+                                        style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;">Threads:</label>
+                                    <input type="number" id="threadCount" min="1" max="20" value="2"
+                                        style="width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.07);border:1px solid var(--border-color);border-radius:8px;color:#fff;font-size:0.9rem;text-align:center;"
+                                        title="Number of bots to run in parallel">
+                                    <button id="loadAccountsBtn" class="btn"
+                                        style="padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);"
+                                        onclick="loadAccountsManual()" title="Load/Refresh accounts list">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18"
+                                            style="margin-right: 0.4rem;">
+                                            <path d="M23 4v6h-6"></path>
+                                            <path d="M1 20v-6h6"></path>
+                                            <path
+                                                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                            </path>
+                                        </svg>
+                                        Load
+                                    </button>
+                                    <label
+                                        style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); cursor: pointer;"
+                                        title="Auto refresh when sessions are active">
+                                        <input type="checkbox" id="autoRefreshToggle" checked
+                                            onchange="toggleAutoRefresh(this.checked)" style="cursor: pointer;">
+                                        Auto
+                                    </label>
+                                    <button id="checkProxiesBtn" class="btn"
+                                        style="padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);"
+                                        onclick="checkAllProxies()" title="Check all proxies">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18">
+                                            <path d="M23 4v6h-6"></path>
+                                            <path d="M1 20v-6h6"></path>
+                                            <path
+                                                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                    <button id="bulkGroupBtn" class="btn"
+                                        style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);"
+                                        onclick="bulkChangeGroup()" title="Move selected to group">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18">
+                                            <path
+                                                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                            </path>
+                                            <line x1="12" y1="11" x2="12" y2="17"></line>
+                                            <line x1="9" y1="14" x2="15" y2="14"></line>
+                                        </svg>
+                                    </button>
+                                    <button id="bulkRemoveProxyBtn" class="btn"
+                                        style="padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #f59e0b;"
+                                        onclick="bulkRemoveProxyByGroup()" title="Remove proxies from group">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                                        </svg>
+                                    </button>
+                                    <button class="btn" onclick="clearAllLocks()"
+                                        style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); font-weight: 600; padding: 0.6rem 1rem;"
+                                        title="Clear all proxy locks (.locks folder)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18"
+                                            style="margin-right: 0.4rem;">
+                                            <path
+                                                d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm3.012 3.012L21 10m-3 3l3 3m-3-3l-3-3m3 3l-3 3">
+                                            </path>
+                                            <path d="M10.5 3.5a2.121 2.121 0 0 0-3 0l-4 4a2.121 2.121 0 0 0 0 3"></path>
+                                            <path d="M14.5 20.5a2.121 2.121 0 0 1 3 0l4-4a2.121 2.121 0 0 1 0-3"></path>
+                                        </svg>
+                                        Clear Locks
+                                    </button>
+                                    <button id="runBotsBtn" class="btn bot-btn" style="padding: 0.75rem 1.25rem;"
+                                        onclick="runSelectedBots()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                        Run Selected Bots
+                                    </button>
+                                    <button id="stopBotsBtn" class="btn stop-btn"
+                                        style="padding: 0.75rem 1.25rem; display:none;" onclick="stopBatchRun()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="18" height="18">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        </svg>
+                                        Stop Queue
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="accounts-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding-left: 1.5rem; width: 40px;">
+                                                <input type="checkbox" class="custom-checkbox" id="selectAll"
+                                                    onchange="toggleSelectAll(this.checked)">
+                                            </th>
+                                            <th>Account</th>
+                                            <th>Points</th>
+                                            <th>Tag</th>
+                                            <th>Daily Status</th>
+                                            <th>Rank</th>
+                                            <th>Worker</th>
+                                            <th style="padding-right: 1.5rem; text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="accountsTableBody"></tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 0.6rem;">
-                            <label
-                                style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;">Threads:</label>
-                            <input type="number" id="threadCount" min="1" max="20" value="2"
-                                style="width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.07);border:1px solid var(--border-color);border-radius:8px;color:#fff;font-size:0.9rem;text-align:center;"
-                                title="Number of bots to run in parallel">
-                            <button id="loadAccountsBtn" class="btn" style="padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);" onclick="loadAccountsManual()" title="Load/Refresh accounts list">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                Load
-                            </button>
-                            <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); cursor: pointer;" title="Auto refresh when sessions are active">
-                                <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh(this.checked)" style="cursor: pointer;">
-                                Auto
-                            </label>
-                            <button id="checkProxiesBtn" class="btn" style="padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);" onclick="checkAllProxies()" title="Check all proxies">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                            </button>
-                            <button id="bulkGroupBtn" class="btn" style="padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);" onclick="bulkChangeGroup()" title="Move selected to group">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
-                            </button>
-                            <button id="bulkRemoveProxyBtn" class="btn" style="padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #f59e0b;" onclick="bulkRemoveProxyByGroup()" title="Remove proxies from group">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                            </button>
-                            <button class="btn" onclick="clearAllLocks()" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); font-weight: 600; padding: 0.6rem 1rem;" title="Clear all proxy locks (.locks folder)">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="margin-right: 0.4rem;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm3.012 3.012L21 10m-3 3l3 3m-3-3l-3-3m3 3l-3 3"></path><path d="M10.5 3.5a2.121 2.121 0 0 0-3 0l-4 4a2.121 2.121 0 0 0 0 3"></path><path d="M14.5 20.5a2.121 2.121 0 0 1 3 0l4-4a2.121 2.121 0 0 1 0-3"></path></svg>
-                                Clear Locks
-                            </button>
-                            <button id="runBotsBtn" class="btn bot-btn" style="padding: 0.75rem 1.25rem;"
-                                onclick="runSelectedBots()">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="18" height="18">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                                Run Selected Bots
-                            </button>
-                            <button id="stopBotsBtn" class="btn stop-btn"
-                                style="padding: 0.75rem 1.25rem; display:none;" onclick="stopBatchRun()">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="18" height="18">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                </svg>
-                                Stop Queue
-                            </button>
+                        <div id="emptyState" class="empty-state" style="display: none;">
+                            <p>No accounts found in accounts.json</p>
                         </div>
                     </div>
-                    <div style="overflow-x: auto;">
-                        <table class="accounts-table">
-                            <thead>
-                                <tr>
-                                    <th style="padding-left: 1.5rem; width: 40px;">
-                                        <input type="checkbox" class="custom-checkbox" id="selectAll"
-                                            onchange="toggleSelectAll(this.checked)">
-                                    </th>
-                                    <th>Account</th>
-                                    <th>Points</th>
-                                    <th>Tag</th>
-                                    <th>Daily Status</th>
-                                    <th>Rank</th>
-                                    <th>Worker</th>
-                                    <th style="padding-right: 1.5rem; text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="accountsTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div id="emptyState" class="empty-state" style="display: none;">
-                    <p>No accounts found in accounts.json</p>
-                </div>
-            </div>
         </main>
     </div>
 
@@ -1419,8 +1625,8 @@
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.8rem;">Group Name</label>
-                            <input type="text" id="accGroupName" class="form-input" list="groupSuggestions" value="Ungrouped"
-                                style="padding: 0.4rem 0.6rem;">
+                            <input type="text" id="accGroupName" class="form-input" list="groupSuggestions"
+                                value="Ungrouped" style="padding: 0.4rem 0.6rem;">
                             <datalist id="groupSuggestions"></datalist>
                         </div>
                         <div class="cfg-field">
@@ -1436,8 +1642,10 @@
 
                     <div
                         style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                            <h4 style="margin: 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <h4
+                                style="margin: 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px;">
                                 Proxy Configuration
                             </h4>
                             <label class="toggle-label" style="margin: 0; font-size: 0.85rem;">
@@ -1449,100 +1657,123 @@
                             </label>
                         </div>
                         <div id="proxyFieldsContainer">
-                        <div class="cfg-field" style="margin-bottom: 0.75rem;">
-                            <label style="font-size: 0.8rem;">Proxy Quick Paste <span
-                                    style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
-                            <input type="text" id="accProxyString" class="form-input"
-                                placeholder="proxy.example.com:8080:user:pass" oninput="parseProxyString(this.value)"
-                                style="padding: 0.4rem 0.6rem;">
-                        </div>
-                        <div
-                            style="display: grid; grid-template-columns: 100px 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
-                            <div class="cfg-field">
-                                <label style="font-size: 0.8rem;">Proto</label>
-                                <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;"
-                                    onchange="syncProxyString()">
-                                    <option value="http" selected>HTTP</option>
-                                    <option value="https">HTTPS</option>
-                                    <option value="socks4">SOCKS4</option>
-                                    <option value="socks5">SOCKS5</option>
-                                </select>
+                            <div class="cfg-field" style="margin-bottom: 0.75rem;">
+                                <label style="font-size: 0.8rem;">Proxy Quick Paste <span
+                                        style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
+                                <input type="text" id="accProxyString" class="form-input"
+                                    placeholder="proxy.example.com:8080:user:pass"
+                                    oninput="parseProxyString(this.value)" style="padding: 0.4rem 0.6rem;">
                             </div>
-                            <div class="cfg-field">
-                                <label style="font-size: 0.8rem;">Host</label>
-                                <input type="text" id="accProxyUrl" class="form-input" placeholder="host"
-                                    oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
-                            </div>
-                            <div class="cfg-field">
-                                <label style="font-size: 0.8rem;">Port</label>
-                                <input type="number" id="accProxyPort" class="form-input" placeholder="80"
-                                    oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
-                            </div>
-                            <div class="cfg-field">
-                                <label style="font-size: 0.8rem;">User</label>
-                                <input type="text" id="accProxyUser" class="form-input" oninput="syncProxyString()"
-                                    style="padding: 0.4rem 0.6rem;">
-                            </div>
-                            <div class="cfg-field">
-                                <label style="font-size: 0.8rem;">Pass</label>
-                                <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()"
-                                    style="padding: 0.4rem 0.6rem;">
-                            </div>
-                        </div>
-                        <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.75rem;">
-                            <button type="button" class="btn" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);" id="btnTestProxy" onclick="testProxy()">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                Check Proxy IP
-                            </button>
-                            <div id="testProxyResult" style="font-size: 0.85rem; font-weight: 500; display: none;"></div>
-                            <div style="margin-left: auto; display: flex; align-items: center; gap: 1rem;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #fff; font-size: 0.85rem;">
-                                    <input type="checkbox" id="accProxyV6">
-                                    <span>Proxy V6</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- V4 Fallback section -->
-                        <div id="v4FallbackBlock" style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <div>
-                                    <label style="font-size: 0.8rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Proxy V4 Fallback</label>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Routes domains in <code>bypass.txt</code> through this V4 proxy instead of going direct.</div>
+                            <div
+                                style="display: grid; grid-template-columns: 100px 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
+                                <div class="cfg-field">
+                                    <label style="font-size: 0.8rem;">Proto</label>
+                                    <select id="accProxyProtoSelect" class="form-input" style="padding: 0.4rem 0.3rem;"
+                                        onchange="syncProxyString()">
+                                        <option value="http" selected>HTTP</option>
+                                        <option value="https">HTTPS</option>
+                                        <option value="socks4">SOCKS4</option>
+                                        <option value="socks5">SOCKS5</option>
+                                    </select>
                                 </div>
-                                <label class="toggle-label" style="margin: 0; font-size: 0.85rem;">
-                                    <span>Enable</span>
-                                    <label class="toggle">
-                                        <input type="checkbox" id="accV4Enabled" onchange="toggleV4Fields()">
-                                        <span class="slider"></span>
+                                <div class="cfg-field">
+                                    <label style="font-size: 0.8rem;">Host</label>
+                                    <input type="text" id="accProxyUrl" class="form-input" placeholder="host"
+                                        oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                </div>
+                                <div class="cfg-field">
+                                    <label style="font-size: 0.8rem;">Port</label>
+                                    <input type="number" id="accProxyPort" class="form-input" placeholder="80"
+                                        oninput="syncProxyString()" style="padding: 0.4rem 0.6rem;">
+                                </div>
+                                <div class="cfg-field">
+                                    <label style="font-size: 0.8rem;">User</label>
+                                    <input type="text" id="accProxyUser" class="form-input" oninput="syncProxyString()"
+                                        style="padding: 0.4rem 0.6rem;">
+                                </div>
+                                <div class="cfg-field">
+                                    <label style="font-size: 0.8rem;">Pass</label>
+                                    <input type="text" id="accProxyPass" class="form-input" oninput="syncProxyString()"
+                                        style="padding: 0.4rem 0.6rem;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.75rem;">
+                                <button type="button" class="btn"
+                                    style="padding: 0.4rem 0.75rem; font-size: 0.85rem; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);"
+                                    id="btnTestProxy" onclick="testProxy()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="14" height="14" style="margin-right: 4px;">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    Check Proxy IP
+                                </button>
+                                <div id="testProxyResult" style="font-size: 0.85rem; font-weight: 500; display: none;">
+                                </div>
+                                <div style="margin-left: auto; display: flex; align-items: center; gap: 1rem;">
+                                    <label
+                                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #fff; font-size: 0.85rem;">
+                                        <input type="checkbox" id="accProxyV6">
+                                        <span>Proxy V6</span>
                                     </label>
-                                </label>
-                            </div>
-                            <div id="v4FieldsContainer" style="display:none;">
-                                <div class="cfg-field" style="margin-bottom: 0.5rem;">
-                                    <label style="font-size: 0.8rem;">V4 Quick Paste <span style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
-                                    <input type="text" id="accV4String" class="form-input" placeholder="v4-proxy.example.com:8080:user:pass" oninput="parseV4String(this.value)" style="padding: 0.4rem 0.6rem;">
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
-                                    <div class="cfg-field">
-                                        <label style="font-size: 0.8rem;">Host</label>
-                                        <input type="text" id="accV4Url" class="form-input" placeholder="host" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
-                                    </div>
-                                    <div class="cfg-field">
-                                        <label style="font-size: 0.8rem;">Port</label>
-                                        <input type="number" id="accV4Port" class="form-input" placeholder="80" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
-                                    </div>
-                                    <div class="cfg-field">
-                                        <label style="font-size: 0.8rem;">User</label>
-                                        <input type="text" id="accV4User" class="form-input" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
-                                    </div>
-                                    <div class="cfg-field">
-                                        <label style="font-size: 0.8rem;">Pass</label>
-                                        <input type="text" id="accV4Pass" class="form-input" oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
-                                    </div>
                                 </div>
                             </div>
-                        </div>
+
+                            <!-- V4 Fallback section -->
+                            <div id="v4FallbackBlock"
+                                style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <div>
+                                        <label
+                                            style="font-size: 0.8rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Proxy
+                                            V4 Fallback</label>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+                                            Routes domains in <code>bypass.txt</code> through this V4 proxy instead of
+                                            going direct.</div>
+                                    </div>
+                                    <label class="toggle-label" style="margin: 0; font-size: 0.85rem;">
+                                        <span>Enable</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="accV4Enabled" onchange="toggleV4Fields()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </label>
+                                </div>
+                                <div id="v4FieldsContainer" style="display:none;">
+                                    <div class="cfg-field" style="margin-bottom: 0.5rem;">
+                                        <label style="font-size: 0.8rem;">V4 Quick Paste <span
+                                                style="color: var(--text-muted); font-weight: 400;">(host:port:user:pass)</span></label>
+                                        <input type="text" id="accV4String" class="form-input"
+                                            placeholder="v4-proxy.example.com:8080:user:pass"
+                                            oninput="parseV4String(this.value)" style="padding: 0.4rem 0.6rem;">
+                                    </div>
+                                    <div
+                                        style="display: grid; grid-template-columns: 1fr 100px 1fr 1fr; gap: 0.75rem; align-items: end;">
+                                        <div class="cfg-field">
+                                            <label style="font-size: 0.8rem;">Host</label>
+                                            <input type="text" id="accV4Url" class="form-input" placeholder="host"
+                                                oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                        </div>
+                                        <div class="cfg-field">
+                                            <label style="font-size: 0.8rem;">Port</label>
+                                            <input type="number" id="accV4Port" class="form-input" placeholder="80"
+                                                oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                        </div>
+                                        <div class="cfg-field">
+                                            <label style="font-size: 0.8rem;">User</label>
+                                            <input type="text" id="accV4User" class="form-input"
+                                                oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                        </div>
+                                        <div class="cfg-field">
+                                            <label style="font-size: 0.8rem;">Pass</label>
+                                            <input type="text" id="accV4Pass" class="form-input"
+                                                oninput="syncV4String()" style="padding: 0.4rem 0.6rem;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1692,8 +1923,8 @@
                                     Earn</span><label class="toggle"><input type="checkbox" id="cfg_doReadToEarn"><span
                                         class="slider"></span></label></label>
                             <label class="toggle-label" style="font-size: 0.75rem; margin:0;"><span>Extra
-                                    Search</span><label class="toggle"><input type="checkbox" id="cfg_doExtraSearch"><span
-                                        class="slider"></span></label></label>
+                                    Search</span><label class="toggle"><input type="checkbox"
+                                        id="cfg_doExtraSearch"><span class="slider"></span></label></label>
                         </div>
                     </div>
 
@@ -1814,41 +2045,54 @@
                 </div>
 
                 <!-- Registration & OTP Section -->
-                <div style="background: rgba(16, 185, 129, 0.05); padding: 1rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.15); margin-bottom: 1.25rem;">
-                    <div class="cfg-section-title" style="margin-top: 0; color: var(--success); border-color: rgba(16, 185, 129, 0.2);">Registration & Proxy Automation</div>
+                <div
+                    style="background: rgba(16, 185, 129, 0.05); padding: 1rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.15); margin-bottom: 1.25rem;">
+                    <div class="cfg-section-title"
+                        style="margin-top: 0; color: var(--success); border-color: rgba(16, 185, 129, 0.2);">
+                        Registration & Proxy Automation</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                         <div class="cfg-field">
                             <label style="font-weight: 600; font-size: 0.85rem;">ShopGmail API Key (OTP)</label>
-                            <input id="cfg_apiOtpKey" type="text" class="form-input" placeholder="Your API Key" style="padding: 0.5rem 0.75rem;">
-                            <small style="color: var(--text-muted); font-size: 0.7rem;">Dùng để thuê Gmail nhận code Microsoft qua shopgmail9999.com</small>
+                            <input id="cfg_apiOtpKey" type="text" class="form-input" placeholder="Your API Key"
+                                style="padding: 0.5rem 0.75rem;">
+                            <small style="color: var(--text-muted); font-size: 0.7rem;">Dùng để thuê Gmail nhận code
+                                Microsoft qua shopgmail9999.com</small>
                         </div>
                         <div class="cfg-field">
                             <label style="font-weight: 600; font-size: 0.85rem;">Proxy Rotation URL</label>
-                            <input id="cfg_proxyRotationUrl" type="text" class="form-input" placeholder="http://proxy-api.com/rotate?key=..." style="padding: 0.5rem 0.75rem;">
-                            <small style="color: var(--text-muted); font-size: 0.7rem;">URL đổi IP proxy (trả về định dạng ip:port:user:pass)</small>
+                            <input id="cfg_proxyRotationUrl" type="text" class="form-input"
+                                placeholder="http://proxy-api.com/rotate?key=..." style="padding: 0.5rem 0.75rem;">
+                            <small style="color: var(--text-muted); font-size: 0.7rem;">URL đổi IP proxy (trả về định
+                                dạng ip:port:user:pass)</small>
                         </div>
                     </div>
-                    
-                    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(16, 185, 129, 0.1); display: grid; grid-template-columns: 0.5fr 1.5fr 0.5fr 1fr 1fr; gap: 0.75rem; align-items: end;">
+
+                    <div
+                        style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(16, 185, 129, 0.1); display: grid; grid-template-columns: 0.5fr 1.5fr 0.5fr 1fr 1fr; gap: 0.75rem; align-items: end;">
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Global Proxy</label>
-                            <label class="toggle" style="margin-bottom: 0.5rem;"><input type="checkbox" id="cfg_proxyEnable"><span class="slider"></span></label>
+                            <label class="toggle" style="margin-bottom: 0.5rem;"><input type="checkbox"
+                                    id="cfg_proxyEnable"><span class="slider"></span></label>
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Host</label>
-                            <input id="cfg_proxyUrl" type="text" class="form-input" placeholder="proxy.example.com" style="padding: 0.4rem 0.6rem;">
+                            <input id="cfg_proxyUrl" type="text" class="form-input" placeholder="proxy.example.com"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Port</label>
-                            <input id="cfg_proxyPort" type="text" class="form-input" placeholder="8080" style="padding: 0.4rem 0.6rem;">
+                            <input id="cfg_proxyPort" type="text" class="form-input" placeholder="8080"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Username</label>
-                            <input id="cfg_proxyUsername" type="text" class="form-input" placeholder="user" style="padding: 0.4rem 0.6rem;">
+                            <input id="cfg_proxyUsername" type="text" class="form-input" placeholder="user"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                         <div class="cfg-field">
                             <label style="font-size: 0.75rem;">Password</label>
-                            <input id="cfg_proxyPassword" type="password" class="form-input" placeholder="pass" style="padding: 0.4rem 0.6rem;">
+                            <input id="cfg_proxyPassword" type="password" class="form-input" placeholder="pass"
+                                style="padding: 0.4rem 0.6rem;">
                         </div>
                     </div>
                 </div>
@@ -1984,7 +2228,7 @@
 
         async function clearAllLocks() {
             if (!confirm('Are you sure you want to clear ALL proxy locks? Only do this if no bots are actually running but are showing "busy".')) return;
-            
+
             try {
                 const res = await fetch(`${API_URL}/api/clear-locks`, { method: 'POST' });
                 const data = await res.json();
@@ -2457,7 +2701,7 @@
             }
             const groupName = prompt('Enter group name for selected accounts:', 'Ungrouped');
             if (groupName === null) return;
-            
+
             try {
                 const res = await fetch(`${API_URL}/api/accounts/bulk-update-group`, {
                     method: 'POST',
@@ -2622,7 +2866,7 @@
             toggleProxyFields();
             document.getElementById('addAccountModal').style.display = 'flex';
         }
-        
+
         function toggleProxyFields() {
             const useProxy = document.getElementById('accUseProxy').checked;
             document.getElementById('proxyFieldsContainer').style.display = useProxy ? 'block' : 'none';
@@ -2677,7 +2921,7 @@
                 const hasProxy = !!(rawUrl || proxy.port || proxy.username);
                 document.getElementById('accUseProxy').checked = hasProxy;
                 toggleProxyFields();
-                
+
                 syncProxyString();
 
                 const fp = acc.saveFingerprint || {};
@@ -2692,7 +2936,7 @@
 
         function parseProxyString(str) {
             if (!str) return;
-            
+
             // Detect protocol
             let proto = 'http';
             const protoMatch = str.match(/^(https?|socks[45])/i);
@@ -2702,19 +2946,19 @@
 
             // Strip any protocol if present for further parsing
             let workingStr = str.replace(/^(https?|socks[45])?:\/\//i, '');
-            
+
             const parts = workingStr.split(':');
             if (parts.length >= 2) {
                 document.getElementById('accProxyUrl').value = parts[0] || '';
                 document.getElementById('accProxyPort').value = parts[1] || '';
                 document.getElementById('accProxyUser').value = parts[2] || '';
                 document.getElementById('accProxyPass').value = parts[3] || '';
-                
+
                 // Extra fields detection (:v6, :bypass=...)
                 let isV6 = false;
-                for(let i=4; i<parts.length; i++) {
+                for (let i = 4; i < parts.length; i++) {
                     const p = parts[i].toLowerCase();
-                    if(p === 'v6') isV6 = true;
+                    if (p === 'v6') isV6 = true;
                 }
                 document.getElementById('accProxyV6').checked = isV6;
 
@@ -2782,7 +3026,7 @@
                 langCode: document.getElementById('accLangCode').value || "en",
                 group: document.getElementById('accGroupName').value || "Ungrouped",
                 tag: document.getElementById('accTag').value || "",
-                proxy: document.getElementById('accUseProxy').checked ? (function() {
+                proxy: document.getElementById('accUseProxy').checked ? (function () {
                     const p = {
                         proxyAxios: document.getElementById('accProxyAxios').checked,
                         url: document.getElementById('accProxyProtoSelect').value + "://" + (document.getElementById('accProxyUrl').value || "").replace(/^(https?|socks[45])?:\/\//i, ''),
@@ -2960,8 +3204,8 @@
                 cfg.errorDiagnostics = getCheck('cfg_errorDiagnostics');
                 cfg.debugLogs = getCheck('cfg_debugLogs');
                 cfg.searchOnBingLocalQueries = getCheck('cfg_searchOnBingLocalQueries');
-                cfg.proxy = { 
-                    ...(cfg.proxy || {}), 
+                cfg.proxy = {
+                    ...(cfg.proxy || {}),
                     queryEngine: getCheck('cfg_proxyQueryEngine'),
                     enable: getCheck('cfg_proxyEnable'),
                     url: getVal('cfg_proxyUrl'),
@@ -3129,7 +3373,7 @@
                             <div class="stat-footer">
                                 <span class="stat-sub">of ${ts.total} total accounts</span>
                                 <div class="stat-progress-bg" style="height: 4px; margin-top: 5px;">
-                                    <div class="stat-progress-fill" style="width: ${Math.round((ts.readyCount/ts.total)*100)}%; background: var(--primary);"></div>
+                                    <div class="stat-progress-fill" style="width: ${Math.round((ts.readyCount / ts.total) * 100)}%; background: var(--primary);"></div>
                                 </div>
                             </div>
                         </div>
@@ -3144,19 +3388,26 @@
             let accountsToExport = [];
             let exportLabel = '';
 
-            // Always fetch full data from backend (password, proxy object, saveFingerprint, etc.)
             try {
-                const res = await fetch(`${API_URL}/api/accounts/export`);
+                let res;
+                if (selectedEmails.size > 0) {
+                    // Export selected accounts only via POST to backend to get full fields (like password)
+                    res = await fetch(`${API_URL}/api/accounts/export`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emails: Array.from(selectedEmails) })
+                    });
+                    exportLabel = `${selectedEmails.size} selected`;
+                } else {
+                    // No selection — export all
+                    res = await fetch(`${API_URL}/api/accounts/export`);
+                    exportLabel = 'all';
+                }
+
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
-
-                if (selectedEmails.size > 0) {
-                    accountsToExport = data.accounts.filter(a => selectedEmails.has(a.email));
-                    exportLabel = `${accountsToExport.length} selected`;
-                } else {
-                    accountsToExport = data.accounts;
-                    exportLabel = `${accountsToExport.length} total`;
-                }
+                accountsToExport = data.accounts;
+                if (exportLabel === 'all') exportLabel = `${accountsToExport.length} total`;
             } catch (e) {
                 showToast('Failed to export accounts: ' + e.message, 'error');
                 return;
@@ -3179,34 +3430,97 @@
             }
         }
 
+        async function exportFullAccounts() {
+            let exportLabel = '';
+            try {
+                let res;
+                if (selectedEmails.size > 0) {
+                    exportLabel = `${selectedEmails.size} selected`;
+                    res = await fetch(`${API_URL}/api/accounts/export-full`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emails: Array.from(selectedEmails) })
+                    });
+                } else {
+                    exportLabel = 'all';
+                    res = await fetch(`${API_URL}/api/accounts/export-full`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emails: [] })
+                    });
+                }
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || 'Server error');
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `bing_full_export_${new Date().toISOString().slice(0, 10)}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast(`Exported ${exportLabel} accounts + sessions to ZIP!`, 'success');
+            } catch (e) {
+                showToast('Failed to export full data: ' + e.message, 'error');
+            }
+        }
+
+
         async function importAccounts(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const accounts = JSON.parse(e.target.result);
-                    if (!Array.isArray(accounts)) throw new Error('File does not contain an array of accounts');
+            const isZip = file.name.toLowerCase().endsWith('.zip');
 
-                    const res = await fetch(`${API_URL}/api/accounts/import`, {
+            if (isZip) {
+                try {
+                    showToast('Uploading and importing ZIP data...', 'info');
+                    const res = await fetch(`${API_URL}/api/accounts/import-full`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ accounts })
+                        body: file
                     });
-                    
                     const data = await res.json();
                     if (data.success) {
-                        showToast(`Successfully imported ${data.count} accounts!`, 'success');
+                        showToast(`Successfully imported ${data.count} accounts with sessions!`, 'success');
                         fetchAccounts();
                     } else throw new Error(data.error);
-                } catch (err) {
-                    showToast('Import failed: ' + err.message, 'error');
+                } catch (e) {
+                    showToast('Import ZIP failed: ' + e.message, 'error');
                 } finally {
-                    event.target.value = ''; // Reset input
+                    event.target.value = '';
                 }
-            };
-            reader.readAsText(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        const accounts = Array.isArray(data) ? data : (data.accounts || []);
+
+                        const res = await fetch(`${API_URL}/api/accounts/import`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ accounts })
+                        });
+
+                        const result = await res.json();
+                        if (result.success) {
+                            showToast(`Successfully imported ${result.count} accounts!`, 'success');
+                            fetchAccounts();
+                        } else throw new Error(result.error);
+                    } catch (err) {
+                        showToast('Import JSON failed: ' + err.message, 'error');
+                    } finally {
+                        event.target.value = ''; // Reset input
+                    }
+                };
+                reader.readAsText(file);
+            }
         }
 
         async function testProxy() {
@@ -3241,7 +3555,7 @@
                         password: pass
                     })
                 });
-                
+
                 const data = await res.json();
                 resultBox.style.display = 'block';
 
@@ -3268,13 +3582,13 @@
         async function checkProxyForAccount(email, btn) {
             const acc = lastAccounts.find(a => a.email === email);
             if (!acc || !acc.proxy) return;
-            
+
             const statusEl = document.getElementById(`proxy-status-${email.replace(/[@.]/g, '_')}`);
             if (statusEl) {
                 statusEl.style.color = 'var(--text-muted)';
                 statusEl.innerText = '(checking...)';
             }
-            
+
             // Spin the icon
             const svg = btn.querySelector('svg');
             if (svg) svg.classList.add('spin');
@@ -3285,7 +3599,7 @@
                 // But from the server it might be an object if we didn't stringify it
                 let p = acc.proxy;
                 let proxyData = {};
-                
+
                 // The backend API returns proxy as a string if it's from current list rendering
                 // We need to parse it for the test endpoint
                 const match = p.match(/^((?:https?|socks[45]):\/\/)?([^:]+):(\d+)(?::([^:]+):([^:]+))?$/i);
@@ -3305,7 +3619,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(proxyData)
                 });
-                
+
                 const data = await res.json();
                 if (data.success) {
                     statusEl.style.color = '#10b981';
@@ -3343,7 +3657,7 @@
                     if (rowBtn) await checkProxyForAccount(acc.email, rowBtn);
                 }
             }
-            await Promise.all(Array.from({length: CONCURRENCY}, () => worker()));
+            await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
             showToast('Bulk proxy check completed!', 'success');
             if (svg) svg.classList.remove('spin');
@@ -3355,7 +3669,7 @@
             const current = document.documentElement.getAttribute('data-theme') || 'dark';
             const next = current === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', next);
-            try { localStorage.setItem('bpm-theme', next); } catch {}
+            try { localStorage.setItem('bpm-theme', next); } catch { }
             updateThemeUI(next);
         }
 
@@ -3374,7 +3688,7 @@
 
         (function initTheme() {
             let saved = 'dark';
-            try { saved = localStorage.getItem('bpm-theme') || 'dark'; } catch {}
+            try { saved = localStorage.getItem('bpm-theme') || 'dark'; } catch { }
             document.documentElement.setAttribute('data-theme', saved);
             // Defer UI update until DOM ready
             if (document.readyState === 'loading') {
@@ -3428,7 +3742,7 @@
 
         // Hook into session start/stop to update refresh intervals
         const originalOpenSession = openSession;
-        openSession = async function(email, type, silent = false) {
+        openSession = async function (email, type, silent = false) {
             const result = await originalOpenSession(email, type, silent);
             // Trigger refresh after a short delay to allow backend to update status
             setTimeout(updateRefreshIntervals, 500);
@@ -3436,14 +3750,14 @@
         };
 
         const originalOpenRedem = openRedem;
-        openRedem = async function(email, btn) {
+        openRedem = async function (email, btn) {
             const result = await originalOpenRedem(email, btn);
             setTimeout(updateRefreshIntervals, 500);
             return result;
         };
 
         const originalStopSession = stopSession;
-        stopSession = async function(email, type) {
+        stopSession = async function (email, type) {
             const result = await originalStopSession(email, type);
             // Check intervals after session stops
             setTimeout(updateRefreshIntervals, 1000);
@@ -3457,8 +3771,13 @@
     </script>
     <style>
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </body>
