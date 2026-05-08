@@ -30,6 +30,10 @@ const projectRoot = getProjectRoot(__dirname)
 const args = parseArgs()
 const { data: config, path: configPath } = loadConfig(projectRoot, args.dev || false)
 
+// === CONFIG: Thay đổi URL đích ở đây ===
+const urlRef = 'https://rewards.bing.com/welcome?rh=45F6AD&ref=rafsrchae'
+const groupRegister = 'EdgeV6'
+
 let lastRotatedProxy = null // Cache last successful proxy for multi-slot reuse
 
 // --- Persistence logic for new config fields ---
@@ -56,74 +60,156 @@ if ((args.rotationUrl && !config.proxyRotationUrl) || (args.otpKey && !config.ap
 async function rotateProxy(url, maxWaitMs = 360000) {
     if (!url) return null
 
-    const attempt = async () => {
+    const started = Date.now()
+    let networkRetries = 0
+    const maxNetworkRetries = 5
+
+    while (true) {
         try {
             log('INFO', 'Rotating proxy...')
-            const response = await axios.get(url)
-            if (response.data.status === 'success' || response.data.success === true) {
-                const proxyStr = response.data.proxy
+            const response = await axios.get(url, { timeout: 15000 })
+            const data = response.data
+            networkRetries = 0 // reset on successful HTTP response
+
+            // SUCCESS
+            if (data.status === 'success' || data.success === true) {
+                const proxyStr = data.proxy
                 if (proxyStr) {
                     const parts = proxyStr.split(':')
-                    log('SUCCESS', `Proxy Rotated: ${parts[0]}:${parts[1]} | IP: ${response.data.ip || 'Unknown'}`)
+                    log('SUCCESS', `Proxy Rotated: ${parts[0]}:${parts[1]} | IP: ${data.ip || 'Unknown'}`)
                     return {
                         server: `http://${parts[0]}:${parts[1]}`,
                         host: parts[0],
                         port: parts[1],
                         username: parts[2],
                         password: parts[3],
-                        isProxyV6: (response.data.ip && response.data.ip.includes(':')) || parts[0].includes(':')
+                        isProxyV6: (data.ip && data.ip.includes(':')) || parts[0].includes(':')
                     }
                 } else {
                     log('SUCCESS', 'Proxy rotation triggered successfully (Static Proxy)')
                     return { triggerOnly: true }
                 }
-            } else {
-                const msg = response.data.message || response.data.msg || ''
-                // Parse cooldown: e.g. "Chưa tới thời gian xoay: 36s" or "wait 120 seconds"
-                const match = msg.match(/(\d+)\s*s(econds?)?/i)
-                const cooldownSec = match ? parseInt(match[1]) : null
-                return { cooldownSec, errorMsg: msg }
             }
+
+            // RATE LIMIT or cooldown — use retry_after if present
+            const msg = data.message || data.msg || ''
+            let waitSec = null
+            if (data.retry_after) {
+                waitSec = parseInt(data.retry_after)
+                log('WARN', `Proxy rate limited (${data.error_code || 'COOLDOWN'}). retry_after=${waitSec}s — ${msg}`)
+            } else {
+                // Parse from message: "36s", "120 seconds", "4 minutes"
+                const mMin = msg.match(/(\d+)\s*minute/i)
+                const mSec = msg.match(/(\d+)\s*s(ec(ond)?s?)?/i)
+                if (mMin) waitSec = parseInt(mMin[1]) * 60
+                else if (mSec) waitSec = parseInt(mSec[1])
+                log('WARN', `Proxy rotation not ready (wait ${waitSec ?? '?'}s): ${msg}`)
+            }
+
+            const waitMs = waitSec ? (waitSec + 3) * 1000 : 30000
+            if (Date.now() - started + waitMs > maxWaitMs) {
+                log('ERROR', `Proxy rotation aborted (max wait exceeded): ${msg}`)
+                return null
+            }
+            log('INFO', `Waiting ${Math.round(waitMs / 1000)}s before retry...`)
+            await new Promise(r => setTimeout(r, waitMs))
+
         } catch (e) {
-            log('ERROR', `Proxy rotation request failed: ${e.message}`)
-            return null
+            networkRetries++
+            log('WARN', `Proxy rotation network error (${networkRetries}/${maxNetworkRetries}): ${e.message}`)
+            if (networkRetries >= maxNetworkRetries) {
+                log('ERROR', `Proxy rotation aborted after ${maxNetworkRetries} consecutive network failures`)
+                return null
+            }
+            const retryDelay = Math.min(5000 * networkRetries, 30000) // 5s → 10s → 15s → 20s → 25s
+            log('INFO', `Retrying rotation in ${retryDelay / 1000}s...`)
+            await new Promise(r => setTimeout(r, retryDelay))
         }
-    }
-
-    const started = Date.now()
-    while (true) {
-        const result = await attempt()
-        if (!result) return null                         // network error
-        if (!result.cooldownSec && !result.errorMsg) return result // success
-        if (result.triggerOnly) return result
-
-        const waitMs = result.cooldownSec ? (result.cooldownSec + 5) * 1000 : 0
-        if (!waitMs || Date.now() - started + waitMs > maxWaitMs) {
-            log('ERROR', `Proxy rotation failed: ${result.errorMsg || 'Unknown error'}`)
-            return null
-        }
-        log('INFO', `Proxy cooldown active (${result.cooldownSec}s). Waiting before retry...`)
-        await new Promise(r => setTimeout(r, waitMs))
     }
 }
 
-async function createOtpOrder(apiKey, retries = 5) {
+function isEmailBotLike(email) {
+    const name = email.split('@')[0].toLowerCase()
+    const letters = name.replace(/[^a-z]/g, '')
+    const vowels = letters.replace(/[^aeiou]/g, '')
+    const digits = name.replace(/[^0-9]/g, '')
+
+    if (name.length > 18) return `name too long (${name.length} chars)`
+    if (digits.length > 4) return `too many digits (${digits.length})`
+    if (letters.length >= 5 && vowels.length / letters.length < 0.20)
+        return `low vowel ratio (${vowels.length}/${letters.length} letters)`
+    if (/[^aeiou]{5,}/.test(letters)) return `5+ consecutive consonants`
+    return null
+}
+
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+
+function extractNameFromEmail(email) {
+    const raw = email.split('@')[0].toLowerCase()
+    const base = raw.replace(/\d+$/, '') // strip trailing digits
+
+    // Separator-based split: john.doe / john_doe / john-doe
+    const sepMatch = base.match(/^([a-z]{2,})[-._]([a-z]{2,})/)
+    if (sepMatch) {
+        return { firstName: capitalize(sepMatch[1]), lastName: capitalize(sepMatch[2]) }
+    }
+
+    // Dictionary prefix match (longest first for greedy match)
+    const NAMES = [
+        // VN transliterated
+        'nguyen', 'hoang', 'phuong', 'thanh', 'trang', 'minh', 'hung',
+        'dung', 'tuan', 'quang', 'linh', 'hieu', 'thao', 'huong',
+        'ngoc', 'vinh', 'cuong', 'khoi', 'thinh', 'tien', 'khoa',
+        'long', 'son', 'van', 'bao', 'duc', 'lan', 'nhi', 'ha',
+        'tran', 'le', 'pham', 'huynh', 'phan', 'vu', 'vo', 'dang',
+        'bui', 'do', 'ho', 'ngo', 'duong', 'ly', 'quoc', 'dat',
+        'thang', 'tuyen', 'mai', 'dao', 'uyen', 'vy', 'khanh', 'phuc',
+        'tung', 'nhung', 'truc', 'quynh', 'tram', 'nhien', 'tuyen'
+    ].sort((a, b) => b.length - a.length) // longest match first
+
+    for (const first of NAMES) {
+        if (base.startsWith(first) && base.length > first.length + 1) {
+            const rest = base.slice(first.length).replace(/^\d+/, '').replace(/\d+$/, '')
+            if (rest.length >= 2 && /^[a-z]+$/.test(rest)) {
+                return { firstName: capitalize(first), lastName: capitalize(rest) }
+            }
+        }
+    }
+
+    return null // fallback to random
+}
+
+async function createOtpOrder(apiKey, maxAttempts = 10) {
     if (!apiKey) return null
-    for (let i = 0; i < retries; i++) {
+    let apiFailures = 0
+    for (let i = 0; i < maxAttempts; i++) {
         try {
-            log('INFO', `Renting Gmail for OTP... (Attempt ${i + 1}/${retries})`)
+            log('INFO', `Renting Gmail for OTP... (Attempt ${i + 1}/${maxAttempts})`)
             const response = await axios.get(`https://api.shopgmail9999.com/api/ApiV2/CreateOrder?apikey=${apiKey}&service=microsoft`)
             if (response.data.status === 'success') {
-                return response.data.data // { email, orderid, ... }
+                const data = response.data.data // { email, orderid, ... }
+                const botReason = isEmailBotLike(data.email)
+                if (botReason) {
+                    log('WARN', `Skipping bot-like email: ${data.email} (${botReason}). Getting new one...`)
+                    await new Promise(r => setTimeout(r, 3000))
+                    continue
+                }
+                return data
             } else {
                 log('WARN', `OTP Order failed: ${response.data.msg}. Retrying in 15s...`)
+                if (++apiFailures >= 3) return null
+                await new Promise(r => setTimeout(r, 15000))
             }
         } catch (e) {
             const errorMsg = e.response?.data?.msg || e.message
             log('ERROR', `OTP Order error (400?): ${errorMsg}. Retrying in 15s...`)
+            if (++apiFailures >= 3) return null
+            await new Promise(r => setTimeout(r, 15000))
         }
-        if (i < retries - 1) await new Promise(r => setTimeout(r, 15000))
     }
+    log('ERROR', `Could not get a valid Gmail after ${maxAttempts} attempts`)
     return null
 }
 
@@ -183,7 +269,9 @@ async function fluentUIClick(page, selector) {
         await element.click({ delay: getRandomInt(50, 150) })
     } catch (e) {
         // Fallback to Enter if click fails (Fluent UI quirk)
-        await page.keyboard.press('Enter')
+        if (!page.isClosed()) {
+            await page.keyboard.press('Enter').catch(() => { })
+        }
     }
     await page.waitForTimeout(getRandomInt(1000, 2000)) // Wait for UI transition
 }
@@ -196,7 +284,29 @@ async function waitForPageStable(page, timeout = 10000) {
     } catch (e) { }
 }
 
-async function getIpLocation(proxy) {
+function normalizeTimezone(tz) {
+    if (!tz || typeof tz !== 'string') return 'UTC'
+    // Đã là IANA ID (có chứa '/') → trả về luôn
+    if (tz.includes('/')) return tz
+    // Convert UTC offset (+07:00, -05:00, ...) → IANA ID
+    const offsetMap = {
+        '-12:00': 'Etc/GMT+12', '-11:00': 'Pacific/Pago_Pago', '-10:00': 'Pacific/Honolulu',
+        '-09:00': 'America/Anchorage', '-08:00': 'America/Los_Angeles', '-07:00': 'America/Denver',
+        '-06:00': 'America/Chicago', '-05:00': 'America/New_York', '-04:00': 'America/Halifax',
+        '-03:00': 'America/Sao_Paulo', '-02:00': 'Atlantic/South_Georgia', '-01:00': 'Atlantic/Azores',
+        '+00:00': 'UTC', '+01:00': 'Europe/Paris', '+02:00': 'Europe/Kiev',
+        '+03:00': 'Europe/Moscow', '+03:30': 'Asia/Tehran', '+04:00': 'Asia/Dubai',
+        '+04:30': 'Asia/Kabul', '+05:00': 'Asia/Karachi', '+05:30': 'Asia/Kolkata',
+        '+05:45': 'Asia/Kathmandu', '+06:00': 'Asia/Dhaka', '+06:30': 'Asia/Rangoon',
+        '+07:00': 'Asia/Bangkok', '+08:00': 'Asia/Shanghai', '+08:45': 'Australia/Eucla',
+        '+09:00': 'Asia/Tokyo', '+09:30': 'Australia/Darwin', '+10:00': 'Australia/Sydney',
+        '+10:30': 'Australia/Lord_Howe', '+11:00': 'Pacific/Noumea', '+12:00': 'Pacific/Auckland',
+        '+13:00': 'Pacific/Apia', '+14:00': 'Pacific/Kiritimati'
+    }
+    return offsetMap[tz] || 'UTC'
+}
+
+async function getIpLocation(proxy, knownIp = null) {
     const isNoProxy = !proxy || !proxy.server
     const hostPart = isNoProxy ? '' : proxy.server.replace(/^(https?|socks[45]):\/\//i, '').split(':')[0]
     const isV6 = !isNoProxy && (proxy.isProxyV6 || hostPart.includes('[') || (hostPart.includes(':') && !hostPart.includes('.')))
@@ -205,11 +315,14 @@ async function getIpLocation(proxy) {
         log('INFO', 'IPv6 Proxy detected. Location sync might be slow or fail.')
     }
 
+    const IP2LOCATION_KEY = '6629706EAD9DB314262AA7FA68098760'
+
     const services = [
-        'http://api64.ipify.org?format=json',
-        'http://ip.nf/me.json',
-        'http://ip-api.com/json',
-        'https://ipinfo.io/json'
+        { url: 'https://ipwho.is/', parse: d => ({ city: d.city || '', country: d.country || '', timezone: d.timezone?.id || 'UTC', lat: parseFloat(d.latitude || 0), lon: parseFloat(d.longitude || 0) }) },
+        { url: 'https://freeipapi.com/api/json', parse: d => ({ city: d.cityName || '', country: d.countryName || '', timezone: d.timeZone || 'UTC', lat: parseFloat(d.latitude || 0), lon: parseFloat(d.longitude || 0) }) },
+        { url: 'https://ipapi.co/json/', parse: d => ({ city: d.city || '', country: d.country_name || '', timezone: d.timezone || 'UTC', lat: parseFloat(d.latitude || 0), lon: parseFloat(d.longitude || 0) }) },
+        { url: 'http://ip-api.com/json', parse: d => ({ city: d.city || '', country: d.country || '', timezone: d.timezone || 'UTC', lat: parseFloat(d.lat || 0), lon: parseFloat(d.lon || 0) }) },
+        { url: 'https://ipwhois.app/json/', parse: d => ({ city: d.city || '', country: d.country || '', timezone: d.timezone || 'UTC', lat: parseFloat(d.latitude || 0), lon: parseFloat(d.longitude || 0) }) }
     ]
 
     try {
@@ -239,33 +352,70 @@ async function getIpLocation(proxy) {
             log('INFO', 'Syncing location and timezone with Direct IP...')
         }
 
-        for (const url of services) {
+        // --- ip2location: dùng IP đã biết từ health check, hoặc detect lại nếu chưa có ---
+        try {
+            let detectedIp = knownIp || null
+            if (!detectedIp) {
+                const ipDetectEndpoints = [
+                    { url: 'http://ip-api.com/json', extract: d => d.query },
+                    { url: 'http://ipwho.is/', extract: d => d.ip },
+                    { url: 'https://api64.ipify.org?format=json', extract: d => d.ip }
+                ]
+                for (const ep of ipDetectEndpoints) {
+                    try {
+                        const ipRes = await axios.get(ep.url, {
+                            httpsAgent: axiosAgent,
+                            httpAgent: axiosAgent,
+                            timeout: isV6 ? 15000 : 8000
+                        })
+                        const ip = ep.extract(ipRes.data)
+                        if (ip) { detectedIp = ip; break }
+                    } catch { /* try next */ }
+                }
+            }
+
+            if (detectedIp) {
+                const geoRes = await axios.get(`https://api.ip2location.io/?key=${IP2LOCATION_KEY}&ip=${detectedIp}&format=json`, {
+                    timeout: 10000
+                })
+                const d = geoRes.data
+                const data = {
+                    city: d.city_name || '',
+                    country: d.country_name || '',
+                    timezone: normalizeTimezone(d.time_zone),
+                    lat: parseFloat(d.latitude || 0),
+                    lon: parseFloat(d.longitude || 0)
+                }
+                if (data.lat !== 0 || data.timezone !== 'UTC') {
+                    log('SUCCESS', `Location: ${data.city}, ${data.country} | Timezone: ${data.timezone} (via ip2location.io | IP: ${detectedIp})`)
+                    return data
+                }
+            } else {
+                log('WARN', 'ip2location.io skipped: could not detect proxy IP')
+            }
+        } catch (e) {
+            log('WARN', `ip2location.io failed: ${e.message}`)
+        }
+
+        for (const svc of services) {
             try {
-                const response = await axios.get(url, {
+                const response = await axios.get(svc.url, {
                     httpsAgent: axiosAgent,
                     httpAgent: axiosAgent,
                     timeout: isV6 ? 20000 : 12000
                 })
 
                 if (response.data) {
-                    const d = response.data
-                    // Normalize different API responses
-                    const data = {
-                        city: d.city || '',
-                        country: d.country || d.country_name || '',
-                        timezone: d.timezone || d.ip?.timezone || 'UTC',
-                        lat: parseFloat(d.lat || d.latitude || d.ip?.latitude || 0),
-                        lon: parseFloat(d.lon || d.longitude || d.ip?.longitude || 0)
-                    }
+                    const data = svc.parse(response.data)
 
                     if (data.lat !== 0 || data.timezone !== 'UTC') {
-                        log('SUCCESS', `Location: ${data.city}, ${data.country} | Timezone: ${data.timezone} (via ${new URL(url).hostname})`)
+                        log('SUCCESS', `Location: ${data.city}, ${data.country} | Timezone: ${data.timezone} (via ${new URL(svc.url).hostname})`)
                         return data
                     }
                 }
             } catch (e) {
                 const status = e.response?.status
-                log('WARN', `IP API (${new URL(url).hostname}) failed: ${e.message}${status ? ` (Status: ${status})` : ''}`)
+                log('WARN', `IP API (${new URL(svc.url).hostname}) failed: ${e.message}${status ? ` (Status: ${status})` : ''}`)
                 continue
             }
         }
@@ -347,6 +497,58 @@ async function main() {
         throw new Error(`Proxy in use: ${proxyKey}`)
     }
 
+    // 1.5. Proxy health check trước khi rent Gmail
+    let detectedProxyIp = null
+    if (effectiveProxy) {
+        log('INFO', 'Checking proxy connectivity...')
+        try {
+            const { HttpsProxyAgent } = await import('https-proxy-agent')
+            const { HttpProxyAgent } = await import('http-proxy-agent')
+            const { SocksProxyAgent } = await import('socks-proxy-agent')
+
+            const serverUrl = effectiveProxy.server.includes('://') ? effectiveProxy.server : `http://${effectiveProxy.server}`
+            const urlObj = new URL(serverUrl)
+            let proxyUrl = serverUrl
+            if (effectiveProxy.username && effectiveProxy.password) {
+                proxyUrl = `${urlObj.protocol}//${encodeURIComponent(effectiveProxy.username)}:${encodeURIComponent(effectiveProxy.password)}@${urlObj.host}`
+            }
+            let agent
+            if (urlObj.protocol === 'socks4:' || urlObj.protocol === 'socks5:') {
+                agent = new SocksProxyAgent(proxyUrl)
+            } else if (urlObj.protocol === 'https:') {
+                agent = new HttpsProxyAgent(proxyUrl)
+            } else {
+                agent = new HttpProxyAgent(proxyUrl)
+            }
+
+            const checkEndpoints = [
+                'http://ip-api.com/json',
+                'http://ipapi.co/json/',
+                'http://ipwho.is/'
+            ]
+            let proxyOk = false
+            for (const ep of checkEndpoints) {
+                try {
+                    const checkRes = await axios.get(ep, {
+                        httpsAgent: agent,
+                        httpAgent: agent,
+                        timeout: 10000
+                    })
+                    const ip = checkRes.data?.query || checkRes.data?.ip || checkRes.data?.IPv4 || null
+                    if (ip) detectedProxyIp = ip
+                    log('SUCCESS', `Proxy OK — detected IP: ${ip || '?'} (via ${new URL(ep).hostname})`)
+                    proxyOk = true
+                    break
+                } catch { /* try next */ }
+            }
+            if (!proxyOk) throw new Error('All health check endpoints failed')
+        } catch (e) {
+            log('ERROR', `Proxy health check FAILED: ${e.message}`)
+            releaseProxyLock(proxyKey, projectRoot)
+            throw new Error(`Proxy not working: ${e.message}`)
+        }
+    }
+
     // 2. Order OTP
     const otpKey = config.apiOtpKey || args.otpKey
     const order = await createOtpOrder(otpKey)
@@ -390,7 +592,7 @@ async function main() {
         } : {},
         geoLocale: 'auto',
         langCode: 'vi',
-        group: 'AutoChinh',
+        group: groupRegister,
         saveFingerprint: { mobile: args.mobile || false, desktop: !(args.mobile || false) }
     }
     saveAccount(projectRoot, initialAccount, args.dev || false)
@@ -408,13 +610,17 @@ async function main() {
         '--disable-web-authentication-ui',
         '--disable-external-intent-requests',
         '--disable-blink-features=Attestation',
-        '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys,WebAuthenticationProxy,U2F',
+        '--disable-features=WebAuthentication,PasswordManagerOnboarding,PasswordManager,EnablePasswordsAccountStorage,Passkeys,WebAuthenticationProxy,U2F,msEdgeSync,EdgeIdentityConsistency,EdgeSyncConsent',
         '--disable-save-password-bubble',
+        '--disable-sync',
         '--window-size=1920,1080'
     ]
 
+    const browserType = config.browserType ?? 'chromium'
+
     const browser = await chromium.launch({
         headless: false,
+        channel: browserType === 'edge' ? 'msedge' : undefined,
         proxy: effectiveProxy || undefined,
         args: [...BROWSER_ARGS]
     })
@@ -426,7 +632,6 @@ async function main() {
     })
 
     let fingerprint = null
-    const browserType = config.browserType ?? 'chromium'
     const fingerprintBrowser = browserType === 'edge' ? 'edge' : 'chrome'
 
     const isMobile = args.mobile || false
@@ -495,7 +700,7 @@ async function main() {
         }
     }
 
-    const ipLocation = await getIpLocation(effectiveProxy)
+    const ipLocation = await getIpLocation(effectiveProxy, detectedProxyIp)
     if (!ipLocation && !((args.geo || 'US').toLowerCase() === 'vi')) {
         log('ERROR', 'Stopping flow to prevent IP leak. Deleting account info...')
         deleteAccount(projectRoot, email, args.dev || false)
@@ -641,13 +846,14 @@ async function main() {
 
         // Click next/submit
         const submitSelector = 'input[type="submit"], button[type="submit"], #nextbutton'
-        await fluentUIClick(page, submitSelector)
-        await waitForPageStable(page)
+        //await fluentUIClick(page, submitSelector)
+        //await waitForPageStable(page)
         await page.waitForTimeout(getRandomInt(3000, 5000))
         // 6. Birth Date (Custom Dropdowns)
         log('INFO', 'Filling Birth Date...')
         await page.waitForSelector('[data-testid="birthdateControls"], #BirthMonthDropdown', { state: 'visible', timeout: 30000 })
         log('INFO', 'Birthdate controls visible')
+        await waitForPageStable(page, 5000)
 
         const day = String(getRandomInt(1, 25)) // Avoid 29-31 for safety
         const monthIndex = getRandomInt(1, 12)
@@ -697,7 +903,7 @@ async function main() {
                 },
                 btnSelector,
                 { timeout: 5000 }
-            ).catch(() => {})
+            ).catch(() => { })
             await page.waitForTimeout(getRandomInt(700, 1200))
         }
 
@@ -721,108 +927,57 @@ async function main() {
         await fluentUIClick(page, submitSelector)
         await waitForPageStable(page)
         await page.waitForTimeout(getRandomInt(2000, 4000))
-        // 8. Name - Vietnamese + English Random (Expanded List)
+        // 8. Name - Vietnamese Random (Filtered for common names)
         const lastNames = [
-            // Phổ biến nhất (VN)
+            // Phổ biến nhất (Top 16 họ chiếm hơn 90% dân số VN)
             'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 'Vũ', 'Võ', 'Đặng',
-            'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Lưu', 'Trương', 'Đinh', 'Cao',
-            // Khá phổ biến (VN)
-            'Phùng', 'Chu', 'Trịnh', 'Quách', 'Đào', 'Hà', 'Tạ', 'Lương', 'Mai', 'Liễu',
-            'Lục', 'Lâm', 'Đoàn', 'Kiều', 'Thái', 'Vương', 'Tống', 'Tô', 'Từ', 'Mạc',
-            'Châu', 'Phó', 'Hứa', 'Nghiêm', 'Âu', 'Diệp', 'Sầm', 'Giáp', 'Thân', 'Thạch',
-            // Ít phổ biến hơn (VN)
-            'Nông', 'Vi', 'Đoàn', 'Lã', 'Đới', 'Chiêu', 'Vương', 'Ông', 'Bạch', 'La',
-            'Văn', 'Kim', 'Đường', 'Tề', 'Khuất', 'Tưởng', 'Đồng', 'Khổng', 'Trang', 'Biên',
-            'Chung', 'Cái', 'Lại', 'Mã', 'Liêu', 'Trịnh', 'Hình', 'Hoa', 'Triệu', 'Thẩm',
-            // English / Western
-            'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
-            'Rodriguez', 'Martinez', 'Taylor', 'Anderson', 'Thomas', 'Jackson', 'White',
-            'Harris', 'Martin', 'Thompson', 'Robinson', 'Clark', 'Lewis', 'Lee', 'Walker',
-            'Hall', 'Allen', 'Young', 'Hernandez', 'King', 'Wright', 'Lopez', 'Hill', 'Scott',
-            'Green', 'Adams', 'Baker', 'Gonzalez', 'Nelson', 'Carter', 'Mitchell', 'Perez',
-            'Roberts', 'Turner', 'Phillips', 'Campbell', 'Parker', 'Evans', 'Edwards', 'Collins',
-            'Stewart', 'Sanchez', 'Morris', 'Rogers', 'Reed', 'Cook', 'Morgan', 'Bell', 'Murphy',
-            'Bailey', 'Rivera', 'Cooper', 'Richardson', 'Cox', 'Howard', 'Ward', 'Torres', 'Peterson',
-            'Gray', 'Ramirez', 'James', 'Watson', 'Brooks', 'Kelly', 'Sanders', 'Price', 'Bennett',
-            'Wood', 'Barnes', 'Ross', 'Henderson', 'Coleman', 'Jenkins', 'Perry', 'Powell', 'Long',
-            'Patterson', 'Hughes', 'Flores', 'Washington', 'Butler', 'Simmons', 'Foster', 'Gonzales',
-            'Bryant', 'Alexander', 'Russell', 'Griffin', 'Diaz', 'Hayes'
+            'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý'
         ]
 
         // Tên đệm
         const middleNames = [
-            // VN
             'Thị', 'Văn', 'Đức', 'Thành', 'Minh', 'Quang', 'Anh', 'Bảo', 'Hữu', 'Công',
             'Ngọc', 'Tiến', 'Phước', 'Thế', 'Trung', 'Xuân', 'Như', 'Mỹ', 'Thanh', 'Tấn',
             'Phú', 'Gia', 'Hồng', 'Khắc', 'Nhật', 'Trọng', 'Hoài', 'Bích', 'Kim', 'Tú',
-            'Đình', 'Xuân', 'Hoàng', 'Kiều', 'Tuấn', 'Nhã', 'Đan', 'Thủy', 'Hải', 'Song',
-            // EN
-            'Alan', 'Edward', 'Rose', 'Grace', 'Lee', 'Ray', 'Lynn', 'Marie', 'Ann', 'Jane',
-            'Joseph', 'Charles', 'Thomas', 'Alexander', 'William', 'James', 'Arthur', 'David',
-            'Elizabeth', 'Claire', 'Louise', 'Victoria', 'Mae', 'Renee', 'Kate', 'Faith'
+            'Đình', 'Xuân', 'Hoàng', 'Kiều', 'Tuấn', 'Nhã', 'Đan', 'Thủy', 'Hải', 'Song'
         ]
 
         // Tên chính đa dạng (nam + nữ)
         const givenNamesMale = [
-            // VN
             'Hùng', 'Dũng', 'Tuấn', 'Minh', 'Nam', 'Phong', 'Sơn', 'Quân', 'Huy', 'Long',
             'Vinh', 'Đạt', 'Cường', 'Hiếu', 'Nghĩa', 'Khôi', 'Bình', 'Thịnh', 'Tiến', 'Tài',
             'Quang', 'Quốc', 'Thắng', 'Khải', 'Sang', 'Trung', 'Tú', 'Việt', 'Hải', 'Thành',
             'Duy', 'Bảo', 'Đức', 'Nhân', 'Trọng', 'Khánh', 'Tâm', 'Hòa', 'Thạch', 'Tấn',
             'Phúc', 'Gia', 'Khoa', 'Lộc', 'Phước', 'Thế', 'Nhật', 'Quý', 'Hậu', 'Thiện',
-            'Lâm', 'Cẩm', 'Đăng', 'Mạnh', 'Vũ', 'Tín', 'Nhân', 'Hào', 'Kiên', 'Lực',
-            'Dương', 'Hưng', 'Toàn', 'Tùng', 'Quân', 'Trí', 'Tùng', 'Đạo', 'Nguyên', 'Hào',
-            'Phát', 'Khang', 'Đại', 'Chính', 'Bằng', 'Doanh', 'Quyết', 'Thái', 'Kỷ', 'Sỹ',
-            // EN
-            'James', 'Robert', 'John', 'Michael', 'David', 'William', 'Richard', 'Joseph',
-            'Thomas', 'Charles', 'Christopher', 'Daniel', 'Matthew', 'Anthony', 'Mark', 'Donald',
-            'Steven', 'Paul', 'Andrew', 'Joshua', 'Kenneth', 'Kevin', 'Brian', 'George', 'Timothy',
-            'Ronald', 'Edward', 'Jason', 'Jeffrey', 'Ryan', 'Jacob', 'Gary', 'Nicholas', 'Eric',
-            'Jonathan', 'Stephen', 'Larry', 'Justin', 'Scott', 'Brandon', 'Benjamin', 'Samuel',
-            'Gregory', 'Alexander', 'Frank', 'Patrick', 'Raymond', 'Jack', 'Dennis', 'Jerry',
-            'Tyler', 'Aaron', 'Jose', 'Adam', 'Henry', 'Nathan', 'Douglas', 'Zachary', 'Peter',
-            'Kyle', 'Walter', 'Ethan', 'Jeremy', 'Harold', 'Keith', 'Christian', 'Roger', 'Noah',
-            'Gerald', 'Carl', 'Terry', 'Sean', 'Austin', 'Arthur', 'Lawrence', 'Jesse', 'Dylan',
-            'Bryan', 'Joe', 'Jordan', 'Billy', 'Bruce', 'Albert', 'Willie', 'Gabriel', 'Logan',
-            'Alan', 'Juan', 'Wayne', 'Ralph', 'Roy', 'Eugene', 'Randy', 'Vincent', 'Russell',
-            'Louis', 'Philip', 'Bobby', 'Johnny', 'Bradley'
+            'Lâm', 'Cẩm', 'Đăng', 'Mạnh', 'Vũ', 'Tín', 'Nhân', 'Hào', 'Kiên', 'Lực'
         ]
         const givenNamesFemale = [
-            // VN
             'Linh', 'Hương', 'Ngọc', 'Thảo', 'Lan', 'Oanh', 'Phương', 'Hạnh', 'Tuyết', 'Yên',
             'My', 'Ngân', 'Uyên', 'Vy', 'Xuân', 'Trâm', 'Diệp', 'Hà', 'Hân', 'Thụy',
             'Chi', 'Giang', 'Kim', 'Mai', 'Anh', 'Lệ', 'Vân', 'Nhi', 'Quỳnh', 'Nhung',
             'Trang', 'Huệ', 'Duyên', 'Phượng', 'Thương', 'Như', 'Bích', 'Cẩm', 'Mỹ', 'Hoa',
             'Thanh', 'Thu', 'Lý', 'Tiên', 'Yến', 'Hồng', 'Trinh', 'Loan', 'Thắm', 'Hiền',
-            'Thùy', 'Châu', 'Ngà', 'Khánh', 'Tú', 'Nhàn', 'Thơm', 'Hoài', 'Tâm', 'Lam',
-            'Thẩm', 'Nguyệt', 'Bảo', 'Hà', 'Trúc', 'Liên', 'Thủy', 'Thái', 'Phúc', 'Ân',
-            'Băng', 'Diễm', 'Khuê', 'Cát', 'Uyển', 'Giao', 'Chuyên', 'Tuyền', 'Mơ', 'Mận',
-            // EN
-            'Mary', 'Patricia', 'Jennifer', 'Linda', 'Elizabeth', 'Barbara', 'Susan', 'Jessica',
-            'Sarah', 'Karen', 'Lisa', 'Nancy', 'Betty', 'Margaret', 'Sandra', 'Ashley', 'Kimberly',
-            'Emily', 'Donna', 'Michelle', 'Carol', 'Amanda', 'Dorothy', 'Melissa', 'Deborah',
-            'Stephanie', 'Rebecca', 'Sharon', 'Laura', 'Cynthia', 'Kathleen', 'Amy', 'Angela',
-            'Shirley', 'Anna', 'Brenda', 'Pamela', 'Emma', 'Nicole', 'Helen', 'Samantha', 'Katherine',
-            'Christine', 'Debra', 'Rachel', 'Carolyn', 'Janet', 'Catherine', 'Maria', 'Heather',
-            'Diane', 'Ruth', 'Julie', 'Olivia', 'Joyce', 'Virginia', 'Victoria', 'Kelly', 'Lauren',
-            'Christina', 'Joan', 'Evelyn', 'Judith', 'Megan', 'Cheryl', 'Andrea', 'Hannah', 'Martha',
-            'Jacqueline', 'Frances', 'Gloria', 'Ann', 'Teresa', 'Kathryn', 'Sara', 'Janice', 'Jean',
-            'Alice', 'Madison', 'Doris', 'Abigail', 'Julia', 'Judy', 'Grace', 'Denise', 'Amber',
-            'Marilyn', 'Beverly', 'Danielle', 'Theresa', 'Sophia', 'Marie', 'Diana', 'Brittany',
-            'Natalie', 'Isabella', 'Charlotte', 'Rose', 'Alexis', 'Kayla'
+            'Thùy', 'Châu', 'Ngà', 'Khánh', 'Tú', 'Nhàn', 'Thơm', 'Hoài', 'Tâm', 'Lam'
         ]
 
-        // Sinh ngẫu nhiên: kết hợp tên đệm + tên chính (có thể có hoặc không có tên đệm)
-        const lastName = lastNames[getRandomInt(0, lastNames.length - 1)]
-        const useMiddle = Math.random() > 0.45 // ~55% có tên đệm
-        const isMale = Math.random() > 0.5
-        const givenName = isMale
-            ? givenNamesMale[getRandomInt(0, givenNamesMale.length - 1)]
-            : givenNamesFemale[getRandomInt(0, givenNamesFemale.length - 1)]
-        const middle = middleNames[getRandomInt(0, middleNames.length - 1)]
-        const firstName = useMiddle ? `${middle} ${givenName}` : givenName
-
-        log('INFO', `Entering Name: ${lastName} ${firstName}`)
+        // Try to derive name from email first, fallback to random
+        const extractedName = extractNameFromEmail(email)
+        let firstName, lastName
+        if (extractedName) {
+            firstName = extractedName.firstName
+            lastName = extractedName.lastName || lastNames[getRandomInt(0, lastNames.length - 1)]
+            log('INFO', `Using email-derived name: ${firstName} ${lastName}`)
+        } else {
+            const useMiddle = Math.random() > 0.45
+            const isMale = Math.random() > 0.5
+            const givenName = isMale
+                ? givenNamesMale[getRandomInt(0, givenNamesMale.length - 1)]
+                : givenNamesFemale[getRandomInt(0, givenNamesFemale.length - 1)]
+            const middle = middleNames[getRandomInt(0, middleNames.length - 1)]
+            firstName = useMiddle ? `${middle} ${givenName}` : givenName
+            lastName = lastNames[getRandomInt(0, lastNames.length - 1)]
+            log('INFO', `Using random name: ${firstName} ${lastName}`)
+        }
         const firstNameSelector = 'input[name="FirstName"], input#firstNameInput, input[name="firstNameInput"]'
         const lastNameSelector = 'input[name="LastName"], input#lastNameInput, input[name="lastNameInput"]'
 
@@ -928,6 +1083,17 @@ async function main() {
 
 
 
+            // --- b1. Handle Edge "Sign in to sync" dialog ---
+            try {
+                const noThanksBtn = page.locator('button:has-text("No, thanks"), button:has-text("No thanks")').first()
+                if (await noThanksBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    log('INFO', 'Edge sync dialog detected. Clicking "No, thanks"...')
+                    await noThanksBtn.click().catch(() => { })
+                    await page.waitForTimeout(1500)
+                    continue
+                }
+            } catch { /* not present */ }
+
             // --- b2. Handle Passkey / Security Prompts ---
             const passkeyRefused = await handlePasskeyPrompt(page)
             if (passkeyRefused) {
@@ -968,12 +1134,12 @@ async function main() {
                     try {
                         const btn = page.locator(sel).first()
                         if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                            await btn.scrollIntoViewIfNeeded().catch(() => {})
+                            await btn.scrollIntoViewIfNeeded().catch(() => { })
                             await page.waitForTimeout(getRandomInt(300, 600))
                             try {
                                 await btn.click({ timeout: 5000 })
                             } catch {
-                                await btn.focus().catch(() => {})
+                                await btn.focus().catch(() => { })
                                 await page.keyboard.press('Enter')
                             }
                             await page.waitForTimeout(3000)
@@ -1029,6 +1195,57 @@ async function main() {
             await page.waitForTimeout(3000)
         }
 
+        // Nếu vẫn không thấy form — kiểm tra xem có bị chặn ở màn hình KMSI không
+        if (!pwFormFound) {
+            const kmsiSelectors = [
+                '[data-testid="kmsiVideo"]',
+                'div:has-text("Stay signed in?")',
+                'div:has-text("Rester connecté")',
+                'input#idSIButton9',
+                'input[value="Yes"]'
+            ]
+            let kmsiDetectedNow = false
+            for (const sel of kmsiSelectors) {
+                if (await page.locator(sel).first().isVisible({ timeout: 1500 }).catch(() => false)) {
+                    kmsiDetectedNow = true
+                    break
+                }
+            }
+
+            if (kmsiDetectedNow) {
+                log('INFO', `KMSI screen detected after password form retries — handling it...`)
+                const kmsiYesSelectors = [
+                    'button[data-testid="primaryButton"]',
+                    'input#idSIButton9',
+                    'input[value="Yes"]',
+                    'button#idSIButton9'
+                ]
+                for (const sel of kmsiYesSelectors) {
+                    try {
+                        const btn = page.locator(sel).first()
+                        if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                            await btn.scrollIntoViewIfNeeded().catch(() => { })
+                            await page.waitForTimeout(getRandomInt(300, 600))
+                            try { await btn.click({ timeout: 5000 }) } catch {
+                                await btn.focus().catch(() => { })
+                                await page.keyboard.press('Enter')
+                            }
+                            log('INFO', `KMSI clicked. URL after: ${page.url()}`)
+                            await page.waitForTimeout(3000)
+                            break
+                        }
+                    } catch { /* try next */ }
+                }
+
+                // Navigate lại trang password và thử thêm lần nữa
+                await page.goto('https://account.live.com/password/Change?mkt=en-US&refd=account.microsoft.com&refp=security', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
+                await page.waitForTimeout(3000)
+                log('INFO', `Password page URL after KMSI: ${page.url()}`)
+                pwFormFound = await passwordInput.isVisible({ timeout: 8000 }).catch(() => false)
+                if (!pwFormFound) log('WARN', `Password form still not found after KMSI handling`)
+            }
+        }
+
         if (pwFormFound) {
             log('INFO', 'Form "Add a password" detected. Securing account...')
             await humanType(page, passwordInput, initialAccount.password)
@@ -1046,7 +1263,7 @@ async function main() {
 
         // 11. Activate Microsoft Rewards via Referral
         log('INFO', 'Activating Microsoft Rewards via referral link...')
-        await page.goto('https://rewards.bing.com/welcome?rh=FBF6AB43&ref=rafsrchae', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => { })
+        await page.goto(urlRef, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => { })
         await waitForPageStable(page)
         await page.waitForTimeout(getRandomInt(2000, 3000))
         log('INFO', `Rewards page URL: ${page.url()}`)
@@ -1132,7 +1349,7 @@ async function main() {
                     const touch = new Touch({ identifier: Date.now(), target: el, clientX: cx, clientY: cy, pageX: cx, pageY: cy, screenX: cx, screenY: cy, radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1 })
                     const touchInit = { bubbles: true, cancelable: true, view: window, touches: [touch], targetTouches: [touch], changedTouches: [touch] }
                     el.dispatchEvent(new TouchEvent('touchstart', touchInit))
-                    el.dispatchEvent(new TouchEvent('touchend',   { ...touchInit, touches: [], targetTouches: [] }))
+                    el.dispatchEvent(new TouchEvent('touchend', { ...touchInit, touches: [], targetTouches: [] }))
                     // Also fire click for fallback
                     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }))
                 })
@@ -1182,12 +1399,12 @@ async function main() {
 
         // Redeem SKU page
         log('INFO', 'Navigating to rewards redeem SKU page...')
-        await page.goto('https://rewards.bing.com/redeem/sku/000899012002', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
+        await page.goto('https://rewards.bing.com/redeem/sku/000899012002', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { })
         await page.waitForTimeout(getRandomInt(3000, 5000))
         log('INFO', `SKU page URL: ${page.url()}`)
 
         const dispatchTouchClick = async (el) => {
-            await el.scrollIntoViewIfNeeded().catch(() => {})
+            await el.scrollIntoViewIfNeeded().catch(() => { })
             await page.waitForTimeout(getRandomInt(200, 400))
             await el.evaluate((node) => {
                 const rect = node.getBoundingClientRect()
@@ -1473,7 +1690,7 @@ async function solveArkosePressAndHold(page) {
 
         if (challengeFrame) {
             // Wait for frame to be fully loaded
-            await challengeFrame.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+            await challengeFrame.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => { })
             await page.waitForTimeout(getRandomInt(1000, 2000))
 
             // --- Strategy 1: Accessibility bypass ---
@@ -1639,7 +1856,7 @@ async function solveArkosePressAndHold(page) {
 }
 
 // Entry point — supports -slot N to create multiple accounts sequentially
-;(async () => {
+; (async () => {
     const slots = parseInt(args.slot) || 1
     let succeeded = 0
     let failed = 0
